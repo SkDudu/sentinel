@@ -61,7 +61,7 @@ export class EnvironmentRepository {
       name: input.name.trim(),
       baseUrl: input.baseUrl.trim(),
       authType: input.authType ?? AuthType.NONE,
-      secretRef: input.secretRef ?? null,
+      secretRef: input.secretRef ?? `env:${id}:auth`,
       headersJson: JSON.stringify(input.headers ?? {}),
       productionSafetyMode: input.productionSafetyMode ?? false,
     });

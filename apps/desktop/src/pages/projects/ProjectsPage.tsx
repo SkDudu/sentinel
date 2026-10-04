@@ -15,6 +15,8 @@ export function ProjectsPage() {
     deleteProject,
     createEnvironment,
     deleteEnvironment,
+    setEnvironmentSecret,
+    clearEnvironmentSecret,
   } = useProjectStore();
 
   const [name, setName] = useState("");
@@ -27,6 +29,9 @@ export function ProjectsPage() {
   const [envBaseUrl, setEnvBaseUrl] = useState("http://localhost:3000");
   const [envAuthType, setEnvAuthType] = useState<string>(AuthType.NONE);
   const [envSafety, setEnvSafety] = useState(false);
+  const [envSecret, setEnvSecret] = useState("");
+  const [secretEnvId, setSecretEnvId] = useState<string | null>(null);
+  const [secretValue, setSecretValue] = useState("");
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
@@ -65,12 +70,14 @@ export function ProjectsPage() {
         baseUrl: envBaseUrl,
         authType: envAuthType,
         productionSafetyMode: envSafety,
+        secret: envSecret || undefined,
       });
       setEnvProjectId(null);
       setEnvName("Development");
       setEnvBaseUrl("http://localhost:3000");
       setEnvAuthType(AuthType.NONE);
       setEnvSafety(false);
+      setEnvSecret("");
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Erro ao criar ambiente");
     } finally {
@@ -261,29 +268,114 @@ export function ProjectsPage() {
                         project.environments.map((env) => (
                           <li
                             key={env.id}
-                            className="flex flex-wrap items-center justify-between gap-2 rounded border border-[var(--line)] px-3 py-2 font-mono text-xs text-[var(--muted)]"
+                            className="space-y-2 rounded border border-[var(--line)] px-3 py-2 font-mono text-xs text-[var(--muted)]"
                           >
-                            <span>
-                              {env.name}: {env.baseUrl}
-                              {env.productionSafetyMode ? " · safety" : ""}
-                              {" · "}
-                              {env.authType}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (
-                                  window.confirm(
-                                    `Remover ambiente "${env.name}"?`,
-                                  )
-                                ) {
-                                  void deleteEnvironment(env.id);
-                                }
-                              }}
-                              className="text-[var(--danger)]"
-                            >
-                              remover
-                            </button>
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span>
+                                {env.name}: {env.baseUrl}
+                                {env.productionSafetyMode ? " · safety" : ""}
+                                {" · "}
+                                {env.authType}
+                                {env.secretConfigured
+                                  ? " · secret ✓"
+                                  : env.authType !== "NONE"
+                                    ? " · sem secret"
+                                    : ""}
+                              </span>
+                              <div className="flex gap-2">
+                                {env.authType !== "NONE" && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSecretEnvId(env.id);
+                                      setSecretValue("");
+                                    }}
+                                    className="text-[var(--accent)]"
+                                  >
+                                    secret
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (
+                                      window.confirm(
+                                        `Remover ambiente "${env.name}"?`,
+                                      )
+                                    ) {
+                                      void deleteEnvironment(env.id);
+                                    }
+                                  }}
+                                  className="text-[var(--danger)]"
+                                >
+                                  remover
+                                </button>
+                              </div>
+                            </div>
+                            {secretEnvId === env.id && (
+                              <form
+                                className="flex flex-wrap gap-2 border-t border-[var(--line)] pt-2"
+                                onSubmit={(event) => {
+                                  event.preventDefault();
+                                  void (async () => {
+                                    setBusy(true);
+                                    try {
+                                      await setEnvironmentSecret(
+                                        env.id,
+                                        secretValue,
+                                      );
+                                      setSecretEnvId(null);
+                                      setSecretValue("");
+                                    } catch (err) {
+                                      setFormError(
+                                        err instanceof Error
+                                          ? err.message
+                                          : "Falha ao salvar secret",
+                                      );
+                                    } finally {
+                                      setBusy(false);
+                                    }
+                                  })();
+                                }}
+                              >
+                                <input
+                                  type="password"
+                                  required
+                                  value={secretValue}
+                                  onChange={(e) =>
+                                    setSecretValue(e.target.value)
+                                  }
+                                  placeholder="Token / API key"
+                                  className="min-w-[200px] flex-1 rounded-md border border-[var(--line)] bg-[var(--bg)] px-2 py-1"
+                                />
+                                <button
+                                  type="submit"
+                                  disabled={busy}
+                                  className="rounded-md bg-[var(--accent)] px-2 py-1 text-[#062016]"
+                                >
+                                  Salvar
+                                </button>
+                                {env.secretConfigured && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      void clearEnvironmentSecret(env.id).then(
+                                        () => setSecretEnvId(null),
+                                      );
+                                    }}
+                                    className="text-[var(--danger)]"
+                                  >
+                                    limpar
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => setSecretEnvId(null)}
+                                >
+                                  cancelar
+                                </button>
+                              </form>
+                            )}
                           </li>
                         ))
                       )}
@@ -339,6 +431,18 @@ export function ProjectsPage() {
                         />
                         Production Safety Mode
                       </label>
+                      {envAuthType !== AuthType.NONE && (
+                        <label className="block text-sm sm:col-span-2">
+                          Secret (vault criptografado — nunca no SQLite)
+                          <input
+                            type="password"
+                            value={envSecret}
+                            onChange={(e) => setEnvSecret(e.target.value)}
+                            className="mt-1 w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2 font-mono text-xs"
+                            placeholder="Bearer token ou API key"
+                          />
+                        </label>
+                      )}
                     </div>
                     <div className="flex gap-2">
                       <button

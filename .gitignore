@@ -30,6 +30,8 @@ Thumbs.db
 *.sqlite
 *.sqlite-journal
 data/
+*.vault
+.sentinel-key
 .security-workbench/
 
 # Tauri / Rust

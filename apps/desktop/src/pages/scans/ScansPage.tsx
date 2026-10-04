@@ -107,15 +107,22 @@ export function ScansPage() {
         </label>
 
         <label className="block text-sm">
-          Bearer token (opcional, só desta execução — não grava no SQLite)
+          Override de token (opcional — só desta execução; senão usa o vault do
+          ambiente)
           <input
             type="password"
             value={bearerToken}
             onChange={(e) => setBearerToken(e.target.value)}
             className="mt-1 w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2 font-mono text-xs"
-            placeholder="eyJhbGciOi..."
+            placeholder="deixe vazio para usar secret salvo"
           />
         </label>
+        {project.environments.find((e) => e.id === environmentId)
+          ?.secretConfigured && (
+          <p className="text-xs text-[var(--accent)]">
+            Secret configurado no vault para este ambiente.
+          </p>
+        )}
 
         <div>
           <p className="mb-2 text-sm text-[var(--muted)]">

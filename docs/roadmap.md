@@ -24,8 +24,9 @@ Objetivo: **projeto → OpenAPI → casos → run → findings** sem IA obrigat�
 - [x] Ligar orchestrator ao desktop
 - [x] Histórico básico de scans
 - [x] Findings com status (OPEN, etc.)
-- [ ] Auth Bearer/API Key com secret no keychain (ou store seguro)
-  - MVP: Bearer opcional por execução (não persiste no SQLite)
+- [x] Auth Bearer/API Key com store seguro (vault AES-256-GCM em `data/`)
+  - Override efêmero por scan ainda disponível
+  - Keychain nativo do SO → Fase 4 (Tauri)
 
 **Critério de pronto:** rodar um scan local contra uma API de staging/dev e ver findings na UI.
 

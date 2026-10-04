@@ -1,5 +1,11 @@
 import { AuthType, ScanStatus, type Endpoint, type Environment } from "@sw/core";
-import { resolveAuthHeaders, MemorySecretStore } from "@sw/auth";
+import {
+  resolveAuthHeaders,
+  MemorySecretStore,
+  OverlaySecretStore,
+  type SecretStore,
+  environmentSecretRef,
+} from "@sw/auth";
 import type {
   EndpointRepository,
   EnvironmentRepository,
@@ -14,32 +20,8 @@ export interface ScanRequest {
   projectId: string;
   environmentId: string;
   endpointIds?: string[];
-  /** Ephemeral token for this run only — never persisted. */
+  /** Optional one-off override — never written to the vault. */
   bearerToken?: string;
-}
-
-function buildAuthEnvironment(
-  environment: Environment,
-  bearerToken?: string,
-): { environment: Environment; store: MemorySecretStore } {
-  const store = new MemorySecretStore();
-  if (!bearerToken) {
-    return { environment, store };
-  }
-
-  const secretRef = environment.secretRef ?? `ephemeral:${environment.id}`;
-
-  return {
-    store,
-    environment: {
-      ...environment,
-      secretRef,
-      authType:
-        environment.authType === AuthType.NONE
-          ? AuthType.BEARER
-          : environment.authType,
-    },
-  };
 }
 
 export async function runProjectScan(
@@ -51,6 +33,7 @@ export async function runProjectScan(
     findings: FindingRepository;
     runs: TestRunRepository;
   },
+  secretStore: SecretStore,
 ) {
   const project = await repos.projects.getById(input.projectId);
   if (!project) throw new Error("Project not found");
@@ -69,15 +52,14 @@ export async function runProjectScan(
     throw new Error("No endpoints to scan — import OpenAPI first");
   }
 
-  const { environment: authEnv, store } = buildAuthEnvironment(
-    environment,
-    input.bearerToken,
-  );
+  const authEnv = ensureSecretRef(environment, input.bearerToken);
+  const overlay = new MemorySecretStore();
   if (input.bearerToken && authEnv.secretRef) {
-    await store.set(authEnv.secretRef, input.bearerToken);
+    await overlay.set(authEnv.secretRef, input.bearerToken);
   }
-
+  const store = new OverlaySecretStore(secretStore, overlay);
   const authHeaders = await resolveAuthHeaders(authEnv, store);
+
   const run = await repos.runs.create({
     projectId: input.projectId,
     environmentId: input.environmentId,
@@ -138,4 +120,25 @@ export async function runProjectScan(
     });
     throw error;
   }
+}
+
+function ensureSecretRef(
+  environment: Environment,
+  bearerToken?: string,
+): Environment {
+  if (environment.secretRef) {
+    if (bearerToken && environment.authType === AuthType.NONE) {
+      return { ...environment, authType: AuthType.BEARER };
+    }
+    return environment;
+  }
+
+  return {
+    ...environment,
+    secretRef: environmentSecretRef(environment.id),
+    authType:
+      bearerToken && environment.authType === AuthType.NONE
+        ? AuthType.BEARER
+        : environment.authType,
+  };
 }

@@ -1,12 +1,13 @@
 import { AuthType, type Environment } from "@sw/core";
+import type { SecretStore } from "./types.js";
 
-export interface SecretStore {
-  get(ref: string): Promise<string | undefined>;
-  set(ref: string, value: string): Promise<void>;
-  delete(ref: string): Promise<void>;
-}
+export type { SecretStore } from "./types.js";
+export {
+  EncryptedFileSecretStore,
+  environmentSecretRef,
+} from "./encrypted-file-store.js";
 
-/** In-memory store for local/dev only — desktop should use OS keychain. */
+/** In-memory store for tests / ephemeral overrides. */
 export class MemorySecretStore implements SecretStore {
   #secrets = new Map<string, string>();
 
@@ -20,6 +21,27 @@ export class MemorySecretStore implements SecretStore {
 
   async delete(ref: string) {
     this.#secrets.delete(ref);
+  }
+}
+
+/** Overlay wins over primary — used for one-off scan token overrides. */
+export class OverlaySecretStore implements SecretStore {
+  constructor(
+    private readonly primary: SecretStore,
+    private readonly overlay: SecretStore,
+  ) {}
+
+  async get(ref: string) {
+    return (await this.overlay.get(ref)) ?? this.primary.get(ref);
+  }
+
+  async set(ref: string, value: string) {
+    await this.primary.set(ref, value);
+  }
+
+  async delete(ref: string) {
+    await this.overlay.delete(ref);
+    await this.primary.delete(ref);
   }
 }
 

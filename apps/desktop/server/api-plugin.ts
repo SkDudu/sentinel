@@ -5,6 +5,10 @@ import type { Plugin } from "vite";
 import { AuthType, FindingStatus } from "@sw/core";
 import { parseOpenApi } from "@sw/api-parser";
 import {
+  EncryptedFileSecretStore,
+  environmentSecretRef,
+} from "@sw/auth";
+import {
   createSqliteDb,
   EndpointRepository,
   EnvironmentRepository,
@@ -16,7 +20,8 @@ import {
 import { runProjectScan } from "./scan.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const defaultDbPath = join(__dirname, "..", "..", "..", "data", "sentinel.db");
+const dataDir = join(__dirname, "..", "..", "..", "data");
+const defaultDbPath = join(dataDir, "sentinel.db");
 
 async function readJson<T>(req: IncomingMessage): Promise<T> {
   const chunks: Buffer[] = [];
@@ -63,6 +68,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
     name: "sentinel-api",
     configureServer(server) {
       handle = createSqliteDb(dbPath);
+      const secrets = new EncryptedFileSecretStore(dataDir);
       const projects = new ProjectRepository(handle.db);
       const environments = new EnvironmentRepository(handle.db);
       const endpoints = new EndpointRepository(handle.db);
@@ -91,7 +97,21 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
           }
 
           if (path === "/api/projects" && method === "GET") {
-            sendJson(res, 200, await projects.list());
+            const list = await projects.list();
+            const enriched = await Promise.all(
+              list.map(async (project) => ({
+                ...project,
+                environments: await Promise.all(
+                  project.environments.map(async (environment) => ({
+                    ...environment,
+                    secretConfigured: environment.secretRef
+                      ? await secrets.has(environment.secretRef)
+                      : false,
+                  })),
+                ),
+              })),
+            );
+            sendJson(res, 200, enriched);
             return;
           }
 
@@ -137,6 +157,13 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
             }
 
             if (method === "DELETE") {
+              const existing = await projects.getById(id);
+              if (!existing) return notFound(res);
+              for (const environment of existing.environments) {
+                if (environment.secretRef) {
+                  await secrets.delete(environment.secretRef);
+                }
+              }
               if (!(await projects.delete(id))) return notFound(res);
               sendJson(res, 204);
               return;
@@ -218,7 +245,52 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
             }
 
             if (method === "DELETE") {
+              const existing = await environments.getById(id);
+              if (!existing) return notFound(res);
+              if (existing.secretRef) {
+                await secrets.delete(existing.secretRef);
+              }
               if (!(await environments.delete(id))) return notFound(res);
+              sendJson(res, 204);
+              return;
+            }
+          }
+
+          const secretMatch = path.match(
+            /^\/api\/environments\/([^/]+)\/secret$/,
+          );
+          if (secretMatch) {
+            const id = decodeURIComponent(secretMatch[1]!);
+            const environment = await environments.getById(id);
+            if (!environment) return notFound(res);
+            const ref =
+              environment.secretRef ?? environmentSecretRef(environment.id);
+
+            if (!environment.secretRef) {
+              await environments.update(id, { secretRef: ref });
+            }
+
+            if (method === "GET") {
+              sendJson(res, 200, {
+                configured: await secrets.has(ref),
+                secretRef: ref,
+              });
+              return;
+            }
+
+            if (method === "PUT") {
+              const body = await readJson<{ secret?: string }>(req);
+              if (!body.secret?.trim()) {
+                sendJson(res, 400, { error: "secret is required" });
+                return;
+              }
+              await secrets.set(ref, body.secret.trim());
+              sendJson(res, 200, { configured: true });
+              return;
+            }
+
+            if (method === "DELETE") {
+              await secrets.delete(ref);
               sendJson(res, 204);
               return;
             }
@@ -330,6 +402,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                   bearerToken: body.bearerToken,
                 },
                 { projects, environments, endpoints, findings, runs },
+                secrets,
               );
               sendJson(res, 201, result);
             } catch (error) {

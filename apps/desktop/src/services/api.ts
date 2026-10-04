@@ -1,12 +1,16 @@
 import type { Endpoint, Environment, Finding, ScanRun } from "@sw/core";
 
+export type EnvironmentDto = Environment & {
+  secretConfigured?: boolean;
+};
+
 export interface ProjectDto {
   id: string;
   name: string;
   description?: string;
   createdAt: string;
   updatedAt: string;
-  environments: Environment[];
+  environments: EnvironmentDto[];
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -84,6 +88,20 @@ export const api = {
 
   deleteEnvironment: (id: string) =>
     request<void>(`/api/environments/${id}`, { method: "DELETE" }),
+
+  getEnvironmentSecretStatus: (id: string) =>
+    request<{ configured: boolean; secretRef: string }>(
+      `/api/environments/${id}/secret`,
+    ),
+
+  setEnvironmentSecret: (id: string, secret: string) =>
+    request<{ configured: boolean }>(`/api/environments/${id}/secret`, {
+      method: "PUT",
+      body: JSON.stringify({ secret }),
+    }),
+
+  clearEnvironmentSecret: (id: string) =>
+    request<void>(`/api/environments/${id}/secret`, { method: "DELETE" }),
 
   listEndpoints: (projectId: string) =>
     request<Endpoint[]>(`/api/projects/${projectId}/endpoints`),

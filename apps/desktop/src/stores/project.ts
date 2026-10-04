@@ -43,6 +43,7 @@ interface ProjectState {
       baseUrl: string;
       authType?: string;
       productionSafetyMode?: boolean;
+      secret?: string;
     },
   ) => Promise<void>;
   updateEnvironment: (
@@ -55,6 +56,8 @@ interface ProjectState {
     },
   ) => Promise<void>;
   deleteEnvironment: (id: string) => Promise<void>;
+  setEnvironmentSecret: (id: string, secret: string) => Promise<void>;
+  clearEnvironmentSecret: (id: string) => Promise<void>;
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
@@ -110,7 +113,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   createEnvironment: async (projectId, input) => {
-    await api.createEnvironment(projectId, input);
+    const { secret, ...rest } = input;
+    const created = await api.createEnvironment(projectId, rest);
+    if (secret?.trim()) {
+      await api.setEnvironmentSecret(created.id, secret.trim());
+    }
     await get().loadProjects();
   },
 
@@ -121,6 +128,16 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   deleteEnvironment: async (id) => {
     await api.deleteEnvironment(id);
+    await get().loadProjects();
+  },
+
+  setEnvironmentSecret: async (id, secret) => {
+    await api.setEnvironmentSecret(id, secret);
+    await get().loadProjects();
+  },
+
+  clearEnvironmentSecret: async (id) => {
+    await api.clearEnvironmentSecret(id);
     await get().loadProjects();
   },
 }));

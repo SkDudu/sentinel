@@ -37,6 +37,7 @@
 | Tauri | Ainda não inicializado (precisa Rust) |
 | shadcn/ui | Planejado; UI atual é Tailwind direto |
 | SQLite runtime | Drizzle ORM no runtime via `sqlite-proxy` + `node:sqlite` (sem native addon); arquivo em `data/sentinel.db` |
+| Secrets | Vault AES-256-GCM (`data/secrets.vault`) — nunca plaintext no SQLite; keychain SO com Tauri |
 
 ## Decisões conscientes
 
