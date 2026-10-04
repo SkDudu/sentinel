@@ -1,0 +1,37 @@
+---
+description: Sentinel — identidade, arquitetura, stack e limites para agentes de IA
+alwaysApply: true
+---
+
+# Sentinel — regras do projeto
+
+Você está no repositório do **Sentinel** (workbench local de security testing de API).
+
+## Fonte da verdade
+
+Antes de mudar arquitetura, stack ou escopo, leia e respeite:
+
+- `docs/product.md`
+- `docs/roadmap.md`
+- `docs/architecture.md`
+- `docs/technologies.md`
+- `docs/ai-rules.md`
+
+Em conflito entre “ideia criativa” e esses docs, **os docs vencem**, salvo pedido explícito do usuário.
+
+## Não sair do padrão
+
+1. Produto chama-se **Sentinel** na UI e docs (`@sw/*` ok no código).
+2. Lógica de scan/parser/findings/AI data em `packages/` — não na UI.
+3. Novos testes = plugins no `@sw/test-registry`, não hardcoded no executor.
+4. MVP determinístico sem IA/ZAP obrigatórios.
+5. Stack: pnpm, TypeScript, React, Tailwind, Zod, Drizzle, SQLite, fetch via `RequestExecutor`, Tauri depois.
+6. Secrets fora do SQLite plaintext; Production Safety Mode para testes agressivos.
+7. Não pular fases do roadmap sem o usuário pedir.
+8. Comunicação com o usuário em português.
+
+## Escopo de mudança
+
+- Diff mínimo; sem refactors oportunistas.
+- Sem novos docs markdown além de `docs/` / pedido explícito.
+- Sem commits de secret, db local ou `node_modules`.
