@@ -1,4 +1,8 @@
 export * from "./schema.js";
+export * from "./client.js";
+export * from "./migrate.js";
+export * from "./mappers.js";
+export * from "./repositories/projects.js";
+export * from "./repositories/environments.js";
 
-/** Client factory is app-specific (better-sqlite3 / tauri sql plugin). */
 export type DatabaseDriver = "sqlite-node" | "sqlite-tauri";

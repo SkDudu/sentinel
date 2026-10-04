@@ -12,6 +12,11 @@
     "lint": "pnpm -r run typecheck"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.5"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }

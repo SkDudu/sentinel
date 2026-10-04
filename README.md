@@ -62,7 +62,7 @@ Detalhes em [`docs/roadmap.md`](./docs/roadmap.md).
 | AI (opcional) | Ollama / LM Studio / OpenAI-compatible |
 | External scanner | OWASP ZAP (futuro, adapter) |
 
-Requisitos: **Node ≥ 20** e **pnpm**.
+Requisitos: **Node ≥ 22.5** (SQLite nativo) e **pnpm**.
 
 ---
 

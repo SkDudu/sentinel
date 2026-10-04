@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useProjectStore } from "@/stores/project";
 
 const links = [
   { to: "/", label: "Projects" },
@@ -10,6 +11,9 @@ const links = [
 ];
 
 export function Shell() {
+  const { projects, activeProjectId } = useProjectStore();
+  const active = projects.find((p) => p.id === activeProjectId);
+
   return (
     <div className="min-h-screen grid grid-cols-[240px_1fr]">
       <aside className="border-r border-[var(--line)] bg-[var(--bg-elevated)]/90 px-4 py-6">
@@ -17,9 +21,10 @@ export function Shell() {
           <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">
             Local
           </p>
-          <h1 className="mt-1 text-xl font-semibold tracking-tight">
-            Security Workbench
-          </h1>
+          <h1 className="mt-1 text-xl font-semibold tracking-tight">Sentinel</h1>
+          <p className="mt-2 text-xs text-[var(--muted)]">
+            {active ? `Projeto: ${active.name}` : "Nenhum projeto ativo"}
+          </p>
         </div>
         <nav className="flex flex-col gap-1">
           {links.map((link) => (

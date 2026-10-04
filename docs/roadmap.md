@@ -18,8 +18,8 @@ Ordem intencional: valor cedo, risco baixo, sem depender de IA ou ZAP no caminho
 
 Objetivo: **projeto → OpenAPI → casos → run → findings** sem IA obrigatória.
 
-- [ ] Persistência SQLite real (desktop/CLI)
-- [ ] CRUD de projetos e ambientes
+- [x] Persistência SQLite real (desktop via API local / `node:sqlite`)
+- [x] CRUD de projetos e ambientes
 - [ ] Import de `openapi.json` na UI
 - [ ] Ligar orchestrator ao desktop
 - [ ] Histórico básico de scans

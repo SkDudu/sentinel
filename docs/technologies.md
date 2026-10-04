@@ -22,7 +22,7 @@
 
 ## Versões / ambiente
 
-- Node **≥ 20**
+- Node **≥ 22.5** (usa `node:sqlite`)
 - Package manager: **pnpm**
 - TypeScript **5.x**
 - React **19** no desktop scaffold
@@ -36,7 +36,7 @@
 | CLI | `scan` MVP contra OpenAPI |
 | Tauri | Ainda não inicializado (precisa Rust) |
 | shadcn/ui | Planejado; UI atual é Tailwind direto |
-| SQLite runtime | Schema Drizzle; client app-specific pendente |
+| SQLite runtime | Drizzle ORM no runtime via `sqlite-proxy` + `node:sqlite` (sem native addon); arquivo em `data/sentinel.db` |
 
 ## Decisões conscientes
 
