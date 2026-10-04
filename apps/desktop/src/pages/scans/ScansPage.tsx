@@ -1,94 +1,195 @@
-import { useScanStore } from "@/stores/scan";
-
-const demoCases = [
-  { id: "det-email-valid", name: "email: valid", source: "deterministic" as const },
-  { id: "det-email-space", name: "email: space-inside", source: "deterministic" as const },
-  { id: "det-password-leading", name: "password: leading-space", source: "deterministic" as const },
-  { id: "persona-edge-user", name: "Persona: Usuário edge-case", source: "business-logic" as const },
-  { id: "ai-1", name: "AI: role admin + email inválido", source: "ai" as const },
-];
+import { useEffect, useMemo, useState } from "react";
+import type { Endpoint, ScanRun } from "@sw/core";
+import { api } from "@/services/api";
+import { useProjectStore } from "@/stores/project";
 
 export function ScansPage() {
-  const { cases, setCases, toggleCase, running, setRunning } = useScanStore();
+  const { projects, activeProjectId, loadProjects } = useProjectStore();
+  const project = projects.find((p) => p.id === activeProjectId);
 
-  function generate() {
-    setCases(demoCases.map((c) => ({ ...c, selected: c.source !== "ai" })));
+  const [endpoints, setEndpoints] = useState<Endpoint[]>([]);
+  const [runs, setRuns] = useState<ScanRun[]>([]);
+  const [environmentId, setEnvironmentId] = useState("");
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [bearerToken, setBearerToken] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [lastResult, setLastResult] = useState<string | null>(null);
+
+  useEffect(() => {
+    void loadProjects();
+  }, [loadProjects]);
+
+  useEffect(() => {
+    if (!project) return;
+    setEnvironmentId(project.environments[0]?.id ?? "");
+    void api.listEndpoints(project.id).then((items) => {
+      setEndpoints(items);
+      const next: Record<string, boolean> = {};
+      for (const item of items) next[item.id] = true;
+      setSelected(next);
+    });
+    void api.listRuns(project.id).then(setRuns);
+  }, [project]);
+
+  const selectedIds = useMemo(
+    () => Object.entries(selected).filter(([, v]) => v).map(([id]) => id),
+    [selected],
+  );
+
+  async function onRun() {
+    if (!project || !environmentId) return;
+    setBusy(true);
+    setError(null);
+    setLastResult(null);
+    try {
+      const result = await api.runScan({
+        projectId: project.id,
+        environmentId,
+        endpointIds: selectedIds,
+        bearerToken: bearerToken || undefined,
+      });
+      setLastResult(
+        `Scan concluído: ${result.endpointsScanned} endpoints, ${result.totalCases} casos, ${result.findings.length} findings.`,
+      );
+      setRuns(await api.listRuns(project.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Scan falhou");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!project) {
+    return (
+      <section className="max-w-4xl">
+        <h2 className="text-3xl font-semibold tracking-tight">Scans</h2>
+        <p className="mt-4 text-sm text-[var(--muted)]">
+          Selecione um projeto ativo em Projects.
+        </p>
+      </section>
+    );
   }
 
   return (
     <section className="max-w-4xl">
       <header className="mb-8">
-        <h2 className="text-3xl font-semibold tracking-tight">AI Test Lab</h2>
+        <h2 className="text-3xl font-semibold tracking-tight">Scans</h2>
         <p className="mt-2 text-[var(--muted)]">
-          Determinístico primeiro. IA gera casos semânticos — você revisa antes
-          de executar.
+          Executa casos determinísticos via Security Engine no ambiente
+          escolhido.
         </p>
       </header>
 
-      <div className="rounded-lg border border-[var(--line)] bg-[var(--panel)] p-5">
-        <p className="font-mono text-sm text-[var(--accent)]">POST /users</p>
-        <div className="mt-4 grid gap-2 text-sm text-[var(--muted)] sm:grid-cols-2">
-          {[
-            "Normal",
-            "Validation errors",
-            "Edge cases",
-            "Type confusion",
-            "Boundary values",
-            "Business logic",
-            "AI generated",
-          ].map((label) => (
-            <label key={label} className="flex items-center gap-2">
-              <input type="checkbox" defaultChecked={label !== "AI generated"} />
-              {label}
-            </label>
-          ))}
+      {error && (
+        <p className="mb-4 rounded-md border border-[var(--danger)]/40 bg-[var(--danger)]/10 px-3 py-2 text-sm text-[var(--danger)]">
+          {error}
+        </p>
+      )}
+      {lastResult && (
+        <p className="mb-4 text-sm text-[var(--accent)]">{lastResult}</p>
+      )}
+
+      <div className="mb-6 space-y-4 rounded-lg border border-[var(--line)] bg-[var(--panel)] p-5">
+        <label className="block text-sm">
+          Ambiente
+          <select
+            value={environmentId}
+            onChange={(e) => setEnvironmentId(e.target.value)}
+            className="mt-1 w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2"
+          >
+            {project.environments.map((env) => (
+              <option key={env.id} value={env.id}>
+                {env.name} — {env.baseUrl}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="block text-sm">
+          Bearer token (opcional, só desta execução — não grava no SQLite)
+          <input
+            type="password"
+            value={bearerToken}
+            onChange={(e) => setBearerToken(e.target.value)}
+            className="mt-1 w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2 font-mono text-xs"
+            placeholder="eyJhbGciOi..."
+          />
+        </label>
+
+        <div>
+          <p className="mb-2 text-sm text-[var(--muted)]">
+            Endpoints ({selectedIds.length}/{endpoints.length})
+          </p>
+          {endpoints.length === 0 ? (
+            <p className="text-sm text-[var(--muted)]">
+              Importe um OpenAPI em Endpoints primeiro.
+            </p>
+          ) : (
+            <ul className="max-h-56 space-y-1 overflow-auto">
+              {endpoints.map((endpoint) => (
+                <li key={endpoint.id}>
+                  <label className="flex items-center gap-2 rounded border border-[var(--line)] px-3 py-2 font-mono text-xs">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(selected[endpoint.id])}
+                      onChange={() =>
+                        setSelected((prev) => ({
+                          ...prev,
+                          [endpoint.id]: !prev[endpoint.id],
+                        }))
+                      }
+                    />
+                    <span>
+                      {endpoint.method} {endpoint.path}
+                    </span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
+
         <button
           type="button"
-          onClick={generate}
-          className="mt-5 rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[#062016]"
+          disabled={busy || !environmentId || selectedIds.length === 0}
+          onClick={() => void onRun()}
+          className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[#062016] disabled:opacity-50"
         >
-          Generate Test Cases
+          {busy ? "Executando…" : "Run scan"}
         </button>
       </div>
 
-      {cases.length > 0 && (
-        <div className="mt-6 rounded-lg border border-[var(--line)] bg-[var(--bg-elevated)] p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <p className="text-sm text-[var(--muted)]">
-              Generated: {cases.length} — revise casos de IA antes do run
-            </p>
-            <button
-              type="button"
-              disabled={running}
-              onClick={() => {
-                setRunning(true);
-                window.setTimeout(() => setRunning(false), 800);
-              }}
-              className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm hover:border-[var(--accent)] disabled:opacity-50"
-            >
-              {running ? "Running…" : "Run selected"}
-            </button>
-          </div>
+      <div>
+        <h3 className="mb-3 text-sm uppercase tracking-wider text-[var(--muted)]">
+          Histórico
+        </h3>
+        {runs.length === 0 ? (
+          <p className="text-sm text-[var(--muted)]">Nenhum scan ainda.</p>
+        ) : (
           <ul className="space-y-2">
-            {cases.map((c) => (
-              <li key={c.id}>
-                <label className="flex items-center gap-3 rounded-md border border-[var(--line)] px-3 py-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={c.selected}
-                    onChange={() => toggleCase(c.id)}
-                  />
-                  <span className="flex-1">{c.name}</span>
-                  <span className="font-mono text-xs uppercase text-[var(--muted)]">
-                    {c.source}
+            {runs.map((run) => (
+              <li
+                key={run.id}
+                className="rounded-lg border border-[var(--line)] bg-[var(--bg-elevated)] px-4 py-3 text-sm"
+              >
+                <div className="flex flex-wrap gap-3">
+                  <span className="font-medium">{run.status}</span>
+                  <span className="text-[var(--muted)]">
+                    {run.completedCases}/{run.totalCases} casos
                   </span>
-                </label>
+                  <span className="text-[var(--muted)]">
+                    {run.findingsCount} findings
+                  </span>
+                </div>
+                <p className="mt-1 font-mono text-xs text-[var(--muted)]">
+                  {run.startedAt ?? "—"}
+                </p>
               </li>
             ))}
           </ul>
-        </div>
-      )}
+        )}
+      </div>
     </section>
   );
 }

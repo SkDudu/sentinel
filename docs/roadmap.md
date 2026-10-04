@@ -20,11 +20,12 @@ Objetivo: **projeto → OpenAPI → casos → run → findings** sem IA obrigat�
 
 - [x] Persistência SQLite real (desktop via API local / `node:sqlite`)
 - [x] CRUD de projetos e ambientes
-- [ ] Import de `openapi.json` na UI
-- [ ] Ligar orchestrator ao desktop
-- [ ] Histórico básico de scans
-- [ ] Findings com status (OPEN, etc.)
+- [x] Import de `openapi.json` na UI
+- [x] Ligar orchestrator ao desktop
+- [x] Histórico básico de scans
+- [x] Findings com status (OPEN, etc.)
 - [ ] Auth Bearer/API Key com secret no keychain (ou store seguro)
+  - MVP: Bearer opcional por execução (não persiste no SQLite)
 
 **Critério de pronto:** rodar um scan local contra uma API de staging/dev e ver findings na UI.
 

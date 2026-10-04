@@ -38,12 +38,24 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@sw/api-parser':
+        specifier: workspace:*
+        version: link:../../packages/api-parser
+      '@sw/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@sw/core':
         specifier: workspace:*
         version: link:../../packages/core
       '@sw/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@sw/http-client':
+        specifier: workspace:*
+        version: link:../../packages/http-client
+      '@sw/security-engine':
+        specifier: workspace:*
+        version: link:../../packages/security-engine
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
@@ -222,6 +234,9 @@ importers:
         specifier: workspace:*
         version: link:../test-registry
     devDependencies:
+      '@types/node':
+        specifier: ^22.13.10
+        version: 22.20.5
       typescript:
         specifier: ^5.8.2
         version: 5.9.3

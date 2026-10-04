@@ -138,6 +138,17 @@ Novos testes de segurança entram em `@sw/test-registry` como plugins — não n
 
 ---
 
+## MVP (fluxo atual)
+
+1. Crie um projeto e ambiente em **Projects**  
+2. Importe `openapi.json` em **Endpoints** (ex.: `examples/sample-openapi.json`)  
+3. Rode o scan em **Scans** (Bearer opcional só da execução)  
+4. Revise e atualize status em **Findings**
+
+IA e keychain completo entram depois — ver [roadmap](./docs/roadmap.md).
+
+---
+
 ## Licença / uso
 
 Projeto em desenvolvimento ativo. Use apenas contra APIs que você tem autorização para testar (local / staging / próprias).

@@ -17,6 +17,12 @@ export default defineConfig({
     strictPort: true,
   },
   optimizeDeps: {
-    exclude: ["@sw/database"],
+    exclude: [
+      "@sw/database",
+      "@sw/security-engine",
+      "@sw/http-client",
+      "@sw/api-parser",
+      "@sw/auth",
+    ],
   },
 });

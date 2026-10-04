@@ -2,13 +2,18 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
-import { AuthType } from "@sw/core";
+import { AuthType, FindingStatus } from "@sw/core";
+import { parseOpenApi } from "@sw/api-parser";
 import {
   createSqliteDb,
+  EndpointRepository,
   EnvironmentRepository,
+  FindingRepository,
   ProjectRepository,
+  TestRunRepository,
   type SqliteHandle,
 } from "@sw/database";
+import { runProjectScan } from "./scan.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const defaultDbPath = join(__dirname, "..", "..", "..", "data", "sentinel.db");
@@ -29,9 +34,8 @@ function sendJson(res: ServerResponse, status: number, body?: unknown) {
     res.end();
     return;
   }
-  const payload = JSON.stringify(body);
   res.setHeader("Content-Type", "application/json; charset=utf-8");
-  res.end(payload);
+  res.end(JSON.stringify(body));
 }
 
 function notFound(res: ServerResponse) {
@@ -45,6 +49,13 @@ function parseAuthType(value: unknown) {
     : AuthType.NONE;
 }
 
+function parseFindingStatus(value: unknown) {
+  if (typeof value !== "string") return null;
+  return (Object.values(FindingStatus) as string[]).includes(value)
+    ? (value as (typeof FindingStatus)[keyof typeof FindingStatus])
+    : null;
+}
+
 export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
   let handle: SqliteHandle | undefined;
 
@@ -54,6 +65,9 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
       handle = createSqliteDb(dbPath);
       const projects = new ProjectRepository(handle.db);
       const environments = new EnvironmentRepository(handle.db);
+      const endpoints = new EndpointRepository(handle.db);
+      const findings = new FindingRepository(handle.db);
+      const runs = new TestRunRepository(handle.db);
 
       server.httpServer?.once("close", () => {
         handle?.close();
@@ -106,10 +120,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
 
             if (method === "GET") {
               const project = await projects.getById(id);
-              if (!project) {
-                notFound(res);
-                return;
-              }
+              if (!project) return notFound(res);
               sendJson(res, 200, project);
               return;
             }
@@ -120,20 +131,13 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                 description?: string | null;
               }>(req);
               const updated = await projects.update(id, body);
-              if (!updated) {
-                notFound(res);
-                return;
-              }
+              if (!updated) return notFound(res);
               sendJson(res, 200, updated);
               return;
             }
 
             if (method === "DELETE") {
-              const ok = await projects.delete(id);
-              if (!ok) {
-                notFound(res);
-                return;
-              }
+              if (!(await projects.delete(id))) return notFound(res);
               sendJson(res, 204);
               return;
             }
@@ -146,10 +150,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
             const projectId = decodeURIComponent(projectEnvsMatch[1]!);
 
             if (method === "GET") {
-              if (!(await projects.getById(projectId))) {
-                notFound(res);
-                return;
-              }
+              if (!(await projects.getById(projectId))) return notFound(res);
               sendJson(res, 200, await environments.listByProject(projectId));
               return;
             }
@@ -170,16 +171,19 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
               }
 
               try {
-                const created = await environments.create({
-                  projectId,
-                  name: body.name,
-                  baseUrl: body.baseUrl,
-                  authType: parseAuthType(body.authType),
-                  secretRef: body.secretRef,
-                  headers: body.headers,
-                  productionSafetyMode: body.productionSafetyMode,
-                });
-                sendJson(res, 201, created);
+                sendJson(
+                  res,
+                  201,
+                  await environments.create({
+                    projectId,
+                    name: body.name,
+                    baseUrl: body.baseUrl,
+                    authType: parseAuthType(body.authType),
+                    secretRef: body.secretRef,
+                    headers: body.headers,
+                    productionSafetyMode: body.productionSafetyMode,
+                  }),
+                );
               } catch (error) {
                 sendJson(res, 404, {
                   error: error instanceof Error ? error.message : "Not found",
@@ -202,30 +206,138 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                 headers?: Record<string, string>;
                 productionSafetyMode?: boolean;
               }>(req);
-
               const updated = await environments.update(id, {
                 ...body,
                 authType: body.authType
                   ? parseAuthType(body.authType)
                   : undefined,
               });
-              if (!updated) {
-                notFound(res);
-                return;
-              }
+              if (!updated) return notFound(res);
               sendJson(res, 200, updated);
               return;
             }
 
             if (method === "DELETE") {
-              const ok = await environments.delete(id);
-              if (!ok) {
-                notFound(res);
-                return;
-              }
+              if (!(await environments.delete(id))) return notFound(res);
               sendJson(res, 204);
               return;
             }
+          }
+
+          const endpointsMatch = path.match(
+            /^\/api\/projects\/([^/]+)\/endpoints$/,
+          );
+          if (endpointsMatch) {
+            const projectId = decodeURIComponent(endpointsMatch[1]!);
+            if (!(await projects.getById(projectId))) return notFound(res);
+
+            if (method === "GET") {
+              sendJson(res, 200, await endpoints.listByProject(projectId));
+              return;
+            }
+          }
+
+          const importMatch = path.match(
+            /^\/api\/projects\/([^/]+)\/openapi\/import$/,
+          );
+          if (importMatch && method === "POST") {
+            const projectId = decodeURIComponent(importMatch[1]!);
+            if (!(await projects.getById(projectId))) return notFound(res);
+
+            const body = await readJson<{ document?: unknown }>(req);
+            if (!body.document) {
+              sendJson(res, 400, { error: "document is required" });
+              return;
+            }
+
+            try {
+              const parsed = parseOpenApi(body.document, projectId);
+              const saved = await endpoints.replaceOpenApiEndpoints(
+                projectId,
+                parsed,
+              );
+              sendJson(res, 201, {
+                imported: saved.filter((e) => e.source === "openapi").length,
+                endpoints: saved,
+              });
+            } catch (error) {
+              sendJson(res, 400, {
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : "Invalid OpenAPI document",
+              });
+            }
+            return;
+          }
+
+          const findingsMatch = path.match(
+            /^\/api\/projects\/([^/]+)\/findings$/,
+          );
+          if (findingsMatch && method === "GET") {
+            const projectId = decodeURIComponent(findingsMatch[1]!);
+            if (!(await projects.getById(projectId))) return notFound(res);
+            sendJson(res, 200, await findings.listByProject(projectId));
+            return;
+          }
+
+          const findingStatusMatch = path.match(
+            /^\/api\/findings\/([^/]+)\/status$/,
+          );
+          if (findingStatusMatch && method === "PATCH") {
+            const id = decodeURIComponent(findingStatusMatch[1]!);
+            const body = await readJson<{ status?: string }>(req);
+            const status = parseFindingStatus(body.status);
+            if (!status) {
+              sendJson(res, 400, { error: "invalid status" });
+              return;
+            }
+            const updated = await findings.updateStatus(id, status);
+            if (!updated) return notFound(res);
+            sendJson(res, 200, updated);
+            return;
+          }
+
+          const runsMatch = path.match(/^\/api\/projects\/([^/]+)\/runs$/);
+          if (runsMatch && method === "GET") {
+            const projectId = decodeURIComponent(runsMatch[1]!);
+            if (!(await projects.getById(projectId))) return notFound(res);
+            sendJson(res, 200, await runs.listByProject(projectId));
+            return;
+          }
+
+          if (path === "/api/scans" && method === "POST") {
+            const body = await readJson<{
+              projectId?: string;
+              environmentId?: string;
+              endpointIds?: string[];
+              bearerToken?: string;
+            }>(req);
+
+            if (!body.projectId || !body.environmentId) {
+              sendJson(res, 400, {
+                error: "projectId and environmentId are required",
+              });
+              return;
+            }
+
+            try {
+              const result = await runProjectScan(
+                {
+                  projectId: body.projectId,
+                  environmentId: body.environmentId,
+                  endpointIds: body.endpointIds,
+                  bearerToken: body.bearerToken,
+                },
+                { projects, environments, endpoints, findings, runs },
+              );
+              sendJson(res, 201, result);
+            } catch (error) {
+              sendJson(res, 400, {
+                error: error instanceof Error ? error.message : "Scan failed",
+              });
+            }
+            return;
           }
 
           notFound(res);

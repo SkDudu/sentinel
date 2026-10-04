@@ -1,5 +1,8 @@
+import { randomUUID } from "node:crypto";
 import { analyzeEndpoint } from "@sw/api-parser";
 import {
+  FindingStatus,
+  Severity,
   type Endpoint,
   type Finding,
   type TestCase,
@@ -137,24 +140,50 @@ export class TestOrchestrator {
         request = { ...request, headers: rest };
       }
 
-      const response = await input.executor.execute(request);
-      executed += 1;
-      input.onProgress?.({
-        completed: executed,
-        total: prepared.cases.length,
-        testCase,
-      });
+      try {
+        const response = await input.executor.execute(request);
+        executed += 1;
+        input.onProgress?.({
+          completed: executed,
+          total: prepared.cases.length,
+          testCase,
+        });
 
-      if (test) {
-        const result = await test.analyse(
-          prepared.context,
-          { ...testCase, id: testCase.id.replace(`${pluginId}:`, "") },
-          request,
-          response,
-        );
-        if (result) {
-          findings.push(...(Array.isArray(result) ? result : [result]));
+        if (test) {
+          const result = await test.analyse(
+            prepared.context,
+            { ...testCase, id: testCase.id.replace(`${pluginId}:`, "") },
+            request,
+            response,
+          );
+          if (result) {
+            findings.push(...(Array.isArray(result) ? result : [result]));
+          }
         }
+      } catch (error) {
+        executed += 1;
+        input.onProgress?.({
+          completed: executed,
+          total: prepared.cases.length,
+          testCase,
+        });
+        findings.push({
+          id: randomUUID(),
+          projectId: prepared.context.endpoint.projectId,
+          endpointId: prepared.context.endpoint.id,
+          testId: pluginId ?? "execution.error",
+          testCaseId: testCase.id,
+          title: `Request failed: ${testCase.name}`,
+          severity: Severity.HIGH,
+          confidence: 90,
+          status: FindingStatus.OPEN,
+          evidence:
+            error instanceof Error ? error.message : "Unknown execution error",
+          request,
+          recommendation:
+            "Verifique se a API alvo está no ar e se baseUrl/auth estão corretos.",
+          createdAt: new Date().toISOString(),
+        });
       }
     }
 

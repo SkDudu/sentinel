@@ -1,4 +1,4 @@
-import type { Environment } from "@sw/core";
+import type { Endpoint, Environment, Finding, ScanRun } from "@sw/core";
 
 export interface ProjectDto {
   id: string;
@@ -9,10 +9,7 @@ export interface ProjectDto {
   environments: Environment[];
 }
 
-async function request<T>(
-  path: string,
-  init?: RequestInit,
-): Promise<T> {
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     headers: {
       "Content-Type": "application/json",
@@ -87,4 +84,44 @@ export const api = {
 
   deleteEnvironment: (id: string) =>
     request<void>(`/api/environments/${id}`, { method: "DELETE" }),
+
+  listEndpoints: (projectId: string) =>
+    request<Endpoint[]>(`/api/projects/${projectId}/endpoints`),
+
+  importOpenApi: (projectId: string, document: unknown) =>
+    request<{ imported: number; endpoints: Endpoint[] }>(
+      `/api/projects/${projectId}/openapi/import`,
+      {
+        method: "POST",
+        body: JSON.stringify({ document }),
+      },
+    ),
+
+  listFindings: (projectId: string) =>
+    request<Finding[]>(`/api/projects/${projectId}/findings`),
+
+  updateFindingStatus: (id: string, status: Finding["status"]) =>
+    request<Finding>(`/api/findings/${id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }),
+
+  listRuns: (projectId: string) =>
+    request<ScanRun[]>(`/api/projects/${projectId}/runs`),
+
+  runScan: (input: {
+    projectId: string;
+    environmentId: string;
+    endpointIds?: string[];
+    bearerToken?: string;
+  }) =>
+    request<{
+      run: ScanRun;
+      findings: Finding[];
+      endpointsScanned: number;
+      totalCases: number;
+    }>("/api/scans", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
 };

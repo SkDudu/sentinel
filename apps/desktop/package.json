@@ -10,8 +10,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@sw/api-parser": "workspace:*",
+    "@sw/auth": "workspace:*",
     "@sw/core": "workspace:*",
     "@sw/database": "workspace:*",
+    "@sw/http-client": "workspace:*",
+    "@sw/security-engine": "workspace:*",
     "clsx": "^2.1.1",
     "lucide-react": "^0.483.0",
     "react": "^19.0.0",
