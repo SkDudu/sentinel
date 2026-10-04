@@ -23,10 +23,34 @@ async function parseBody(response: Response): Promise<unknown> {
 
 export class HttpExecutor implements RequestExecutor {
   readonly name = "http";
+  private windowStart = Date.now();
+  private windowCount = 0;
 
   constructor(private readonly options: ExecutorOptions = {}) {}
 
+  private async enforceRateGuard() {
+    const max = this.options.maxRequestsPerMinute;
+    if (!max || max <= 0) return;
+
+    const now = Date.now();
+    if (now - this.windowStart >= 60_000) {
+      this.windowStart = now;
+      this.windowCount = 0;
+    }
+
+    if (this.windowCount >= max) {
+      const waitMs = 60_000 - (now - this.windowStart) + 10;
+      await new Promise((r) => setTimeout(r, Math.max(waitMs, 50)));
+      this.windowStart = Date.now();
+      this.windowCount = 0;
+    }
+
+    this.windowCount += 1;
+  }
+
   async execute(request: HttpRequest): Promise<HttpResponse> {
+    await this.enforceRateGuard();
+
     const controller = new AbortController();
     const timeout = this.options.timeoutMs ?? 30_000;
     const timer = setTimeout(() => controller.abort(), timeout);
@@ -42,14 +66,18 @@ export class HttpExecutor implements RequestExecutor {
       if (
         request.body !== undefined &&
         request.method !== "GET" &&
-        request.method !== "HEAD"
+        request.method !== "HEAD" &&
+        request.method !== "OPTIONS"
       ) {
         init.body =
           typeof request.body === "string"
             ? request.body
             : JSON.stringify(request.body);
 
-        if (!request.headers["content-type"] && !request.headers["Content-Type"]) {
+        if (
+          !request.headers["content-type"] &&
+          !request.headers["Content-Type"]
+        ) {
           init.headers = {
             ...request.headers,
             "Content-Type": "application/json",

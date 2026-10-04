@@ -3,6 +3,7 @@ import type {
   Finding,
   HttpRequest,
   HttpResponse,
+  RateLimitConfig,
   Severity,
   TestCase,
   TestCategory,
@@ -15,6 +16,13 @@ export interface TestContext {
   variables: Record<string, string>;
   baseUrl: string;
   authHeaders: Record<string, string>;
+  productionSafetyMode?: boolean;
+  rateLimit?: RateLimitConfig;
+}
+
+/** Minimal executor surface — avoids hard dep on @sw/http-client. */
+export interface TestExecutor {
+  execute(request: HttpRequest): Promise<HttpResponse>;
 }
 
 export interface SecurityTest {
@@ -29,6 +37,12 @@ export interface SecurityTest {
     ctx: TestContext,
     testCase: TestCase,
   ): HttpRequest | Promise<HttpRequest>;
+  /** Multi-request suites (rate-limit). When set, orchestrator skips execute+analyse. */
+  run?(
+    ctx: TestContext,
+    testCase: TestCase,
+    executor: TestExecutor,
+  ): Promise<Finding | Finding[] | null>;
   analyse(
     ctx: TestContext,
     testCase: TestCase,

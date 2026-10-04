@@ -1,4 +1,12 @@
-import { AuthType, ScanStatus, type Endpoint, type Environment, type TestCase } from "@sw/core";
+import {
+  AuthType,
+  ScanStatus,
+  type Endpoint,
+  type Environment,
+  type RateLimitConfig,
+  type TestCase,
+  type Variable,
+} from "@sw/core";
 import {
   resolveAuthHeaders,
   MemorySecretStore,
@@ -26,7 +34,17 @@ export interface ScanRequest {
   approvedAiCases?: TestCase[];
   /** When true, skip deterministic plugins; run only approvedAiCases. */
   aiOnly?: boolean;
+  /** Scan variables for {{token}} / {{userId}} interpolation + authz fixtures. */
+  variables?: Variable[];
+  rateLimit?: Partial<RateLimitConfig>;
 }
+
+const DEFAULT_RATE_LIMIT: RateLimitConfig = {
+  requests: 30,
+  windowSeconds: 10,
+  concurrency: 5,
+  expectedStatus: 429,
+};
 
 export async function runProjectScan(
   input: ScanRequest,
@@ -69,6 +87,11 @@ export async function runProjectScan(
   const store = new OverlaySecretStore(secretStore, overlay);
   const authHeaders = await resolveAuthHeaders(authEnv, store);
 
+  const rateLimit: RateLimitConfig = {
+    ...DEFAULT_RATE_LIMIT,
+    ...input.rateLimit,
+  };
+
   const run = await repos.runs.create({
     projectId: input.projectId,
     environmentId: input.environmentId,
@@ -77,6 +100,9 @@ export async function runProjectScan(
   const orchestrator = new TestOrchestrator();
   const executor = new HttpExecutor({
     timeoutMs: environment.productionSafetyMode ? 10_000 : 15_000,
+    maxRequestsPerMinute: environment.productionSafetyMode
+      ? 30
+      : rateLimit.requests * 6,
   });
 
   let totalCases = 0;
@@ -84,6 +110,8 @@ export async function runProjectScan(
   const allFindings = [];
 
   const casesByEndpoint = groupCasesByEndpoint(approved, targetEndpoints);
+  // Shared mutable bag across endpoints so extracts from step N feed step N+1.
+  const sharedVariables: Variable[] = [...(input.variables ?? [])];
 
   try {
     for (const endpoint of targetEndpoints as Endpoint[]) {
@@ -94,9 +122,12 @@ export async function runProjectScan(
         endpoint,
         baseUrl: environment.baseUrl,
         authHeaders,
+        variables: sharedVariables,
         executor,
         extraCases,
         skipPlugins: Boolean(input.aiOnly),
+        productionSafetyMode: environment.productionSafetyMode,
+        rateLimit,
         options: {
           normal: !input.aiOnly,
           validationErrors: !input.aiOnly,
@@ -107,6 +138,13 @@ export async function runProjectScan(
           aiGenerated: false,
         },
       });
+
+      // Persist extracts back into shared variable list for next endpoints.
+      for (const [key, value] of Object.entries(result.context.variables)) {
+        const existing = sharedVariables.find((v) => v.key === key);
+        if (existing) existing.value = value;
+        else sharedVariables.push({ key, value, source: "extract" });
+      }
 
       totalCases += result.cases.length;
       completedCases += result.executed;
@@ -132,6 +170,7 @@ export async function runProjectScan(
       findings: allFindings,
       endpointsScanned: targetEndpoints.length,
       totalCases,
+      variables: sharedVariables,
     };
   } catch (error) {
     await repos.runs.complete(run.id, {

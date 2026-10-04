@@ -2,9 +2,11 @@ import type {
   Endpoint,
   Environment,
   Finding,
+  RateLimitConfig,
   ScanRun,
   TestCase,
   TestPersona,
+  Variable,
 } from "@sw/core";
 
 export type EnvironmentDto = Environment & {
@@ -150,12 +152,15 @@ export const api = {
     bearerToken?: string;
     approvedAiCases?: TestCase[];
     aiOnly?: boolean;
+    variables?: Variable[];
+    rateLimit?: Partial<RateLimitConfig>;
   }) =>
     request<{
       run: ScanRun;
       findings: Finding[];
       endpointsScanned: number;
       totalCases: number;
+      variables?: Variable[];
     }>("/api/scans", {
       method: "POST",
       body: JSON.stringify(input),

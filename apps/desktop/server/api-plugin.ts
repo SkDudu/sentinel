@@ -2,7 +2,13 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
-import { AiProviderKind, AuthType, FindingStatus, type TestCase } from "@sw/core";
+import {
+  AiProviderKind,
+  AuthType,
+  FindingStatus,
+  type TestCase,
+  type Variable,
+} from "@sw/core";
 import { parseOpenApi } from "@sw/api-parser";
 import {
   EncryptedFileSecretStore,
@@ -402,6 +408,13 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
               bearerToken?: string;
               approvedAiCases?: TestCase[];
               aiOnly?: boolean;
+              variables?: Variable[];
+              rateLimit?: {
+                requests?: number;
+                windowSeconds?: number;
+                concurrency?: number;
+                expectedStatus?: number;
+              };
             }>(req);
 
             if (!body.projectId || !body.environmentId) {
@@ -420,6 +433,8 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                   bearerToken: body.bearerToken,
                   approvedAiCases: body.approvedAiCases,
                   aiOnly: body.aiOnly,
+                  variables: body.variables,
+                  rateLimit: body.rateLimit,
                 },
                 { projects, environments, endpoints, findings, runs },
                 secrets,

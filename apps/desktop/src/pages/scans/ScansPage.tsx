@@ -12,6 +12,9 @@ export function ScansPage() {
   const [environmentId, setEnvironmentId] = useState("");
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [bearerToken, setBearerToken] = useState("");
+  const [variablesJson, setVariablesJson] = useState(
+    '{\n  "userId": "1",\n  "otherUserId": "999999"\n}',
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<string | null>(null);
@@ -59,6 +62,15 @@ export function ScansPage() {
     [aiCases, approved],
   );
 
+  function parseVariables() {
+    const raw = JSON.parse(variablesJson) as Record<string, unknown>;
+    return Object.entries(raw).map(([key, value]) => ({
+      key,
+      value: typeof value === "string" ? value : JSON.stringify(value),
+      source: "manual" as const,
+    }));
+  }
+
   async function onRun() {
     if (!project || !environmentId) return;
     setBusy(true);
@@ -70,6 +82,7 @@ export function ScansPage() {
         environmentId,
         endpointIds: selectedIds,
         bearerToken: bearerToken || undefined,
+        variables: parseVariables(),
       });
       setLastResult(
         `Scan concluído: ${result.endpointsScanned} endpoints, ${result.totalCases} casos, ${result.findings.length} findings.`,
@@ -122,6 +135,7 @@ export function ScansPage() {
         bearerToken: bearerToken || undefined,
         approvedAiCases: stamped,
         aiOnly: true,
+        variables: parseVariables(),
       });
       setLastResult(
         `AI Lab: ${result.totalCases} casos aprovados, ${result.findings.length} findings.`,
@@ -231,6 +245,23 @@ export function ScansPage() {
             Secret configurado no vault para este ambiente.
           </p>
         )}
+        {project.environments.find((e) => e.id === environmentId)
+          ?.productionSafetyMode && (
+          <p className="text-xs text-[var(--warn)]">
+            Production Safety Mode: rate-limit capped (≤5 req, concurrency 1).
+          </p>
+        )}
+
+        <label className="block text-sm">
+          Variáveis do scan (JSON → {"{{userId}}"}, {"{{otherUserId}}"},{" "}
+          {"{{token}}"}…)
+          <textarea
+            value={variablesJson}
+            onChange={(e) => setVariablesJson(e.target.value)}
+            rows={4}
+            className="mt-1 w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2 font-mono text-xs"
+          />
+        </label>
 
         <div>
           <p className="mb-2 text-sm text-[var(--muted)]">

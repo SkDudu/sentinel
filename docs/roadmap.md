@@ -40,13 +40,13 @@ Objetivo: **projeto → OpenAPI → casos → run → findings** sem IA obrigat�
 
 **Critério de pronto:** gerar N casos AI, revisar, executar só os aprovados.
 
-## Fase 3 — Segurança além de validação
+## Fase 3 — Segurança além de validação ✅
 
-- [ ] Authentication suite (missing/invalid/expired token)
-- [ ] Authorization (IDOR / privilege — com fixtures controladas)
-- [ ] Rate limit module + Production Safety Mode
-- [ ] HTTP (CORS, methods, headers)
-- [ ] Test context / variáveis `{{token}}`, `{{userId}}` entre steps
+- [x] Authentication suite (missing/invalid/expired token)
+- [x] Authorization (IDOR / privilege — com fixtures controladas)
+- [x] Rate limit module + Production Safety Mode
+- [x] HTTP (CORS, methods, headers)
+- [x] Test context / variáveis `{{token}}`, `{{userId}}` entre steps
 
 ## Fase 4 — Desktop nativo + adapters
 
