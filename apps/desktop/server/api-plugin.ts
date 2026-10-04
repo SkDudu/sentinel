@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
-import { AuthType, FindingStatus } from "@sw/core";
+import { AiProviderKind, AuthType, FindingStatus, type TestCase } from "@sw/core";
 import { parseOpenApi } from "@sw/api-parser";
 import {
   EncryptedFileSecretStore,
@@ -17,6 +17,22 @@ import {
   TestRunRepository,
   type SqliteHandle,
 } from "@sw/database";
+import { createAiClientFromSettings } from "./ai-client.js";
+import {
+  generateAiCasesForEndpoints,
+  interpretProjectFindings,
+} from "./ai-lab.js";
+import {
+  loadAiSettings,
+  saveAiSettings,
+  toPublicAiSettings,
+  type AiSettingsFile,
+} from "./ai-settings.js";
+import {
+  deletePersona,
+  listPersonas,
+  upsertPersona,
+} from "./personas-store.js";
 import { runProjectScan } from "./scan.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -384,6 +400,8 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
               environmentId?: string;
               endpointIds?: string[];
               bearerToken?: string;
+              approvedAiCases?: TestCase[];
+              aiOnly?: boolean;
             }>(req);
 
             if (!body.projectId || !body.environmentId) {
@@ -400,6 +418,8 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                   environmentId: body.environmentId,
                   endpointIds: body.endpointIds,
                   bearerToken: body.bearerToken,
+                  approvedAiCases: body.approvedAiCases,
+                  aiOnly: body.aiOnly,
                 },
                 { projects, environments, endpoints, findings, runs },
                 secrets,
@@ -410,6 +430,202 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                 error: error instanceof Error ? error.message : "Scan failed",
               });
             }
+            return;
+          }
+
+          if (path === "/api/ai/settings" && method === "GET") {
+            sendJson(res, 200, toPublicAiSettings(loadAiSettings(dataDir)));
+            return;
+          }
+
+          if (path === "/api/ai/settings" && method === "PUT") {
+            const body = await readJson<Partial<AiSettingsFile>>(req);
+            const kindValues = Object.values(AiProviderKind) as string[];
+            if (body.kind && !kindValues.includes(body.kind)) {
+              sendJson(res, 400, { error: "invalid AI kind" });
+              return;
+            }
+            const saved = saveAiSettings(dataDir, {
+              enabled: body.enabled,
+              kind: body.kind,
+              baseUrl: body.baseUrl,
+              model: body.model,
+              apiKey: body.apiKey === "" ? undefined : body.apiKey,
+              maxAiCases: body.maxAiCases,
+            });
+            sendJson(res, 200, toPublicAiSettings(saved));
+            return;
+          }
+
+          if (path === "/api/ai/generate-cases" && method === "POST") {
+            const body = await readJson<{
+              projectId?: string;
+              endpointIds?: string[];
+              allowPersonaSeed?: boolean;
+            }>(req);
+
+            if (!body.projectId) {
+              sendJson(res, 400, { error: "projectId is required" });
+              return;
+            }
+            if (!(await projects.getById(body.projectId))) return notFound(res);
+
+            let target = await endpoints.listByProject(body.projectId);
+            if (body.endpointIds?.length) {
+              const allow = new Set(body.endpointIds);
+              target = target.filter((e) => allow.has(e.id));
+            }
+            if (target.length === 0) {
+              sendJson(res, 400, { error: "No endpoints selected" });
+              return;
+            }
+
+            const settings = loadAiSettings(dataDir);
+            const client = createAiClientFromSettings(settings);
+            const personas = listPersonas(dataDir, body.projectId);
+
+            try {
+              const result = await generateAiCasesForEndpoints({
+                endpoints: target,
+                personas,
+                client,
+                maxAiCases: settings.maxAiCases,
+                allowPersonaSeed: body.allowPersonaSeed ?? !client,
+              });
+              sendJson(res, 200, result);
+            } catch (error) {
+              sendJson(res, 400, {
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : "AI generation failed",
+              });
+            }
+            return;
+          }
+
+          if (path === "/api/ai/interpret" && method === "POST") {
+            const body = await readJson<{
+              projectId?: string;
+              findingIds?: string[];
+            }>(req);
+
+            if (!body.projectId) {
+              sendJson(res, 400, { error: "projectId is required" });
+              return;
+            }
+            if (!(await projects.getById(body.projectId))) return notFound(res);
+
+            const settings = loadAiSettings(dataDir);
+            const client = createAiClientFromSettings(settings);
+            if (!client) {
+              sendJson(res, 400, {
+                error: "AI desabilitada — configure Settings → AI",
+              });
+              return;
+            }
+
+            let items = await findings.listByProject(body.projectId);
+            if (body.findingIds?.length) {
+              const allow = new Set(body.findingIds);
+              items = items.filter((f) => allow.has(f.id));
+            }
+
+            try {
+              const interpretation = await interpretProjectFindings(
+                client,
+                items,
+              );
+              sendJson(res, 200, { interpretation, count: items.length });
+            } catch (error) {
+              sendJson(res, 400, {
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : "Interpretation failed",
+              });
+            }
+            return;
+          }
+
+          const personasMatch = path.match(
+            /^\/api\/projects\/([^/]+)\/personas$/,
+          );
+          if (personasMatch) {
+            const projectId = decodeURIComponent(personasMatch[1]!);
+            if (!(await projects.getById(projectId))) return notFound(res);
+
+            if (method === "GET") {
+              sendJson(res, 200, listPersonas(dataDir, projectId));
+              return;
+            }
+
+            if (method === "POST") {
+              const body = await readJson<{
+                id?: string;
+                name?: string;
+                description?: string;
+                fields?: Record<string, unknown>;
+                tags?: string[];
+              }>(req);
+              if (!body.name?.trim() || !body.fields) {
+                sendJson(res, 400, { error: "name and fields are required" });
+                return;
+              }
+              sendJson(
+                res,
+                201,
+                upsertPersona(dataDir, projectId, {
+                  id: body.id,
+                  name: body.name,
+                  description: body.description,
+                  fields: body.fields,
+                  tags: body.tags,
+                }),
+              );
+              return;
+            }
+          }
+
+          const personaMatch = path.match(
+            /^\/api\/projects\/([^/]+)\/personas\/([^/]+)$/,
+          );
+          if (personaMatch && method === "DELETE") {
+            const projectId = decodeURIComponent(personaMatch[1]!);
+            const personaId = decodeURIComponent(personaMatch[2]!);
+            if (!(await projects.getById(projectId))) return notFound(res);
+            if (!deletePersona(dataDir, projectId, personaId)) {
+              return notFound(res);
+            }
+            sendJson(res, 204);
+            return;
+          }
+
+          if (personaMatch && method === "PUT") {
+            const projectId = decodeURIComponent(personaMatch[1]!);
+            const personaId = decodeURIComponent(personaMatch[2]!);
+            if (!(await projects.getById(projectId))) return notFound(res);
+            const body = await readJson<{
+              name?: string;
+              description?: string;
+              fields?: Record<string, unknown>;
+              tags?: string[];
+            }>(req);
+            if (!body.name?.trim() || !body.fields) {
+              sendJson(res, 400, { error: "name and fields are required" });
+              return;
+            }
+            sendJson(
+              res,
+              200,
+              upsertPersona(dataDir, projectId, {
+                id: personaId,
+                name: body.name,
+                description: body.description,
+                fields: body.fields,
+                tags: body.tags,
+              }),
+            );
             return;
           }
 

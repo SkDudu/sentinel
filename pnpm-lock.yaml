@@ -38,6 +38,12 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@sw/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
+      '@sw/ai-data-generator':
+        specifier: workspace:*
+        version: link:../../packages/ai-data-generator
       '@sw/api-parser':
         specifier: workspace:*
         version: link:../../packages/api-parser

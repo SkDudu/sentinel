@@ -1,4 +1,4 @@
-import { AuthType, ScanStatus, type Endpoint, type Environment } from "@sw/core";
+import { AuthType, ScanStatus, type Endpoint, type Environment, type TestCase } from "@sw/core";
 import {
   resolveAuthHeaders,
   MemorySecretStore,
@@ -22,6 +22,10 @@ export interface ScanRequest {
   endpointIds?: string[];
   /** Optional one-off override — never written to the vault. */
   bearerToken?: string;
+  /** Reviewed AI cases only — never regenerated/auto-run. */
+  approvedAiCases?: TestCase[];
+  /** When true, skip deterministic plugins; run only approvedAiCases. */
+  aiOnly?: boolean;
 }
 
 export async function runProjectScan(
@@ -52,6 +56,11 @@ export async function runProjectScan(
     throw new Error("No endpoints to scan — import OpenAPI first");
   }
 
+  const approved = input.approvedAiCases ?? [];
+  if (input.aiOnly && approved.length === 0) {
+    throw new Error("No approved AI cases to run");
+  }
+
   const authEnv = ensureSecretRef(environment, input.bearerToken);
   const overlay = new MemorySecretStore();
   if (input.bearerToken && authEnv.secretRef) {
@@ -74,18 +83,25 @@ export async function runProjectScan(
   let completedCases = 0;
   const allFindings = [];
 
+  const casesByEndpoint = groupCasesByEndpoint(approved, targetEndpoints);
+
   try {
     for (const endpoint of targetEndpoints as Endpoint[]) {
+      const extraCases = casesByEndpoint.get(endpoint.id) ?? [];
+      if (input.aiOnly && extraCases.length === 0) continue;
+
       const result = await orchestrator.run({
         endpoint,
         baseUrl: environment.baseUrl,
         authHeaders,
         executor,
+        extraCases,
+        skipPlugins: Boolean(input.aiOnly),
         options: {
-          normal: true,
-          validationErrors: true,
-          edgeCases: true,
-          typeConfusion: true,
+          normal: !input.aiOnly,
+          validationErrors: !input.aiOnly,
+          edgeCases: !input.aiOnly,
+          typeConfusion: !input.aiOnly,
           boundaryValues: false,
           businessLogic: false,
           aiGenerated: false,
@@ -95,6 +111,12 @@ export async function runProjectScan(
       totalCases += result.cases.length;
       completedCases += result.executed;
       allFindings.push(...result.findings);
+    }
+
+    if (input.aiOnly && totalCases === 0) {
+      throw new Error(
+        "Approved AI cases do not match selected endpoints (set endpointId on cases)",
+      );
     }
 
     await repos.findings.createMany(allFindings, run.id);
@@ -120,6 +142,27 @@ export async function runProjectScan(
     });
     throw error;
   }
+}
+
+function groupCasesByEndpoint(
+  cases: TestCase[],
+  endpoints: Endpoint[],
+): Map<string, TestCase[]> {
+  const map = new Map<string, TestCase[]>();
+  const fallbackId = endpoints[0]?.id;
+
+  for (const testCase of cases) {
+    const tagged = testCase.tags
+      .find((t) => t.startsWith("endpoint:"))
+      ?.replace("endpoint:", "");
+    const endpointId = tagged ?? fallbackId;
+    if (!endpointId) continue;
+    const list = map.get(endpointId) ?? [];
+    list.push(testCase);
+    map.set(endpointId, list);
+  }
+
+  return map;
 }
 
 function ensureSecretRef(

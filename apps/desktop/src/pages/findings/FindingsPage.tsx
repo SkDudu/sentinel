@@ -10,6 +10,8 @@ export function FindingsPage() {
   const [findings, setFindings] = useState<Finding[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [interpretation, setInterpretation] = useState<string | null>(null);
 
   async function refresh(projectId: string) {
     setLoading(true);
@@ -44,6 +46,23 @@ export function FindingsPage() {
     }
   }
 
+  async function onInterpret() {
+    if (!project) return;
+    setBusy(true);
+    setError(null);
+    setInterpretation(null);
+    try {
+      const result = await api.interpretFindings({ projectId: project.id });
+      setInterpretation(result.interpretation);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Interpretação AI falhou",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!project) {
     return (
       <section className="max-w-4xl">
@@ -65,19 +84,35 @@ export function FindingsPage() {
             RESOLVED / IGNORED.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void refresh(project.id)}
-          className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm"
-        >
-          Atualizar
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            disabled={busy || findings.length === 0}
+            onClick={() => void onInterpret()}
+            className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm disabled:opacity-50"
+          >
+            {busy ? "Interpretando…" : "Interpretar com AI"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void refresh(project.id)}
+            className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm"
+          >
+            Atualizar
+          </button>
+        </div>
       </header>
 
       {error && (
         <p className="mb-4 rounded-md border border-[var(--danger)]/40 bg-[var(--danger)]/10 px-3 py-2 text-sm text-[var(--danger)]">
           {error}
         </p>
+      )}
+
+      {interpretation && (
+        <div className="mb-6 whitespace-pre-wrap rounded-lg border border-[var(--line)] bg-[var(--panel)] px-5 py-4 text-sm">
+          {interpretation}
+        </div>
       )}
 
       {loading && findings.length === 0 ? (

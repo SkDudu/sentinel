@@ -1,4 +1,11 @@
-import type { Endpoint, Environment, Finding, ScanRun } from "@sw/core";
+import type {
+  Endpoint,
+  Environment,
+  Finding,
+  ScanRun,
+  TestCase,
+  TestPersona,
+} from "@sw/core";
 
 export type EnvironmentDto = Environment & {
   secretConfigured?: boolean;
@@ -11,6 +18,15 @@ export interface ProjectDto {
   createdAt: string;
   updatedAt: string;
   environments: EnvironmentDto[];
+}
+
+export interface AiSettingsDto {
+  enabled: boolean;
+  kind: string;
+  baseUrl: string;
+  model: string;
+  maxAiCases: number;
+  hasApiKey: boolean;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -132,6 +148,8 @@ export const api = {
     environmentId: string;
     endpointIds?: string[];
     bearerToken?: string;
+    approvedAiCases?: TestCase[];
+    aiOnly?: boolean;
   }) =>
     request<{
       run: ScanRun;
@@ -141,5 +159,63 @@ export const api = {
     }>("/api/scans", {
       method: "POST",
       body: JSON.stringify(input),
+    }),
+
+  getAiSettings: () => request<AiSettingsDto>("/api/ai/settings"),
+
+  saveAiSettings: (input: {
+    enabled?: boolean;
+    kind?: string;
+    baseUrl?: string;
+    model?: string;
+    apiKey?: string;
+    maxAiCases?: number;
+  }) =>
+    request<AiSettingsDto>("/api/ai/settings", {
+      method: "PUT",
+      body: JSON.stringify(input),
+    }),
+
+  generateAiCases: (input: {
+    projectId: string;
+    endpointIds?: string[];
+    allowPersonaSeed?: boolean;
+  }) =>
+    request<{
+      cases: TestCase[];
+      rejected: Array<{ id: string; name: string; reason: string }>;
+      mode: "ai" | "persona-seed";
+    }>("/api/ai/generate-cases", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
+  interpretFindings: (input: { projectId: string; findingIds?: string[] }) =>
+    request<{ interpretation: string; count: number }>("/api/ai/interpret", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
+  listPersonas: (projectId: string) =>
+    request<TestPersona[]>(`/api/projects/${projectId}/personas`),
+
+  upsertPersona: (
+    projectId: string,
+    input: {
+      id?: string;
+      name: string;
+      description?: string;
+      fields: Record<string, unknown>;
+      tags?: string[];
+    },
+  ) =>
+    request<TestPersona>(`/api/projects/${projectId}/personas`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
+  deletePersona: (projectId: string, personaId: string) =>
+    request<void>(`/api/projects/${projectId}/personas/${personaId}`, {
+      method: "DELETE",
     }),
 };

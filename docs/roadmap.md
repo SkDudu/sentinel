@@ -30,13 +30,13 @@ Objetivo: **projeto → OpenAPI → casos → run → findings** sem IA obrigat�
 
 **Critério de pronto:** rodar um scan local contra uma API de staging/dev e ver findings na UI.
 
-## Fase 2 — AI Test Lab
+## Fase 2 — AI Test Lab ✅
 
-- [ ] Geração IA de casos semânticos (Ollama primeiro)
-- [ ] Personas de teste editáveis
-- [ ] Review gate obrigatório para casos AI
-- [ ] Safety filter reforçado
-- [ ] Interpretação pós-scan de findings (opcional)
+- [x] Geração IA de casos semânticos (Ollama primeiro; seed de personas offline)
+- [x] Personas de teste editáveis (por projeto)
+- [x] Review gate obrigatório para casos AI
+- [x] Safety filter reforçado (`@sw/ai-data-generator`)
+- [x] Interpretação pós-scan de findings (opcional, Settings → AI)
 
 **Critério de pronto:** gerar N casos AI, revisar, executar só os aprovados.
 

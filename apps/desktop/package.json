@@ -10,6 +10,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@sw/ai": "workspace:*",
+    "@sw/ai-data-generator": "workspace:*",
     "@sw/api-parser": "workspace:*",
     "@sw/auth": "workspace:*",
     "@sw/core": "workspace:*",

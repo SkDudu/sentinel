@@ -25,11 +25,15 @@ export interface OrchestratorInput {
   authHeaders?: Record<string, string>;
   variables?: Variable[];
   options?: Partial<TestDataOptions>;
-  /** When true, skip AI cases that were not explicitly approved. */
+  /** Reviewed AI/manual cases — executed as-is, never regenerated. */
+  extraCases?: TestCase[];
+  /** Legacy filter if AI regenerated during prepare (prefer extraCases). */
   approvedAiCaseIds?: string[];
   ai?: AiDataGeneratorOptions;
   registry?: TestRegistry;
   executor: RequestExecutor;
+  /** Skip registry plugins (AI-only run). */
+  skipPlugins?: boolean;
   onProgress?: (event: {
     completed: number;
     total: number;
@@ -80,25 +84,37 @@ export class TestOrchestrator {
       authHeaders: input.authHeaders ?? {},
     };
 
-    for (const test of this.registry.list()) {
-      const cases = await test.generateCases(ctxPreview);
-      pluginCases.push(
-        ...cases.map((c) => ({
-          ...c,
-          id: `${test.id}:${c.id}`,
-          tags: [...c.tags, `plugin:${test.id}`],
-        })),
-      );
+    if (!input.skipPlugins) {
+      for (const test of this.registry.list()) {
+        const cases = await test.generateCases(ctxPreview);
+        pluginCases.push(
+          ...cases.map((c) => ({
+            ...c,
+            id: `${test.id}:${c.id}`,
+            tags: [...c.tags, `plugin:${test.id}`],
+          })),
+        );
+      }
     }
 
     const approved = new Set(input.approvedAiCaseIds ?? []);
     const aiCases = bundle.aiGenerated.filter((c) =>
       input.ai?.requireReview === false ? true : approved.has(c.id),
     );
+    const extra = (input.extraCases ?? []).map((c) => ({
+      ...c,
+      tags: c.tags.includes("approved") ? c.tags : [...c.tags, "approved"],
+    }));
 
     return {
       analyzed,
-      cases: [...bundle.deterministic, ...bundle.businessLogic, ...aiCases, ...pluginCases],
+      cases: [
+        ...bundle.deterministic,
+        ...bundle.businessLogic,
+        ...aiCases,
+        ...extra,
+        ...pluginCases,
+      ],
       bundle,
       context: ctxPreview,
     };
@@ -159,6 +175,14 @@ export class TestOrchestrator {
           if (result) {
             findings.push(...(Array.isArray(result) ? result : [result]));
           }
+        } else {
+          const heuristic = analyseGenericCase(
+            prepared.context,
+            testCase,
+            request,
+            response,
+          );
+          if (heuristic) findings.push(heuristic);
         }
       } catch (error) {
         executed += 1;
@@ -194,4 +218,53 @@ export class TestOrchestrator {
       executed,
     };
   }
+}
+
+function analyseGenericCase(
+  ctx: TestContext,
+  testCase: TestCase,
+  request: { method: string; url: string; headers: Record<string, string>; body?: unknown },
+  response: { status: number; headers: Record<string, string>; body?: unknown; durationMs: number },
+): Finding | null {
+  if (response.status >= 500) {
+    return {
+      id: randomUUID(),
+      projectId: ctx.endpoint.projectId,
+      endpointId: ctx.endpoint.id,
+      testId: "ai.generic",
+      testCaseId: testCase.id,
+      title: `Server error on AI/extra case: ${testCase.name}`,
+      severity: Severity.HIGH,
+      confidence: 75,
+      status: FindingStatus.OPEN,
+      evidence: `HTTP ${response.status} for reviewed case ${testCase.id}.`,
+      request,
+      response,
+      recommendation: "Validate and reject malformed/semantic edge inputs safely.",
+      createdAt: new Date().toISOString(),
+    };
+  }
+
+  if (
+    testCase.expectedStatus?.length &&
+    !testCase.expectedStatus.includes(response.status)
+  ) {
+    return {
+      id: randomUUID(),
+      projectId: ctx.endpoint.projectId,
+      endpointId: ctx.endpoint.id,
+      testId: "ai.expected-status",
+      testCaseId: testCase.id,
+      title: `Unexpected status for ${testCase.name}`,
+      severity: Severity.MEDIUM,
+      confidence: 60,
+      status: FindingStatus.OPEN,
+      evidence: `Expected ${testCase.expectedStatus.join("|")}, got ${response.status}.`,
+      request,
+      response,
+      createdAt: new Date().toISOString(),
+    };
+  }
+
+  return null;
 }
