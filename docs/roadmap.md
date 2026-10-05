@@ -68,12 +68,12 @@ Objetivo: fluxos UI/API sólidos no uso diário; sem feature nova grande.
 
 Detalhe operacional (checklist humano + gaps P0–P3 para agentes): **[hardening.md](./hardening.md)**.
 
-- [ ] Projects: editar ambiente/headers/auth após criar
-- [ ] Endpoints: delete / detalhe mínimo (CRUD manual se necessário)
-- [ ] Scans: feedback de execução; cancel quando fizer sentido
-- [ ] Findings: evidência HTTP na UI + filtros; export desktop ou path CLI explícito
-- [ ] AI Lab: persona edit + casos aprovados sem surpresa de sessão
-- [ ] CLI vs UI: mesmo projeto/DB, findings coerentes
+- [x] Projects: editar ambiente/headers/auth após criar
+- [x] Endpoints: delete / detalhe mínimo (CRUD manual se necessário)
+- [x] Scans: feedback de execução; cancel quando fizer sentido
+- [x] Findings: evidência HTTP na UI + filtros; export desktop ou path CLI explícito
+- [x] AI Lab: persona edit + casos aprovados sem surpresa de sessão
+- [x] CLI vs UI: mesmo projeto/DB, findings coerentes
 
 **Critério de pronto:** ver seção “Critério de hardening pronto” em [hardening.md](./hardening.md).
 

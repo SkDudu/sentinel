@@ -14,12 +14,12 @@ Rodar o desktop (`pnpm --filter @sw/desktop dev` ou script do monorepo) contra A
 
 | # | Fluxo | O que fazer | Resultado esperado | Gap conhecido |
 | --- | --- | --- | --- | --- |
-| 1 | **Projects** | Criar projeto → ambiente (baseUrl, auth, safety) → gravar secret no vault → selecionar projeto ativo | Projeto + env persistem após reload; `secretConfigured` true | Editar ambiente/headers/auth **depois** de criar é fraco ou ausente na UI |
-| 2 | **Endpoints** | Importar OpenAPI (`examples/sample-openapi.json` ou contrato real) | Lista de endpoints com method/path; reimport substitui source OpenAPI | Sem CRUD manual, delete, YAML, detalhe de schema |
-| 3 | **Scans (determinístico)** | Escolher env + endpoints → vars JSON se precisar → Run | Run no histórico; findings novos no projeto | Scan **síncrono**; sem progress/cancel; store `scan.ts` pouco usado |
-| 4 | **Findings** | Abrir lista → mudar status (OPEN → …) → refresh | Status persiste no SQLite | Evidência HTTP (request/response) no DB mas **não na UI**; sem filtro/export |
-| 5 | **AI Lab** | Settings AI (ou seed offline) → gerar casos → aprovar subset → run `aiOnly` | Só casos aprovados disparam; findings aparecem | Persona edit limitada; casos aprovados não persistem entre sessões |
-| 6 | **CLI** | Mesmo DB `data/sentinel.db`: `sentinel scan --project … --format sarif` | Exit codes + relatório batem com findings da UI | ZAP/plugins custom mais ricos na CLI que no desktop |
+| 1 | **Projects** | Criar projeto → ambiente (baseUrl, auth, safety) → gravar secret no vault → selecionar projeto ativo | Projeto + env persistem após reload; `secretConfigured` true | ✅ Editar ambiente (nome, baseUrl, auth, safety, headers) na UI |
+| 2 | **Endpoints** | Importar OpenAPI (`examples/sample-openapi.json` ou contrato real) | Lista de endpoints com method/path; reimport substitui source OpenAPI | ✅ Delete + detalhe mínimo (params/schema); sem CRUD manual/YAML |
+| 3 | **Scans (determinístico)** | Escolher env + endpoints → vars JSON se precisar → Run | Run no histórico; findings novos no projeto | ✅ Cancel + status rodando/cancelado/falhou; `test_results` gravados; store órfão removido |
+| 4 | **Findings** | Abrir lista → mudar status (OPEN → …) → refresh | Status persiste no SQLite | ✅ Evidência HTTP + filtros severity/status + export JSON/SARIF na UI |
+| 5 | **AI Lab** | Settings AI (ou seed offline) → gerar casos → aprovar subset → run `aiOnly` | Só casos aprovados disparam; findings aparecem | ✅ Persona edit + casos/aprovações em `data/ai-cases/` |
+| 6 | **CLI** | Mesmo DB `data/sentinel.db`: `sentinel scan --project … --format sarif` | Exit codes + relatório batem com findings da UI | ✅ Path absoluto logado; `--openapi` é efêmero; ZAP/plugins ainda só na CLI |
 
 ### Checklist rápido por bug
 
@@ -41,19 +41,19 @@ Ao achar problema, anotar:
 
 | Item | Onde | Notas |
 | --- | --- | --- |
-| Editar ambiente (nome, baseUrl, authType, safety, headers) | `ProjectsPage`, `api.updateEnvironment`, `PATCH /api/environments/:id` | Repo + rota já existem; UI e client incompletos (`headers`) |
-| Findings com evidência + filtros básicos | `FindingsPage`, `FindingRepository` | Mostrar request/response já persistidos; filtro por severity/status |
-| Endpoints: delete (+ detalhe mínimo) | `api-plugin`, `EndpointRepository`, `EndpointsPage` | `delete` no repo sem rota HTTP |
-| Export findings na desktop | UI + `@sw/findings` | CLI já tem JSON/SARIF |
+| ✅ Editar ambiente (nome, baseUrl, authType, safety, headers) | `ProjectsPage`, `api.updateEnvironment`, `PATCH /api/environments/:id` | UI de edição + `headers` no client/store/create |
+| ✅ Findings com evidência + filtros básicos | `FindingsPage`, `FindingRepository` | Request/response na UI; filtro severity/status (client-side) |
+| ✅ Endpoints: delete (+ detalhe mínimo) | `api-plugin`, `EndpointRepository`, `EndpointsPage` | `DELETE /api/endpoints/:id` + painel de detalhe |
+| ✅ Export findings na desktop | UI + `@sw/findings` | Export JSON/SARIF na FindingsPage (lista filtrada) |
 
 ### P1 — execução e histórico
 
 | Item | Onde | Notas |
 | --- | --- | --- |
-| Scan async + cancel | `POST /api/scans`, orchestrator, UI | Enum `ScanStatus.CANCELLED` existe; ninguém usa |
-| Persistir `test_results` | `packages/scan-runner`, schema | Tabela no schema; `runProjectScan` não grava |
-| Integrar ou remover `useScanStore` | `apps/desktop/src/stores/scan.ts` | Store órfão hoje |
-| Persona edit completa | `PUT /api/projects/:id/personas/:personaId` | Server ok; client/UI fracos |
+| ✅ Scan cancel + feedback | `POST /api/scans`, orchestrator, UI | AbortSignal + `CANCELLED`; UI rodando/cancelando (ainda sync HTTP) |
+| ✅ Persistir `test_results` | `packages/scan-runner`, schema | `TestResultRepository` + gravação em `runProjectScan` |
+| ✅ Remover `useScanStore` | `apps/desktop/src/stores/scan.ts` | Store órfão removido (estado fica na ScansPage) |
+| ✅ Persona edit completa | `PUT /api/projects/:id/personas/:personaId` | `api.updatePersona` + Editar na ScansPage |
 
 ### P2 — modelo de dados “morto”
 
@@ -99,9 +99,11 @@ API local: `apps/desktop/server/api-plugin.ts`.
 ## Critério de “hardening pronto”
 
 - Fluxos 1–5 da tabela humana passam sem workaround.  
-- P0 fechado.  
-- Scan cancelável ou, no mínimo, feedback claro de “rodando / terminou / falhou”.  
-- Findings mostram evidência suficiente para agir sem abrir o DB.  
-- Export desktop ou caminho documentado “use a CLI” aceito explicitamente no produto.
+- ✅ P0 fechado.  
+- ✅ Scan cancelável + feedback rodando/terminou/falhou/cancelado.  
+- ✅ Findings com evidência HTTP + filtros + export desktop.  
+- ✅ CLI `--project` documentado no mesmo `data/sentinel.db` (log absoluto).  
+
+Verificação humana dos fluxos 1–6 ainda é o gate final. P2/P3 só sob pedido.
 
 Até lá: prioridade = este doc, não features novas fora da lista.
