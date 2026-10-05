@@ -1,6 +1,7 @@
 export * from "./types.js";
 export * from "./registry.js";
 export * from "./utils.js";
+export * from "./plugins.js";
 export * from "./tests/validation.js";
 export * from "./tests/authentication.js";
 export * from "./tests/authorization.js";

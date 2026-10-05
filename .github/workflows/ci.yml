@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build CLI
+        run: pnpm --filter @sw/cli build
+
+      - name: CLI help
+        run: pnpm --filter @sw/cli exec node ./dist/index.js --help || pnpm --filter @sw/cli exec node ./dist/index.js
+
+      - name: Offline SARIF export smoke (unreachable host → findings/errors ok)
+        run: |
+          set +e
+          pnpm --filter @sw/cli exec node ./dist/index.js scan \
+            --openapi ../../examples/sample-openapi.json \
+            --base-url http://127.0.0.1:9 \
+            --plugins ../../examples/plugins \
+            --format sarif \
+            --output ../../sentinel.sarif \
+            --max-critical 999 \
+            --max-high 999
+          code=$?
+          # 0 pass, 2 gate fail — both mean CLI ran end-to-end
+          if [ "$code" -ne 0 ] && [ "$code" -ne 2 ]; then
+            echo "Unexpected exit code: $code"
+            exit 1
+          fi
+          test -f ../../sentinel.sarif
+          grep -q '"version": "2.1.0"' ../../sentinel.sarif
+
+      - name: Upload SARIF artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sentinel-sarif
+          path: sentinel.sarif
+          if-no-files-found: ignore

@@ -8,6 +8,8 @@
     "build": "pnpm -r --filter=./packages/* run build",
     "dev:desktop": "pnpm --filter @sw/desktop dev",
     "dev:cli": "pnpm --filter @sw/cli dev",
+    "tauri:dev": "pnpm --filter @sw/desktop tauri:dev",
+    "tauri:build": "pnpm --filter @sw/desktop tauri:build",
     "typecheck": "pnpm -r run typecheck",
     "lint": "pnpm -r run typecheck"
   },

@@ -1,0 +1,45 @@
+# Example: gate a staging API with Sentinel in CI.
+# Copy/adapt into your app repo (or keep as reference).
+
+name: Sentinel API scan
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1"
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build && pnpm --filter @sw/cli build
+
+      - name: Run Sentinel scan
+        env:
+          TARGET_BASE_URL: ${{ vars.SENTINEL_BASE_URL }}
+          TARGET_TOKEN: ${{ secrets.SENTINEL_BEARER_TOKEN }}
+        run: |
+          pnpm --filter @sw/cli exec node ./dist/index.js scan \
+            --openapi ./examples/sample-openapi.json \
+            --base-url "$TARGET_BASE_URL" \
+            --token "$TARGET_TOKEN" \
+            --format sarif \
+            --output ./sentinel.sarif \
+            --fail-on critical,high
+
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: sentinel.sarif

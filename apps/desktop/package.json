@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
   },
   "dependencies": {
     "@sw/ai": "workspace:*",
@@ -17,7 +20,9 @@
     "@sw/core": "workspace:*",
     "@sw/database": "workspace:*",
     "@sw/http-client": "workspace:*",
+    "@sw/scan-runner": "workspace:*",
     "@sw/security-engine": "workspace:*",
+    "@tauri-apps/api": "^2.4.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.483.0",
     "react": "^19.0.0",
@@ -28,6 +33,7 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.14",
+    "@tauri-apps/cli": "^2.4.0",
     "@types/node": "^22.13.10",
     "@types/react": "^19.0.12",
     "@types/react-dom": "^19.0.4",

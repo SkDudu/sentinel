@@ -6,6 +6,17 @@ export {
   EncryptedFileSecretStore,
   environmentSecretRef,
 } from "./encrypted-file-store.js";
+export {
+  KeychainSecretStore,
+  createTauriKeychainBackend,
+  type KeychainBackend,
+  type TauriInvoke,
+} from "./keychain-store.js";
+export {
+  createSecretStore,
+  type CreateSecretStoreOptions,
+  type SecretBackendKind,
+} from "./create-store.js";
 
 /** In-memory store for tests / ephemeral overrides. */
 export class MemorySecretStore implements SecretStore {
@@ -21,6 +32,10 @@ export class MemorySecretStore implements SecretStore {
 
   async delete(ref: string) {
     this.#secrets.delete(ref);
+  }
+
+  async has(ref: string) {
+    return this.#secrets.has(ref);
   }
 }
 
@@ -42,6 +57,11 @@ export class OverlaySecretStore implements SecretStore {
   async delete(ref: string) {
     await this.overlay.delete(ref);
     await this.primary.delete(ref);
+  }
+
+  async has(ref: string) {
+    if (await this.overlay.has(ref)) return true;
+    return this.primary.has(ref);
   }
 }
 

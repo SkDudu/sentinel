@@ -99,12 +99,3 @@ export class HttpExecutor implements RequestExecutor {
     }
   }
 }
-
-/** Placeholder for future OWASP ZAP integration — not used in MVP. */
-export class ZapExecutor implements RequestExecutor {
-  readonly name = "zap";
-
-  async execute(_request: HttpRequest): Promise<HttpResponse> {
-    throw new Error("ZapExecutor not implemented yet — use HttpExecutor");
-  }
-}

@@ -10,10 +10,7 @@ import {
   type Variable,
 } from "@sw/core";
 import { parseOpenApi } from "@sw/api-parser";
-import {
-  EncryptedFileSecretStore,
-  environmentSecretRef,
-} from "@sw/auth";
+import { createSecretStore, environmentSecretRef } from "@sw/auth";
 import {
   createSqliteDb,
   EndpointRepository,
@@ -23,6 +20,7 @@ import {
   TestRunRepository,
   type SqliteHandle,
 } from "@sw/database";
+import { runProjectScan } from "@sw/scan-runner";
 import { createAiClientFromSettings } from "./ai-client.js";
 import {
   generateAiCasesForEndpoints,
@@ -39,7 +37,6 @@ import {
   listPersonas,
   upsertPersona,
 } from "./personas-store.js";
-import { runProjectScan } from "./scan.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dataDir = join(__dirname, "..", "..", "..", "data");
@@ -90,7 +87,15 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
     name: "sentinel-api",
     configureServer(server) {
       handle = createSqliteDb(dbPath);
-      const secrets = new EncryptedFileSecretStore(dataDir);
+      const { store: secrets, kind: secretBackend } = createSecretStore({
+        dataDir,
+        kind: process.env.SENTINEL_SECRET_BACKEND === "keychain"
+          ? "keychain"
+          : "file",
+        preferKeychain: process.env.SENTINEL_SECRET_BACKEND === "keychain",
+      });
+      // Keychain needs Tauri invoke — without it, factory falls back to file vault.
+      void secretBackend;
       const projects = new ProjectRepository(handle.db);
       const environments = new EnvironmentRepository(handle.db);
       const endpoints = new EndpointRepository(handle.db);

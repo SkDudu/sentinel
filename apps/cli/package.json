@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "bin": {
+    "sentinel": "./dist/index.js",
     "security-workbench": "./dist/index.js"
   },
   "scripts": {
@@ -13,10 +14,14 @@
   },
   "dependencies": {
     "@sw/api-parser": "workspace:*",
+    "@sw/auth": "workspace:*",
     "@sw/core": "workspace:*",
+    "@sw/database": "workspace:*",
     "@sw/findings": "workspace:*",
     "@sw/http-client": "workspace:*",
-    "@sw/security-engine": "workspace:*"
+    "@sw/scan-runner": "workspace:*",
+    "@sw/security-engine": "workspace:*",
+    "@sw/test-registry": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",

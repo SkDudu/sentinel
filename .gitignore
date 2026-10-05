@@ -39,11 +39,14 @@ apps/desktop/src-tauri/target/
 apps/desktop/src-tauri/WixTools/
 apps/desktop/src-tauri/gen/
 
-# Logs / coverage
+# Logs / coverage / scan reports
 logs/
 *.log
 coverage/
 .nyc_output/
+*.sarif
+sentinel-report.json
+sentinel-smoke.sarif
 
 # Misc
 *.local

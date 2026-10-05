@@ -41,10 +41,12 @@ Projeto → Endpoints (OpenAPI) → Casos de teste → Execução → Findings
 
 | Fase | Estado |
 | --- | --- |
-| Fundação (monorepo, engine, docs) | Feito |
-| MVP usável (SQLite + UI wired + scan real) | Em andamento |
-| AI Test Lab completo | Próximo |
-| Authz, rate limit, Tauri, CI | Depois |
+| 0 Fundação | ✅ |
+| 1 MVP usável | ✅ |
+| 2 AI Test Lab | ✅ |
+| 3 Authz / rate-limit / HTTP | ✅ |
+| 4 Tauri + keychain + ZAP + plugins | ✅ (build Tauri precisa Rust) |
+| 5 CLI / CI / SARIF | ✅ |
 
 Detalhes em [`docs/roadmap.md`](./docs/roadmap.md).
 
@@ -60,9 +62,9 @@ Detalhes em [`docs/roadmap.md`](./docs/roadmap.md).
 | Banco | SQLite + Drizzle |
 | HTTP | `fetch` via `RequestExecutor` |
 | AI (opcional) | Ollama / LM Studio / OpenAI-compatible |
-| External scanner | OWASP ZAP (futuro, adapter) |
+| External scanner | OWASP ZAP (`ZapExecutor`, opcional) |
 
-Requisitos: **Node ≥ 22.5** (SQLite nativo) e **pnpm**.
+Requisitos: **Node ≥ 22.5** (SQLite nativo) e **pnpm**. Tauri opcional: **Rust** + `pnpm tauri:dev`.
 
 ---
 
@@ -76,15 +78,24 @@ pnpm dev:desktop
 
 A UI sobe em `http://localhost:1420`.
 
-### CLI (scan via OpenAPI)
+### CLI
 
 ```bash
-pnpm --filter @sw/cli dev scan \
+pnpm --filter @sw/cli build
+
+# OpenAPI ad-hoc
+pnpm --filter @sw/cli exec node ./dist/index.js scan \
   --openapi examples/sample-openapi.json \
-  --base-url http://localhost:3000
+  --base-url http://localhost:3000 \
+  --format sarif --output report.sarif
+
+# Projeto persistido (SQLite do desktop)
+pnpm --filter @sw/cli exec node ./dist/index.js scan \
+  --project <uuid> --environment <uuid> --db ./data/sentinel.db
 ```
 
-Opções úteis: `--path /users` para filtrar um endpoint.
+Exit codes: `0` gate ok · `1` erro · `2` gate falhou (critical/high).  
+Plugins: `--plugins examples/plugins` · ZAP: `--executor zap --zap-url http://127.0.0.1:8080`.
 
 ---
 
@@ -100,10 +111,11 @@ sentinel/
 │   ├── database/          # Schema Drizzle / SQLite
 │   ├── api-parser/        # OpenAPI → modelo interno + semântica
 │   ├── auth/              # Auth headers + secret store
-│   ├── http-client/       # RequestExecutor (HTTP; ZAP depois)
-│   ├── test-registry/     # Plugins de teste
-│   ├── security-engine/   # Orchestrator
-│   ├── findings/          # Summary + CI gate
+│   ├── http-client/       # RequestExecutor + ZapExecutor
+│   ├── test-registry/     # Plugins de teste + loader externo
+│   ├── security-engine/   # Orchestrator + custom scanners
+│   ├── scan-runner/       # runProjectScan compartilhado (UI/CLI)
+│   ├── findings/          # Summary, gate, JSON/SARIF
 │   ├── ai/                # Client LLM + interpretação
 │   └── ai-data-generator/ # Casos determinísticos, personas e IA
 └── docs/                  # Produto, roadmap, arquitetura, stack, regras de IA
@@ -145,7 +157,7 @@ Novos testes de segurança entram em `@sw/test-registry` como plugins — não n
 3. Rode o scan em **Scans** (Bearer opcional só da execução)  
 4. Revise e atualize status em **Findings**
 
-IA e keychain completo entram depois — ver [roadmap](./docs/roadmap.md).
+AI Lab em **Scans**; secrets no vault (keychain no shell Tauri). Ver [roadmap](./docs/roadmap.md).
 
 ---
 

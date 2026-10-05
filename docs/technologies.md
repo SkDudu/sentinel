@@ -32,12 +32,14 @@
 | Peça | Estado |
 | --- | --- |
 | Packages core/engine/parser/ai-data | Scaffold funcional (build OK) |
-| Desktop Vite/React/Tailwind | UI shell + AI Test Lab mock |
-| CLI | `scan` MVP contra OpenAPI |
-| Tauri | Ainda não inicializado (precisa Rust) |
+| Desktop Vite/React/Tailwind | UI + AI Test Lab + scans |
+| CLI | `sentinel scan` (OpenAPI ou `--project`) + JSON/SARIF |
+| Tauri | Scaffold em `apps/desktop/src-tauri` (build nativo precisa Rust) |
 | shadcn/ui | Planejado; UI atual é Tailwind direto |
 | SQLite runtime | Drizzle ORM no runtime via `sqlite-proxy` + `node:sqlite` (sem native addon); arquivo em `data/sentinel.db` |
-| Secrets | Vault AES-256-GCM (`data/secrets.vault`) — nunca plaintext no SQLite; keychain SO com Tauri |
+| Secrets | Vault AES-256-GCM + `KeychainSecretStore` (Tauri/keyring) |
+| ZAP | `ZapExecutor` opcional (`--executor zap`) |
+| Plugins | `--plugins <dir>` carrega `SecurityTest` custom |
 
 ## Decisões conscientes
 

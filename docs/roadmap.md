@@ -48,19 +48,19 @@ Objetivo: **projeto → OpenAPI → casos → run → findings** sem IA obrigat�
 - [x] HTTP (CORS, methods, headers)
 - [x] Test context / variáveis `{{token}}`, `{{userId}}` entre steps
 
-## Fase 4 — Desktop nativo + adapters
+## Fase 4 — Desktop nativo + adapters ✅
 
-- [ ] Empacotar com Tauri
-- [ ] Keychain nativo do SO
-- [ ] Adapter OWASP ZAP (opcional)
-- [ ] Custom scanners pluggable
+- [x] Empacotar com Tauri (`apps/desktop/src-tauri` — requer Rust para build nativo)
+- [x] Keychain nativo do SO (`KeychainSecretStore` + comandos Tauri; fallback vault arquivo)
+- [x] Adapter OWASP ZAP (opcional) (`ZapExecutor` via API REST)
+- [x] Custom scanners pluggable (`--plugins` + `CustomScannerRegistry`)
 
-## Fase 5 — CLI / CI
+## Fase 5 — CLI / CI ✅
 
-- [ ] `sentinel scan --project …` (binário estável)
-- [ ] Exit codes para gate (critical/high)
-- [ ] Exemplo GitHub Actions
-- [ ] Relatório JSON/SARIF (se fizer sentido)
+- [x] `sentinel scan --project …` / `--openapi …` (bin `@sw/cli`)
+- [x] Exit codes para gate (0 ok, 1 erro, 2 gate)
+- [x] Exemplo GitHub Actions (`.github/workflows/`)
+- [x] Relatório JSON/SARIF (`--format json|sarif`)
 
 ## Não-objetivos (por enquanto)
 

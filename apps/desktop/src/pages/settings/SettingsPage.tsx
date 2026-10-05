@@ -71,13 +71,18 @@ export function SettingsPage() {
       <div className="space-y-4">
         <fieldset className="rounded-lg border border-[var(--line)] bg-[var(--panel)] p-5">
           <legend className="px-1 text-sm text-[var(--muted)]">
-            Secret vault
+            Secret vault / keychain
           </legend>
           <p className="text-sm text-[var(--muted)]">
-            Tokens Bearer / API Key em{" "}
-            <code className="text-[var(--accent)]">data/secrets.vault</code>{" "}
-            (AES-256-GCM). Chave em{" "}
-            <code className="text-[var(--accent)]">data/.sentinel-key</code>.
+            Default: vault AES-256-GCM em{" "}
+            <code className="text-[var(--accent)]">data/secrets.vault</code>.
+            No shell Tauri, comandos Rust{" "}
+            <code className="text-[var(--accent)]">secret_*</code> usam o
+            keychain do SO (`KeychainSecretStore`).
+          </p>
+          <p className="mt-2 text-xs text-[var(--muted)]">
+            Build nativo: <code>pnpm --filter @sw/desktop tauri:dev</code>{" "}
+            (precisa Rust). Dev web continua em Vite :1420.
           </p>
         </fieldset>
 
