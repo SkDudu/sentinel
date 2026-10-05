@@ -1,54 +1,29 @@
-import { NavLink, Outlet } from "react-router-dom";
-import { cn } from "@/lib/utils";
-import { useProjectStore } from "@/stores/project";
-
-const links = [
-  { to: "/", label: "Projects" },
-  { to: "/endpoints", label: "Endpoints" },
-  { to: "/scans", label: "Scans / AI Lab" },
-  { to: "/findings", label: "Findings" },
-  { to: "/settings", label: "Settings" },
-];
+import { Outlet } from "react-router-dom";
+import { AppSidebar } from "@/components/app-sidebar";
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
+import { Separator } from "@/components/ui/separator";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 export function Shell() {
-  const { projects, activeProjectId } = useProjectStore();
-  const active = projects.find((p) => p.id === activeProjectId);
-
   return (
-    <div className="min-h-screen grid grid-cols-[240px_1fr]">
-      <aside className="border-r border-[var(--line)] bg-[var(--bg-elevated)]/90 px-4 py-6">
-        <div className="mb-8">
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">
-            Local
-          </p>
-          <h1 className="mt-1 text-xl font-semibold tracking-tight">Sentinel</h1>
-          <p className="mt-2 text-xs text-[var(--muted)]">
-            {active ? `Projeto: ${active.name}` : "Nenhum projeto ativo"}
-          </p>
-        </div>
-        <nav className="flex flex-col gap-1">
-          {links.map((link) => (
-            <NavLink
-              key={link.to}
-              to={link.to}
-              end={link.to === "/"}
-              className={({ isActive }) =>
-                cn(
-                  "rounded-md px-3 py-2 text-sm transition-colors",
-                  isActive
-                    ? "bg-[var(--accent-dim)] text-white"
-                    : "text-[var(--muted)] hover:bg-[var(--panel)] hover:text-[var(--text)]",
-                )
-              }
-            >
-              {link.label}
-            </NavLink>
-          ))}
-        </nav>
-      </aside>
-      <main className="px-8 py-8">
-        <Outlet />
-      </main>
-    </div>
+    <TooltipProvider>
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset>
+          <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
+            <SidebarTrigger className="-ml-1" />
+            <Separator orientation="vertical" className="mr-1 h-4" />
+            <span className="text-sm text-muted-foreground">Sentinel</span>
+          </header>
+          <main className="flex-1 px-8 py-8">
+            <Outlet />
+          </main>
+        </SidebarInset>
+      </SidebarProvider>
+    </TooltipProvider>
   );
 }

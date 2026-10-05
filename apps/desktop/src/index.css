@@ -1,5 +1,155 @@
 @import "tailwindcss";
 @import "./styles/tokens.css";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: "Geist Variable", sans-serif;
+
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-warning: var(--warning);
+
+  /* Direto das escalas — não depender de --muted/--accent (compat de páginas) */
+  --color-accent-foreground: var(--storm-50);
+  --color-accent: var(--storm-800);
+  --color-muted-foreground: var(--storm-400);
+  --color-muted: var(--storm-800);
+  --color-secondary-foreground: var(--storm-50);
+  --color-secondary: var(--storm-800);
+  --color-primary-foreground: #ffffff;
+  --color-primary: var(--malachite-500);
+  --color-popover-foreground: var(--storm-50);
+  --color-popover: var(--storm-900);
+  --color-card-foreground: var(--storm-50);
+  --color-card: var(--storm-900);
+  --color-foreground: var(--storm-50);
+  --color-background: var(--storm-950);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  /* App dark-first — Malachite + Storm Dust */
+  --background: var(--storm-950);
+  --foreground: var(--storm-50);
+  --card: var(--storm-900);
+  --card-foreground: var(--storm-50);
+  --popover: var(--storm-900);
+  --popover-foreground: var(--storm-50);
+  --primary: var(--malachite-500);
+  --primary-foreground: #ffffff;
+  --secondary: var(--storm-800);
+  --secondary-foreground: var(--storm-50);
+  --muted: var(--storm-800);
+  --muted-foreground: var(--storm-400);
+  --accent: var(--storm-800);
+  --accent-foreground: var(--storm-50);
+  --destructive: #e26d6d;
+  --warning: #e6b35a;
+  --border: var(--storm-700);
+  --input: var(--storm-700);
+  --ring: var(--malachite-400);
+  --chart-1: var(--malachite-400);
+  --chart-2: var(--malachite-600);
+  --chart-3: var(--storm-400);
+  --chart-4: var(--storm-600);
+  --chart-5: var(--storm-800);
+  --radius: 0.625rem;
+
+  --sidebar: var(--storm-900);
+  --sidebar-foreground: var(--storm-50);
+  --sidebar-primary: var(--malachite-500);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--storm-800);
+  --sidebar-accent-foreground: var(--storm-50);
+  --sidebar-border: var(--storm-700);
+  --sidebar-ring: var(--malachite-400);
+
+  /* Compat páginas legadas (Tailwind usa --color-* do @theme, não estes) */
+  --bg: var(--background);
+  --bg-elevated: var(--sidebar);
+  --panel: var(--card);
+  --line: var(--border);
+  --text: var(--foreground);
+  --muted: var(--muted-foreground);
+  --accent: var(--primary);
+  --accent-dim: var(--malachite-700);
+  --warn: var(--warning);
+  --danger: var(--destructive);
+  --color-bg: var(--background);
+  --color-fg: var(--foreground);
+  --color-glow: color-mix(in srgb, var(--malachite-600) 40%, transparent);
+  --color-glow-soft: color-mix(in srgb, var(--malachite-800) 28%, transparent);
+}
+
+.dark {
+  --background: var(--storm-950);
+  --foreground: var(--storm-50);
+  --card: var(--storm-900);
+  --card-foreground: var(--storm-50);
+  --popover: var(--storm-900);
+  --popover-foreground: var(--storm-50);
+  --primary: var(--malachite-500);
+  --primary-foreground: #ffffff;
+  --secondary: var(--storm-800);
+  --secondary-foreground: var(--storm-50);
+  --muted: var(--storm-800);
+  --muted-foreground: var(--storm-400);
+  --accent: var(--storm-800);
+  --accent-foreground: var(--storm-50);
+  --destructive: #e26d6d;
+  --warning: #e6b35a;
+  --border: var(--storm-700);
+  --input: var(--storm-700);
+  --ring: var(--malachite-400);
+  --sidebar: var(--storm-900);
+  --sidebar-foreground: var(--storm-50);
+  --sidebar-primary: var(--malachite-500);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--storm-800);
+  --sidebar-accent-foreground: var(--storm-50);
+  --sidebar-border: var(--storm-700);
+  --sidebar-ring: var(--malachite-400);
+
+  --bg: var(--background);
+  --bg-elevated: var(--sidebar);
+  --panel: var(--card);
+  --line: var(--border);
+  --text: var(--foreground);
+  --muted: var(--muted-foreground);
+  --accent: var(--primary);
+  --accent-dim: var(--malachite-700);
+  --warn: var(--warning);
+  --danger: var(--destructive);
+}
 
 * {
   box-sizing: border-box;
@@ -11,22 +161,27 @@ body,
   min-height: 100%;
 }
 
-body {
-  margin: 0;
-  font-family: var(--font-display);
-  color: var(--color-fg);
-  background:
-    radial-gradient(
-      1200px 600px at 10% -10%,
-      var(--color-glow) 0%,
-      transparent 55%
-    ),
-    radial-gradient(
-      900px 500px at 100% 0%,
-      var(--color-glow-soft) 0%,
-      transparent 50%
-    ),
-    var(--color-bg);
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    background-image:
+      radial-gradient(
+        1200px 600px at 10% -10%,
+        var(--color-glow) 0%,
+        transparent 55%
+      ),
+      radial-gradient(
+        900px 500px at 100% 0%,
+        var(--color-glow-soft) 0%,
+        transparent 50%
+      );
+    background-color: var(--background);
+    color: var(--foreground);
+  }
 }
 
 button,
