@@ -30,16 +30,18 @@ jobs:
         env:
           TARGET_BASE_URL: ${{ vars.SENTINEL_BASE_URL }}
           TARGET_TOKEN: ${{ secrets.SENTINEL_BEARER_TOKEN }}
+          OPENAPI: ${{ github.workspace }}/examples/sample-openapi.json
+          SARIF_OUT: ${{ github.workspace }}/sentinel.sarif
         run: |
           pnpm --filter @sw/cli exec node ./dist/index.js scan \
-            --openapi ./examples/sample-openapi.json \
+            --openapi "$OPENAPI" \
             --base-url "$TARGET_BASE_URL" \
             --token "$TARGET_TOKEN" \
             --format sarif \
-            --output ./sentinel.sarif \
+            --output "$SARIF_OUT" \
             --fail-on critical,high
 
       - uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
-          sarif_file: sentinel.sarif
+          sarif_file: ${{ github.workspace }}/sentinel.sarif

@@ -36,17 +36,22 @@ jobs:
         run: pnpm --filter @sw/cli build
 
       - name: CLI help
-        run: pnpm --filter @sw/cli exec node ./dist/index.js --help || pnpm --filter @sw/cli exec node ./dist/index.js
+        run: pnpm --filter @sw/cli exec node ./dist/index.js
 
-      - name: Offline SARIF export smoke (unreachable host → findings/errors ok)
+      - name: Offline SARIF export smoke
+        env:
+          OPENAPI: ${{ github.workspace }}/examples/sample-openapi.json
+          PLUGINS: ${{ github.workspace }}/examples/plugins
+          SARIF_OUT: ${{ github.workspace }}/sentinel.sarif
         run: |
           set +e
+          # pnpm exec cwd = apps/cli — always pass absolute paths
           pnpm --filter @sw/cli exec node ./dist/index.js scan \
-            --openapi ../../examples/sample-openapi.json \
+            --openapi "$OPENAPI" \
             --base-url http://127.0.0.1:9 \
-            --plugins ../../examples/plugins \
+            --plugins "$PLUGINS" \
             --format sarif \
-            --output ../../sentinel.sarif \
+            --output "$SARIF_OUT" \
             --max-critical 999 \
             --max-high 999
           code=$?
@@ -55,8 +60,8 @@ jobs:
             echo "Unexpected exit code: $code"
             exit 1
           fi
-          test -f ../../sentinel.sarif
-          grep -q '"version": "2.1.0"' ../../sentinel.sarif
+          test -f "$SARIF_OUT"
+          grep -q '"version": "2.1.0"' "$SARIF_OUT"
 
       - name: Upload SARIF artifact
         if: always()
