@@ -9,4 +9,6 @@ export interface ExecutorOptions {
   timeoutMs?: number;
   /** Soft guard for production safety mode */
   maxRequestsPerMinute?: number;
+  /** External cancel (scan abort); combined with timeout. */
+  signal?: AbortSignal;
 }

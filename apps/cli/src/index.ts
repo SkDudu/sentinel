@@ -10,6 +10,7 @@ import {
   EnvironmentRepository,
   FindingRepository,
   ProjectRepository,
+  TestResultRepository,
   TestRunRepository,
 } from "@sw/database";
 import {
@@ -48,6 +49,11 @@ Options:
   --fail-on < severities > Comma list (default: critical,high)
   --max-critical <n>       Gate threshold (default: 0)
   --max-high <n>           Gate threshold (default: 0)
+
+Notes:
+  --project mode shares the desktop DB when run from the repo root
+  (or pass an absolute --db path to <repo>/data/sentinel.db).
+  --openapi mode is ephemeral and does NOT write findings to SQLite.
 
 Exit codes:
   0  gate passed
@@ -147,6 +153,7 @@ async function runProjectMode(args: string[]) {
   }
 
   mkdirSync(dirname(dbPath), { recursive: true });
+  console.log(`Using DB: ${dbPath}`);
   const handle = createSqliteDb(dbPath);
   const dataDir = dirname(dbPath);
   const { store } = createSecretStore({ dataDir, kind: "file" });
@@ -172,6 +179,7 @@ async function runProjectMode(args: string[]) {
         endpoints: new EndpointRepository(handle.db),
         findings: new FindingRepository(handle.db),
         runs: new TestRunRepository(handle.db),
+        testResults: new TestResultRepository(handle.db),
       },
       store,
     );

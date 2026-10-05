@@ -5,6 +5,8 @@ import {
   Severity,
   type Endpoint,
   type Finding,
+  type HttpRequest,
+  type HttpResponse,
   type RateLimitConfig,
   type TestCase,
   type TestDataOptions,
@@ -23,6 +25,16 @@ import {
   type TestRegistry,
 } from "@sw/test-registry";
 
+export interface CaseExecutionResult {
+  endpointId: string;
+  testId: string;
+  testCaseId: string;
+  passed: boolean;
+  request?: HttpRequest;
+  response?: HttpResponse;
+  notes?: string;
+}
+
 export interface OrchestratorInput {
   endpoint: Endpoint;
   baseUrl: string;
@@ -40,6 +52,8 @@ export interface OrchestratorInput {
   skipPlugins?: boolean;
   productionSafetyMode?: boolean;
   rateLimit?: RateLimitConfig;
+  /** Abort between cases / in-flight HTTP when supported. */
+  signal?: AbortSignal;
   onProgress?: (event: {
     completed: number;
     total: number;
@@ -52,6 +66,8 @@ export interface OrchestratorResult {
   cases: TestCase[];
   findings: Finding[];
   executed: number;
+  results: CaseExecutionResult[];
+  cancelled: boolean;
 }
 
 const defaultOptions: TestDataOptions = {
@@ -146,12 +162,20 @@ export class TestOrchestrator {
   async run(input: OrchestratorInput): Promise<OrchestratorResult> {
     const prepared = await this.prepare(input);
     const findings: Finding[] = [];
+    const results: CaseExecutionResult[] = [];
     let executed = 0;
+    let cancelled = false;
 
     for (const testCase of prepared.cases) {
+      if (input.signal?.aborted) {
+        cancelled = true;
+        break;
+      }
+
       const pluginId = testCase.tags
         .find((t) => t.startsWith("plugin:"))
         ?.replace("plugin:", "");
+      const resolvedTestId = pluginId ?? "generic";
       const test: SecurityTest | undefined = pluginId
         ? this.registry.get(pluginId)
         : undefined;
@@ -173,10 +197,26 @@ export class TestOrchestrator {
             total: prepared.cases.length,
             testCase,
           });
-          if (result) {
-            findings.push(...(Array.isArray(result) ? result : [result]));
-          }
+          const produced = result
+            ? Array.isArray(result)
+              ? result
+              : [result]
+            : [];
+          if (produced.length) findings.push(...produced);
+          results.push({
+            endpointId: prepared.context.endpoint.id,
+            testId: resolvedTestId,
+            testCaseId: testCase.id,
+            passed: produced.length === 0,
+            notes: produced.length
+              ? `${produced.length} finding(s)`
+              : undefined,
+          });
         } catch (error) {
+          if (input.signal?.aborted) {
+            cancelled = true;
+            break;
+          }
           executed += 1;
           findings.push({
             id: randomUUID(),
@@ -193,6 +233,14 @@ export class TestOrchestrator {
             recommendation:
               "Verifique se a API alvo está no ar e se baseUrl/auth estão corretos.",
             createdAt: new Date().toISOString(),
+          });
+          results.push({
+            endpointId: prepared.context.endpoint.id,
+            testId: pluginId ?? "execution.error",
+            testCaseId: testCase.id,
+            passed: false,
+            notes:
+              error instanceof Error ? error.message : "Unknown execution error",
           });
         }
         continue;
@@ -235,6 +283,7 @@ export class TestOrchestrator {
           response,
         );
 
+        let produced: Finding[] = [];
         if (test) {
           const result = await test.analyse(
             prepared.context,
@@ -243,7 +292,8 @@ export class TestOrchestrator {
             response,
           );
           if (result) {
-            findings.push(...(Array.isArray(result) ? result : [result]));
+            produced = Array.isArray(result) ? result : [result];
+            findings.push(...produced);
           }
         } else {
           const heuristic = analyseGenericCase(
@@ -252,9 +302,26 @@ export class TestOrchestrator {
             request,
             response,
           );
-          if (heuristic) findings.push(heuristic);
+          if (heuristic) {
+            produced = [heuristic];
+            findings.push(heuristic);
+          }
         }
+
+        results.push({
+          endpointId: prepared.context.endpoint.id,
+          testId: resolvedTestId,
+          testCaseId: testCase.id,
+          passed: produced.length === 0,
+          request,
+          response,
+          notes: produced.length ? `${produced.length} finding(s)` : undefined,
+        });
       } catch (error) {
+        if (input.signal?.aborted) {
+          cancelled = true;
+          break;
+        }
         executed += 1;
         input.onProgress?.({
           completed: executed,
@@ -278,6 +345,15 @@ export class TestOrchestrator {
             "Verifique se a API alvo está no ar e se baseUrl/auth estão corretos.",
           createdAt: new Date().toISOString(),
         });
+        results.push({
+          endpointId: prepared.context.endpoint.id,
+          testId: pluginId ?? "execution.error",
+          testCaseId: testCase.id,
+          passed: false,
+          request,
+          notes:
+            error instanceof Error ? error.message : "Unknown execution error",
+        });
       }
     }
 
@@ -286,6 +362,8 @@ export class TestOrchestrator {
       cases: prepared.cases,
       findings: sortFindings(findings),
       executed,
+      results,
+      cancelled,
     };
   }
 }

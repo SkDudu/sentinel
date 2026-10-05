@@ -19,6 +19,8 @@ import type {
   EnvironmentRepository,
   FindingRepository,
   ProjectRepository,
+  TestResultInput,
+  TestResultRepository,
   TestRunRepository,
 } from "@sw/database";
 import { HttpExecutor, type RequestExecutor } from "@sw/http-client";
@@ -41,6 +43,8 @@ export interface ScanRequest {
   /** Optional custom executor (e.g. ZapExecutor). */
   executor?: RequestExecutor;
   registry?: TestRegistry;
+  /** Cancel between endpoints/cases (and HTTP when executor supports it). */
+  signal?: AbortSignal;
 }
 
 const DEFAULT_RATE_LIMIT: RateLimitConfig = {
@@ -58,6 +62,7 @@ export async function runProjectScan(
     endpoints: EndpointRepository;
     findings: FindingRepository;
     runs: TestRunRepository;
+    testResults?: TestResultRepository;
   },
   secretStore: SecretStore,
 ) {
@@ -109,17 +114,25 @@ export async function runProjectScan(
       maxRequestsPerMinute: environment.productionSafetyMode
         ? 30
         : rateLimit.requests * 6,
+      signal: input.signal,
     });
 
   let totalCases = 0;
   let completedCases = 0;
   const allFindings = [];
+  const allResults: TestResultInput[] = [];
+  let cancelled = Boolean(input.signal?.aborted);
 
   const casesByEndpoint = groupCasesByEndpoint(approved, targetEndpoints);
   const sharedVariables: Variable[] = [...(input.variables ?? [])];
 
   try {
     for (const endpoint of targetEndpoints as Endpoint[]) {
+      if (input.signal?.aborted) {
+        cancelled = true;
+        break;
+      }
+
       const extraCases = casesByEndpoint.get(endpoint.id) ?? [];
       if (input.aiOnly && extraCases.length === 0) continue;
 
@@ -133,6 +146,7 @@ export async function runProjectScan(
         skipPlugins: Boolean(input.aiOnly),
         productionSafetyMode: environment.productionSafetyMode,
         rateLimit,
+        signal: input.signal,
         options: {
           normal: !input.aiOnly,
           validationErrors: !input.aiOnly,
@@ -153,17 +167,27 @@ export async function runProjectScan(
       totalCases += result.cases.length;
       completedCases += result.executed;
       allFindings.push(...result.findings);
+      allResults.push(...result.results);
+
+      if (result.cancelled) {
+        cancelled = true;
+        break;
+      }
     }
 
-    if (input.aiOnly && totalCases === 0) {
+    if (!cancelled && input.aiOnly && totalCases === 0) {
       throw new Error(
         "Approved AI cases do not match selected endpoints (set endpointId on cases)",
       );
     }
 
     await repos.findings.createMany(allFindings, run.id);
+    if (repos.testResults && allResults.length > 0) {
+      await repos.testResults.createMany(run.id, allResults);
+    }
+
     const completed = await repos.runs.complete(run.id, {
-      status: ScanStatus.COMPLETED,
+      status: cancelled ? ScanStatus.CANCELLED : ScanStatus.COMPLETED,
       totalCases,
       completedCases,
       findingsCount: allFindings.length,
@@ -175,10 +199,19 @@ export async function runProjectScan(
       endpointsScanned: targetEndpoints.length,
       totalCases,
       variables: sharedVariables,
+      cancelled,
     };
   } catch (error) {
+    await repos.findings.createMany(allFindings, run.id).catch(() => undefined);
+    if (repos.testResults && allResults.length > 0) {
+      await repos.testResults
+        .createMany(run.id, allResults)
+        .catch(() => undefined);
+    }
     await repos.runs.complete(run.id, {
-      status: ScanStatus.FAILED,
+      status: input.signal?.aborted
+        ? ScanStatus.CANCELLED
+        : ScanStatus.FAILED,
       totalCases,
       completedCases,
       findingsCount: allFindings.length,

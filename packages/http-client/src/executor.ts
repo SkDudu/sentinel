@@ -54,13 +54,16 @@ export class HttpExecutor implements RequestExecutor {
     const controller = new AbortController();
     const timeout = this.options.timeoutMs ?? 30_000;
     const timer = setTimeout(() => controller.abort(), timeout);
+    const signal = this.options.signal
+      ? AbortSignal.any([controller.signal, this.options.signal])
+      : controller.signal;
     const started = performance.now();
 
     try {
       const init: RequestInit = {
         method: request.method,
         headers: request.headers,
-        signal: controller.signal,
+        signal,
       };
 
       if (
