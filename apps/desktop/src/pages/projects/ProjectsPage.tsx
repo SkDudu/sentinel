@@ -1,6 +1,89 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  AlertCircle,
+  FolderKanban,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+} from "lucide-react";
 import { AuthType } from "@sw/core";
 import { useProjectStore } from "@/stores/project";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
+import { PageEmptyState } from "@/components/layout/page-empty-state";
+import { PageShell } from "@/components/layout/page-shell";
+
+type ConfirmDelete =
+  | { kind: "project"; id: string; name: string }
+  | { kind: "environment"; id: string; name: string };
+
+function parseHeadersJson(raw: string): Record<string, string> {
+  const trimmed = raw.trim();
+  if (!trimmed) return {};
+  const parsed: unknown = JSON.parse(trimmed);
+  if (
+    typeof parsed !== "object" ||
+    parsed === null ||
+    Array.isArray(parsed)
+  ) {
+    throw new Error("Headers deve ser um objeto JSON, ex: {\"X-App\":\"sentinel\"}");
+  }
+  const headers: Record<string, string> = {};
+  for (const [key, value] of Object.entries(parsed)) {
+    if (typeof value !== "string") {
+      throw new Error(`Header "${key}" precisa ser string`);
+    }
+    headers[key] = value;
+  }
+  return headers;
+}
+
+function headersToJson(headers: Record<string, string> | undefined): string {
+  if (!headers || Object.keys(headers).length === 0) return "";
+  return JSON.stringify(headers, null, 2);
+}
 
 export function ProjectsPage() {
   const {
@@ -14,6 +97,7 @@ export function ProjectsPage() {
     updateProject,
     deleteProject,
     createEnvironment,
+    updateEnvironment,
     deleteEnvironment,
     setEnvironmentSecret,
     clearEnvironmentSecret,
@@ -23,12 +107,27 @@ export function ProjectsPage() {
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<ConfirmDelete | null>(
+    null,
+  );
+
+  const filteredProjects = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return projects;
+    return projects.filter((project) => {
+      const haystack = `${project.name} ${project.description ?? ""}`.toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [projects, search]);
 
   const [envProjectId, setEnvProjectId] = useState<string | null>(null);
   const [envName, setEnvName] = useState("Development");
   const [envBaseUrl, setEnvBaseUrl] = useState("http://localhost:3000");
   const [envAuthType, setEnvAuthType] = useState<string>(AuthType.NONE);
   const [envSafety, setEnvSafety] = useState(false);
+  const [envHeaders, setEnvHeaders] = useState("");
   const [envSecret, setEnvSecret] = useState("");
   const [secretEnvId, setSecretEnvId] = useState<string | null>(null);
   const [secretValue, setSecretValue] = useState("");
@@ -36,6 +135,13 @@ export function ProjectsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
+
+  const [editingEnvId, setEditingEnvId] = useState<string | null>(null);
+  const [editEnvName, setEditEnvName] = useState("");
+  const [editEnvBaseUrl, setEditEnvBaseUrl] = useState("");
+  const [editEnvAuthType, setEditEnvAuthType] = useState<string>(AuthType.NONE);
+  const [editEnvSafety, setEditEnvSafety] = useState(false);
+  const [editEnvHeaders, setEditEnvHeaders] = useState("");
 
   useEffect(() => {
     void loadProjects();
@@ -52,6 +158,7 @@ export function ProjectsPage() {
       });
       setName("");
       setDescription("");
+      setCreateOpen(false);
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Erro ao criar");
     } finally {
@@ -65,10 +172,12 @@ export function ProjectsPage() {
     setFormError(null);
     setBusy(true);
     try {
+      const headers = parseHeadersJson(envHeaders);
       await createEnvironment(envProjectId, {
         name: envName,
         baseUrl: envBaseUrl,
         authType: envAuthType,
+        headers,
         productionSafetyMode: envSafety,
         secret: envSecret || undefined,
       });
@@ -77,9 +186,34 @@ export function ProjectsPage() {
       setEnvBaseUrl("http://localhost:3000");
       setEnvAuthType(AuthType.NONE);
       setEnvSafety(false);
+      setEnvHeaders("");
       setEnvSecret("");
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Erro ao criar ambiente");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onSaveEnvironment(event: FormEvent) {
+    event.preventDefault();
+    if (!editingEnvId) return;
+    setFormError(null);
+    setBusy(true);
+    try {
+      const headers = parseHeadersJson(editEnvHeaders);
+      await updateEnvironment(editingEnvId, {
+        name: editEnvName,
+        baseUrl: editEnvBaseUrl,
+        authType: editEnvAuthType,
+        headers,
+        productionSafetyMode: editEnvSafety,
+      });
+      setEditingEnvId(null);
+    } catch (err) {
+      setFormError(
+        err instanceof Error ? err.message : "Erro ao atualizar ambiente",
+      );
     } finally {
       setBusy(false);
     }
@@ -103,163 +237,309 @@ export function ProjectsPage() {
     }
   }
 
-  return (
-    <section className="max-w-4xl">
-      <header className="mb-8">
-        <h2 className="text-3xl font-semibold tracking-tight">Projects</h2>
-        <p className="mt-2 text-[var(--muted)]">
-          Persistidos em SQLite local. Ambientes trocam o target sem reescrever
-          testes.
-        </p>
-      </header>
+  async function onConfirmDelete() {
+    if (!confirmDelete) return;
+    setBusy(true);
+    setFormError(null);
+    try {
+      if (confirmDelete.kind === "project") {
+        await deleteProject(confirmDelete.id);
+      } else {
+        await deleteEnvironment(confirmDelete.id);
+      }
+      setConfirmDelete(null);
+    } catch (err) {
+      setFormError(
+        err instanceof Error ? err.message : "Erro ao excluir",
+      );
+      setConfirmDelete(null);
+    } finally {
+      setBusy(false);
+    }
+  }
 
+  return (
+    <PageShell
+      title="Projects"
+      actions={
+        <>
+          <div className="relative min-w-0 flex-1 sm:w-64">
+            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar projetos…"
+              className="pl-8"
+              aria-label="Buscar projetos"
+            />
+          </div>
+          <Button
+            type="button"
+            onClick={() => {
+              setFormError(null);
+              setCreateOpen(true);
+            }}
+          >
+            <Plus />
+            Adicionar projeto
+          </Button>
+        </>
+      }
+    >
       {(error || formError) && (
-        <p className="mb-4 rounded-md border border-[var(--danger)]/40 bg-[var(--danger)]/10 px-3 py-2 text-sm text-[var(--danger)]">
-          {formError ?? error}
-        </p>
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle />
+          <AlertTitle>Algo deu errado</AlertTitle>
+          <AlertDescription>{formError ?? error}</AlertDescription>
+        </Alert>
       )}
 
-      <form
-        onSubmit={onCreateProject}
-        className="mb-8 rounded-lg border border-[var(--line)] bg-[var(--panel)] p-5"
+      <Dialog
+        open={createOpen}
+        onOpenChange={(open) => {
+          setCreateOpen(open);
+          if (!open) {
+            setName("");
+            setDescription("");
+            setFormError(null);
+          }
+        }}
       >
-        <h3 className="text-sm font-medium text-[var(--muted)]">Novo projeto</h3>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <label className="block text-sm">
-            Nome
-            <input
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="mt-1 w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2"
-              placeholder="Sharezin"
-            />
-          </label>
-          <label className="block text-sm">
-            Descrição
-            <input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="mt-1 w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2"
-              placeholder="API principal"
-            />
-          </label>
-        </div>
-        <button
-          type="submit"
-          disabled={busy}
-          className="mt-4 rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[#062016] disabled:opacity-50"
-        >
-          Criar projeto
-        </button>
-      </form>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Novo projeto</DialogTitle>
+            <DialogDescription>
+              Crie um projeto local para importar OpenAPI e rodar scans.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={onCreateProject} className="space-y-4">
+            <label className="block text-sm">
+              Nome
+              <Input
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="mt-1"
+                placeholder="Sharezin"
+                autoFocus
+              />
+            </label>
+            <label className="block text-sm">
+              Descrição
+              <Input
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="mt-1"
+                placeholder="API principal"
+              />
+            </label>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setCreateOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={busy || !name.trim()}>
+                {busy ? <Spinner data-icon="inline-start" /> : null}
+                Criar projeto
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={confirmDelete !== null}
+        onOpenChange={(open) => {
+          if (!open && !busy) setConfirmDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmDelete?.kind === "environment"
+                ? "Remover ambiente?"
+                : "Excluir projeto?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDelete?.kind === "environment"
+                ? `Remover o ambiente "${confirmDelete.name}"? Secrets associados serão limpos.`
+                : `Excluir o projeto "${confirmDelete?.name}" e todos os ambientes? Esta ação não pode ser desfeita.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Alert className="mt-1" variant="destructive">
+            <AlertCircle />
+            <AlertTitle>Ação destrutiva</AlertTitle>
+            <AlertDescription>
+              Confirme só se tiver certeza. Dados locais serão apagados.
+            </AlertDescription>
+          </Alert>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={busy}
+              className="bg-destructive text-white hover:bg-destructive/90 focus-visible:border-destructive focus-visible:ring-destructive/40 dark:bg-destructive dark:hover:bg-destructive/90 dark:focus-visible:ring-destructive/40"
+              onClick={() => {
+                void onConfirmDelete();
+              }}
+            >
+              {busy ? <Spinner data-icon="inline-start" /> : null}
+              {confirmDelete?.kind === "environment" ? "Remover" : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {loading && projects.length === 0 ? (
-        <p className="text-sm text-[var(--muted)]">Carregando projetos…</p>
+        <p className="text-sm text-muted-foreground">Carregando projetos…</p>
       ) : projects.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-[var(--line)] bg-[var(--panel)] px-6 py-10 text-center text-sm text-[var(--muted)]">
-          Nenhum projeto ainda. Crie o primeiro acima.
-        </div>
+        <PageEmptyState
+          icon={FolderKanban}
+          title="Nenhum projeto ainda"
+          description="Crie o primeiro projeto para importar OpenAPI, configurar ambientes e rodar scans."
+          action={
+            <Button
+              type="button"
+              onClick={() => {
+                setFormError(null);
+                setCreateOpen(true);
+              }}
+            >
+              <Plus />
+              Adicionar projeto
+            </Button>
+          }
+        />
+      ) : filteredProjects.length === 0 ? (
+        <PageEmptyState
+          icon={Search}
+          title="Nenhum resultado"
+          description={`Nenhum projeto bate com “${search.trim()}”.`}
+          action={
+            <Button type="button" variant="outline" onClick={() => setSearch("")}>
+              Limpar busca
+            </Button>
+          }
+        />
       ) : (
-        <div className="space-y-3">
-          {projects.map((project) => {
+        <div className="grid gap-3 sm:grid-cols-2">
+          {filteredProjects.map((project) => {
             const active = project.id === activeProjectId;
             const editing = editingId === project.id;
 
             return (
-              <article
+              <Card
                 key={project.id}
-                className="rounded-lg border border-[var(--line)] bg-[var(--panel)] px-5 py-4"
+                className={active ? "ring-1 ring-primary/40" : undefined}
               >
                 {editing ? (
-                  <form onSubmit={onSaveEdit} className="space-y-3">
-                    <input
-                      required
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      className="w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2"
-                    />
-                    <input
-                      value={editDescription}
-                      onChange={(e) => setEditDescription(e.target.value)}
-                      className="w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2"
-                      placeholder="Descrição"
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        type="submit"
-                        disabled={busy}
-                        className="rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm text-[#062016]"
-                      >
-                        Salvar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditingId(null)}
-                        className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  </form>
+                  <CardContent>
+                    <form onSubmit={onSaveEdit} className="space-y-3">
+                      <Input
+                        required
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                      />
+                      <Input
+                        value={editDescription}
+                        onChange={(e) => setEditDescription(e.target.value)}
+                        placeholder="Descrição"
+                      />
+                      <div className="flex gap-2">
+                        <Button type="submit" disabled={busy} size="sm">
+                          {busy ? <Spinner data-icon="inline-start" /> : null}
+                          Salvar
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEditingId(null)}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </form>
+                  </CardContent>
                 ) : (
                   <>
-                    <div className="flex flex-wrap items-start justify-between gap-3">
+                    <CardHeader className="border-b">
                       <button
                         type="button"
                         onClick={() => setActiveProject(project.id)}
-                        className="text-left"
+                        className="min-w-0 text-left"
                       >
-                        <div className="flex items-center gap-3">
-                          <h3 className="text-lg font-medium">{project.name}</h3>
+                        <CardTitle className="flex flex-wrap items-center gap-2">
+                          <span className="truncate">{project.name}</span>
                           {active && (
-                            <span className="text-xs uppercase tracking-wider text-[var(--accent)]">
+                            <span className="text-xs font-medium uppercase tracking-wider text-primary">
                               ativo
                             </span>
                           )}
-                        </div>
-                        <p className="mt-1 text-sm text-[var(--muted)]">
+                        </CardTitle>
+                        <CardDescription className="mt-1">
                           {project.description ?? "Sem descrição"}
-                        </p>
+                        </CardDescription>
                       </button>
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingId(project.id);
-                            setEditName(project.name);
-                            setEditDescription(project.description ?? "");
-                          }}
-                          className="rounded-md border border-[var(--line)] px-2.5 py-1 text-xs"
-                        >
-                          Editar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEnvProjectId(project.id)}
-                          className="rounded-md border border-[var(--line)] px-2.5 py-1 text-xs"
-                        >
-                          + Ambiente
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (
-                              window.confirm(
-                                `Excluir projeto "${project.name}" e seus ambientes?`,
-                              )
-                            ) {
-                              void deleteProject(project.id);
+                      <CardAction>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            render={
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label={`Ações de ${project.name}`}
+                              />
                             }
-                          }}
-                          className="rounded-md border border-[var(--danger)]/40 px-2.5 py-1 text-xs text-[var(--danger)]"
-                        >
-                          Excluir
-                        </button>
-                      </div>
-                    </div>
+                          >
+                            <MoreHorizontal />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="min-w-44">
+                            <DropdownMenuGroup>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setEditingId(project.id);
+                                  setEditName(project.name);
+                                  setEditDescription(project.description ?? "");
+                                }}
+                              >
+                                <Pencil />
+                                Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setEditingEnvId(null);
+                                  setEnvProjectId(project.id);
+                                }}
+                              >
+                                <Plus />
+                                Ambiente
+                              </DropdownMenuItem>
+                            </DropdownMenuGroup>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onClick={() =>
+                                setConfirmDelete({
+                                  kind: "project",
+                                  id: project.id,
+                                  name: project.name,
+                                })
+                              }
+                            >
+                              <Trash2 />
+                              Excluir
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </CardAction>
+                    </CardHeader>
 
-                    <ul className="mt-4 space-y-2">
+                    <CardContent className="space-y-3">
+                    <ul className="space-y-2">
                       {project.environments.length === 0 ? (
                         <li className="text-xs text-[var(--muted)]">
                           Sem ambientes. Adicione Development/Staging.
@@ -270,123 +550,235 @@ export function ProjectsPage() {
                             key={env.id}
                             className="space-y-2 rounded border border-[var(--line)] px-3 py-2 font-mono text-xs text-[var(--muted)]"
                           >
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <span>
-                                {env.name}: {env.baseUrl}
-                                {env.productionSafetyMode ? " · safety" : ""}
-                                {" · "}
-                                {env.authType}
-                                {env.secretConfigured
-                                  ? " · secret ✓"
-                                  : env.authType !== "NONE"
-                                    ? " · sem secret"
-                                    : ""}
-                              </span>
-                              <div className="flex gap-2">
-                                {env.authType !== "NONE" && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setSecretEnvId(env.id);
-                                      setSecretValue("");
-                                    }}
-                                    className="text-[var(--accent)]"
-                                  >
-                                    secret
-                                  </button>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (
-                                      window.confirm(
-                                        `Remover ambiente "${env.name}"?`,
-                                      )
-                                    ) {
-                                      void deleteEnvironment(env.id);
-                                    }
-                                  }}
-                                  className="text-[var(--danger)]"
-                                >
-                                  remover
-                                </button>
-                              </div>
-                            </div>
-                            {secretEnvId === env.id && (
+                            {editingEnvId === env.id ? (
                               <form
-                                className="flex flex-wrap gap-2 border-t border-[var(--line)] pt-2"
-                                onSubmit={(event) => {
-                                  event.preventDefault();
-                                  void (async () => {
-                                    setBusy(true);
-                                    try {
-                                      await setEnvironmentSecret(
-                                        env.id,
-                                        secretValue,
-                                      );
-                                      setSecretEnvId(null);
-                                      setSecretValue("");
-                                    } catch (err) {
-                                      setFormError(
-                                        err instanceof Error
-                                          ? err.message
-                                          : "Falha ao salvar secret",
-                                      );
-                                    } finally {
-                                      setBusy(false);
-                                    }
-                                  })();
-                                }}
+                                onSubmit={onSaveEnvironment}
+                                className="space-y-3 font-sans"
                               >
-                                <input
-                                  type="password"
-                                  required
-                                  value={secretValue}
-                                  onChange={(e) =>
-                                    setSecretValue(e.target.value)
-                                  }
-                                  placeholder="Token / API key"
-                                  className="min-w-[200px] flex-1 rounded-md border border-[var(--line)] bg-[var(--bg)] px-2 py-1"
-                                />
-                                <button
-                                  type="submit"
-                                  disabled={busy}
-                                  className="rounded-md bg-[var(--accent)] px-2 py-1 text-[#062016]"
-                                >
-                                  Salvar
-                                </button>
-                                {env.secretConfigured && (
-                                  <button
+                                <h4 className="text-sm text-[var(--muted)]">
+                                  Editar ambiente
+                                </h4>
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                  <label className="block text-sm">
+                                    Nome
+                                    <input
+                                      required
+                                      value={editEnvName}
+                                      onChange={(e) =>
+                                        setEditEnvName(e.target.value)
+                                      }
+                                      className="mt-1 w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2"
+                                    />
+                                  </label>
+                                  <label className="block text-sm">
+                                    Base URL
+                                    <input
+                                      required
+                                      type="url"
+                                      value={editEnvBaseUrl}
+                                      onChange={(e) =>
+                                        setEditEnvBaseUrl(e.target.value)
+                                      }
+                                      className="mt-1 w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2 font-mono text-xs"
+                                    />
+                                  </label>
+                                  <label className="block text-sm">
+                                    Auth
+                                    <select
+                                      value={editEnvAuthType}
+                                      onChange={(e) =>
+                                        setEditEnvAuthType(e.target.value)
+                                      }
+                                      className="mt-1 w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2"
+                                    >
+                                      {Object.values(AuthType).map((type) => (
+                                        <option key={type} value={type}>
+                                          {type}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </label>
+                                  <label className="flex items-center gap-2 pt-6 text-sm">
+                                    <input
+                                      type="checkbox"
+                                      checked={editEnvSafety}
+                                      onChange={(e) =>
+                                        setEditEnvSafety(e.target.checked)
+                                      }
+                                    />
+                                    Production Safety Mode
+                                  </label>
+                                  <label className="block text-sm sm:col-span-2">
+                                    Headers (JSON)
+                                    <textarea
+                                      value={editEnvHeaders}
+                                      onChange={(e) =>
+                                        setEditEnvHeaders(e.target.value)
+                                      }
+                                      rows={3}
+                                      placeholder='{"X-Tenant":"dev"}'
+                                      className="mt-1 w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2 font-mono text-xs"
+                                    />
+                                  </label>
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button type="submit" disabled={busy} size="sm">
+                                    {busy ? (
+                                      <Spinner data-icon="inline-start" />
+                                    ) : null}
+                                    Salvar
+                                  </Button>
+                                  <Button
                                     type="button"
-                                    onClick={() => {
-                                      void clearEnvironmentSecret(env.id).then(
-                                        () => setSecretEnvId(null),
-                                      );
-                                    }}
-                                    className="text-[var(--danger)]"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setEditingEnvId(null)}
                                   >
-                                    limpar
-                                  </button>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => setSecretEnvId(null)}
-                                >
-                                  cancelar
-                                </button>
+                                    Cancelar
+                                  </Button>
+                                </div>
                               </form>
+                            ) : (
+                              <>
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <span>
+                                    {env.name}: {env.baseUrl}
+                                    {env.productionSafetyMode
+                                      ? " · safety"
+                                      : ""}
+                                    {" · "}
+                                    {env.authType}
+                                    {Object.keys(env.headers ?? {}).length > 0
+                                      ? ` · ${Object.keys(env.headers).length} header(s)`
+                                      : ""}
+                                    {env.secretConfigured
+                                      ? " · secret ✓"
+                                      : env.authType !== "NONE"
+                                        ? " · sem secret"
+                                        : ""}
+                                  </span>
+                                  <div className="flex gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEnvProjectId(null);
+                                        setSecretEnvId(null);
+                                        setEditingEnvId(env.id);
+                                        setEditEnvName(env.name);
+                                        setEditEnvBaseUrl(env.baseUrl);
+                                        setEditEnvAuthType(env.authType);
+                                        setEditEnvSafety(
+                                          env.productionSafetyMode,
+                                        );
+                                        setEditEnvHeaders(
+                                          headersToJson(env.headers),
+                                        );
+                                      }}
+                                      className="text-[var(--accent)]"
+                                    >
+                                      editar
+                                    </button>
+                                    {env.authType !== "NONE" && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setSecretEnvId(env.id);
+                                          setSecretValue("");
+                                        }}
+                                        className="text-[var(--accent)]"
+                                      >
+                                        secret
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setConfirmDelete({
+                                          kind: "environment",
+                                          id: env.id,
+                                          name: env.name,
+                                        })
+                                      }
+                                      className="text-[var(--danger)]"
+                                    >
+                                      remover
+                                    </button>
+                                  </div>
+                                </div>
+                                {secretEnvId === env.id && (
+                                  <form
+                                    className="flex flex-wrap gap-2 border-t border-[var(--line)] pt-2"
+                                    onSubmit={(event) => {
+                                      event.preventDefault();
+                                      void (async () => {
+                                        setBusy(true);
+                                        try {
+                                          await setEnvironmentSecret(
+                                            env.id,
+                                            secretValue,
+                                          );
+                                          setSecretEnvId(null);
+                                          setSecretValue("");
+                                        } catch (err) {
+                                          setFormError(
+                                            err instanceof Error
+                                              ? err.message
+                                              : "Falha ao salvar secret",
+                                          );
+                                        } finally {
+                                          setBusy(false);
+                                        }
+                                      })();
+                                    }}
+                                  >
+                                    <input
+                                      type="password"
+                                      required
+                                      value={secretValue}
+                                      onChange={(e) =>
+                                        setSecretValue(e.target.value)
+                                      }
+                                      placeholder="Token / API key"
+                                      className="min-w-[200px] flex-1 rounded-md border border-[var(--line)] bg-[var(--bg)] px-2 py-1"
+                                    />
+                                    <Button type="submit" disabled={busy} size="xs">
+                                      {busy ? (
+                                        <Spinner data-icon="inline-start" />
+                                      ) : null}
+                                      Salvar
+                                    </Button>
+                                    {env.secretConfigured && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          void clearEnvironmentSecret(
+                                            env.id,
+                                          ).then(() => setSecretEnvId(null));
+                                        }}
+                                        className="text-[var(--danger)]"
+                                      >
+                                        limpar
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => setSecretEnvId(null)}
+                                    >
+                                      cancelar
+                                    </button>
+                                  </form>
+                                )}
+                              </>
                             )}
                           </li>
                         ))
                       )}
                     </ul>
-                  </>
-                )}
 
                 {envProjectId === project.id && (
                   <form
                     onSubmit={onCreateEnvironment}
-                    className="mt-4 space-y-3 border-t border-[var(--line)] pt-4"
+                    className="space-y-3 border-t border-border pt-4"
                   >
                     <h4 className="text-sm text-[var(--muted)]">Novo ambiente</h4>
                     <div className="grid gap-3 sm:grid-cols-2">
@@ -431,6 +823,16 @@ export function ProjectsPage() {
                         />
                         Production Safety Mode
                       </label>
+                      <label className="block text-sm sm:col-span-2">
+                        Headers (JSON, opcional)
+                        <textarea
+                          value={envHeaders}
+                          onChange={(e) => setEnvHeaders(e.target.value)}
+                          rows={3}
+                          placeholder='{"X-Tenant":"dev"}'
+                          className="mt-1 w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2 font-mono text-xs"
+                        />
+                      </label>
                       {envAuthType !== AuthType.NONE && (
                         <label className="block text-sm sm:col-span-2">
                           Secret (vault criptografado — nunca no SQLite)
@@ -445,28 +847,29 @@ export function ProjectsPage() {
                       )}
                     </div>
                     <div className="flex gap-2">
-                      <button
-                        type="submit"
-                        disabled={busy}
-                        className="rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm text-[#062016]"
-                      >
+                      <Button type="submit" disabled={busy} size="sm">
+                        {busy ? <Spinner data-icon="inline-start" /> : null}
                         Salvar ambiente
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={() => setEnvProjectId(null)}
-                        className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm"
                       >
                         Cancelar
-                      </button>
+                      </Button>
                     </div>
                   </form>
                 )}
-              </article>
+                    </CardContent>
+                  </>
+                )}
+              </Card>
             );
           })}
         </div>
       )}
-    </section>
+    </PageShell>
   );
 }
