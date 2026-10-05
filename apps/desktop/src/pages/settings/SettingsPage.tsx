@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AiProviderKind } from "@sw/core";
 import { api, type AiSettingsDto } from "@/services/api";
+import { PageShell } from "@/components/layout/page-shell";
 
 const KIND_LABELS: Record<string, string> = {
   [AiProviderKind.OLLAMA]: "Ollama",
@@ -50,15 +51,7 @@ export function SettingsPage() {
   }
 
   return (
-    <section className="max-w-3xl">
-      <header className="mb-8">
-        <h2 className="text-3xl font-semibold tracking-tight">Settings</h2>
-        <p className="mt-2 text-[var(--muted)]">
-          Secrets no vault local. AI opcional (Ollama primeiro) — nunca executa
-          casos sem review.
-        </p>
-      </header>
-
+    <PageShell title="Settings">
       {error && (
         <p className="mb-4 rounded-md border border-[var(--danger)]/40 bg-[var(--danger)]/10 px-3 py-2 text-sm text-[var(--danger)]">
           {error}
@@ -79,6 +72,14 @@ export function SettingsPage() {
             No shell Tauri, comandos Rust{" "}
             <code className="text-[var(--accent)]">secret_*</code> usam o
             keychain do SO (`KeychainSecretStore`).
+          </p>
+          <p className="mt-2 text-sm text-[var(--muted)]">
+            SQLite do workbench:{" "}
+            <code className="text-[var(--accent)]">data/sentinel.db</code>. A
+            CLI no modo{" "}
+            <code className="text-[var(--accent)]">--project</code> usa o mesmo
+            arquivo quando rodada na raiz do repo (ou com{" "}
+            <code className="text-[var(--accent)]">--db</code> absoluto).
           </p>
           <p className="mt-2 text-xs text-[var(--muted)]">
             Build nativo: <code>pnpm --filter @sw/desktop tauri:dev</code>{" "}
@@ -186,6 +187,6 @@ export function SettingsPage() {
           Production Safety Mode (por ambiente em Projects; rate-limit na Fase 3)
         </label>
       </div>
-    </section>
+    </PageShell>
   );
 }

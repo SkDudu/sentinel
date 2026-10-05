@@ -10,7 +10,6 @@ import {
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -20,7 +19,6 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { useProjectStore } from "@/stores/project";
 
 const links = [
   { to: "/", label: "Projects", icon: FolderKanban, end: true },
@@ -37,8 +35,6 @@ function pathActive(pathname: string, to: string, end?: boolean) {
 
 export function AppSidebar() {
   const location = useLocation();
-  const { projects, activeProjectId } = useProjectStore();
-  const active = projects.find((p) => p.id === activeProjectId);
 
   return (
     <Sidebar collapsible="icon" variant="sidebar">
@@ -91,29 +87,6 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-
-      <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              tooltip={active?.name ?? "Sem projeto"}
-              size="lg"
-            >
-              <div className="flex size-8 items-center justify-center rounded-lg bg-sidebar-accent text-xs font-medium">
-                {(active?.name ?? "?").slice(0, 1).toUpperCase()}
-              </div>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">
-                  {active ? active.name : "Nenhum projeto"}
-                </span>
-                <span className="truncate text-xs text-sidebar-foreground/70">
-                  {active ? "Projeto ativo" : "Selecione em Projects"}
-                </span>
-              </div>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );
