@@ -17,6 +17,7 @@ Antes de mudar arquitetura, stack ou escopo, leia e respeite:
 - `docs/technologies.md`
 - `docs/ai-rules.md`
 - `docs/hardening.md` (pós-MVP: ordem de verificação e gaps P0–P3)
+- `docs/ui.md` (padrões de página / empty state)
 
 Em conflito entre “ideia criativa” e esses docs, **os docs vencem**, salvo pedido explícito do usuário.
 
@@ -32,6 +33,7 @@ Trabalho ativo sem pedido de feature nova: Fase 6 / `docs/hardening.md`.
 6. Secrets fora do SQLite plaintext; Production Safety Mode para testes agressivos.
 7. Não pular fases do roadmap sem o usuário pedir.
 8. Comunicação com o usuário em português.
+9. UI de página: `PageShell` + `PageEmptyState` (`docs/ui.md`) — não inventar empty/header paralelo.
 
 ## Escopo de mudança
 

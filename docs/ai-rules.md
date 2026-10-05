@@ -5,7 +5,7 @@ Este arquivo governa **duas IAs**:
 1. **Agentes de código** (Cursor / Copilot / etc.) trabalhando neste repo  
 2. **IA de produto** (geração de dados / interpretação de findings)
 
-Leia também: [product.md](./product.md), [architecture.md](./architecture.md), [roadmap.md](./roadmap.md), [technologies.md](./technologies.md), [hardening.md](./hardening.md).
+Leia também: [product.md](./product.md), [architecture.md](./architecture.md), [roadmap.md](./roadmap.md), [technologies.md](./technologies.md), [hardening.md](./hardening.md), [ui.md](./ui.md).
 
 **Estado atual do repo:** Fases 0–5 feitas. Sem pedido explícito de feature nova, trabalhar pela ordem P0→P1 em [hardening.md](./hardening.md) e atualizar esse arquivo ao fechar gaps.
 

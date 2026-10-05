@@ -8,6 +8,7 @@
 | [technologies.md](./technologies.md) | Stack e decisões técnicas |
 | [ai-rules.md](./ai-rules.md) | Regras para agentes de código e IA de produto |
 | [hardening.md](./hardening.md) | Pós-MVP: verificação fluxo a fluxo + gaps P0–P3 (humano + agentes) |
+| [ui.md](./ui.md) | IA de navegação (global vs projeto) + padrões de UI (PageShell, empty state, cards…) |
 
 Agentes de IA no Cursor também carregam `.cursor/rules/sentinel.mdc`, que aponta para estes arquivos.
 
