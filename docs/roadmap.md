@@ -62,6 +62,21 @@ Objetivo: **projeto → OpenAPI → casos → run → findings** sem IA obrigat�
 - [x] Exemplo GitHub Actions (`.github/workflows/`)
 - [x] Relatório JSON/SARIF (`--format json|sarif`)
 
+## Fase 6 — Hardening do workbench (agora)
+
+Objetivo: fluxos UI/API sólidos no uso diário; sem feature nova grande.
+
+Detalhe operacional (checklist humano + gaps P0–P3 para agentes): **[hardening.md](./hardening.md)**.
+
+- [ ] Projects: editar ambiente/headers/auth após criar
+- [ ] Endpoints: delete / detalhe mínimo (CRUD manual se necessário)
+- [ ] Scans: feedback de execução; cancel quando fizer sentido
+- [ ] Findings: evidência HTTP na UI + filtros; export desktop ou path CLI explícito
+- [ ] AI Lab: persona edit + casos aprovados sem surpresa de sessão
+- [ ] CLI vs UI: mesmo projeto/DB, findings coerentes
+
+**Critério de pronto:** ver seção “Critério de hardening pronto” em [hardening.md](./hardening.md).
+
 ## Não-objetivos (por enquanto)
 
 - SaaS multi-tenant na nuvem
@@ -74,7 +89,7 @@ Objetivo: **projeto → OpenAPI → casos → run → findings** sem IA obrigat�
 
 Quando houver dúvida de escopo:
 
-1. Serve o MVP da Fase 1?  
+1. Serve o hardening da Fase 6 / [hardening.md](./hardening.md)?  
 2. Mantém engine desacoplada da UI?  
 3. Evita dependência obrigatória de cloud/ZAP/IA?  
 

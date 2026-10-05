@@ -16,8 +16,11 @@ Antes de mudar arquitetura, stack ou escopo, leia e respeite:
 - `docs/architecture.md`
 - `docs/technologies.md`
 - `docs/ai-rules.md`
+- `docs/hardening.md` (pós-MVP: ordem de verificação e gaps P0–P3)
 
 Em conflito entre “ideia criativa” e esses docs, **os docs vencem**, salvo pedido explícito do usuário.
+
+Trabalho ativo sem pedido de feature nova: Fase 6 / `docs/hardening.md`.
 
 ## Não sair do padrão
 
