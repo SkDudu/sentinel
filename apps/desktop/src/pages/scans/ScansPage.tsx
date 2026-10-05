@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { FolderKanban } from "lucide-react";
 import type { Endpoint, ScanRun, TestCase, TestPersona } from "@sw/core";
 import { api } from "@/services/api";
 import { useProjectStore } from "@/stores/project";
+import { Button } from "@/components/ui/button";
+import { PageEmptyState } from "@/components/layout/page-empty-state";
+import { PageShell } from "@/components/layout/page-shell";
 
 export function ScansPage() {
   const { projects, activeProjectId, loadProjects } = useProjectStore();
@@ -16,6 +21,10 @@ export function ScansPage() {
     '{\n  "userId": "1",\n  "otherUserId": "999999"\n}',
   );
   const [busy, setBusy] = useState(false);
+  const [scanPhase, setScanPhase] = useState<
+    "idle" | "running" | "cancelling"
+  >("idle");
+  const [scanAbort, setScanAbort] = useState<AbortController | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<string | null>(null);
 
@@ -30,6 +39,7 @@ export function ScansPage() {
   const [personaFieldsJson, setPersonaFieldsJson] = useState(
     '{\n  "email": "edge@example.com",\n  "role": "user"\n}',
   );
+  const [editingPersonaId, setEditingPersonaId] = useState<string | null>(null);
 
   useEffect(() => {
     void loadProjects();
@@ -46,10 +56,24 @@ export function ScansPage() {
     });
     void api.listRuns(project.id).then(setRuns);
     void api.listPersonas(project.id).then(setPersonas);
-    setAiCases([]);
-    setApproved({});
-    setRejectedAi([]);
-    setGenMode(null);
+    void api
+      .getAiCases(project.id)
+      .then((stored) => {
+        setAiCases(stored.cases);
+        const next: Record<string, boolean> = {};
+        for (const c of stored.cases) {
+          next[c.id] = stored.approvedIds.includes(c.id);
+        }
+        setApproved(next);
+        setRejectedAi(stored.rejected ?? []);
+        setGenMode(stored.genMode ?? null);
+      })
+      .catch(() => {
+        setAiCases([]);
+        setApproved({});
+        setRejectedAi([]);
+        setGenMode(null);
+      });
   }, [project]);
 
   const selectedIds = useMemo(
@@ -71,28 +95,80 @@ export function ScansPage() {
     }));
   }
 
-  async function onRun() {
-    if (!project || !environmentId) return;
+  async function persistAiCases(
+    cases: TestCase[],
+    approvedMap: Record<string, boolean>,
+    extras?: {
+      genMode?: string | null;
+      rejected?: Array<{ id: string; name: string; reason: string }>;
+    },
+  ) {
+    if (!project) return;
+    await api.saveAiCases(project.id, {
+      cases,
+      approvedIds: Object.entries(approvedMap)
+        .filter(([, v]) => v)
+        .map(([id]) => id),
+      genMode: extras?.genMode ?? genMode,
+      rejected: extras?.rejected ?? rejectedAi,
+    });
+  }
+
+  async function runScanJob(
+    input: Parameters<typeof api.runScan>[0],
+    successLabel: (result: Awaited<ReturnType<typeof api.runScan>>) => string,
+  ) {
+    if (!project) return;
+    const abort = new AbortController();
+    setScanAbort(abort);
     setBusy(true);
+    setScanPhase("running");
     setError(null);
     setLastResult(null);
     try {
-      const result = await api.runScan({
+      const result = await api.runScan(input, { signal: abort.signal });
+      if (result.cancelled || result.run.status === "CANCELLED") {
+        setLastResult(
+          `Scan cancelado: ${result.run.completedCases}/${result.totalCases} casos, ${result.findings.length} findings.`,
+        );
+      } else {
+        setLastResult(successLabel(result));
+      }
+      setRuns(await api.listRuns(project.id));
+    } catch (err) {
+      if (abort.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) {
+        setLastResult("Scan cancelado pelo usuário.");
+        setRuns(await api.listRuns(project.id));
+      } else {
+        setError(err instanceof Error ? err.message : "Scan falhou");
+        setRuns(await api.listRuns(project.id));
+      }
+    } finally {
+      setBusy(false);
+      setScanPhase("idle");
+      setScanAbort(null);
+    }
+  }
+
+  async function onRun() {
+    if (!project || !environmentId) return;
+    await runScanJob(
+      {
         projectId: project.id,
         environmentId,
         endpointIds: selectedIds,
         bearerToken: bearerToken || undefined,
         variables: parseVariables(),
-      });
-      setLastResult(
+      },
+      (result) =>
         `Scan concluído: ${result.endpointsScanned} endpoints, ${result.totalCases} casos, ${result.findings.length} findings.`,
-      );
-      setRuns(await api.listRuns(project.id));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Scan falhou");
-    } finally {
-      setBusy(false);
-    }
+    );
+  }
+
+  function onCancelScan() {
+    if (!scanAbort) return;
+    setScanPhase("cancelling");
+    scanAbort.abort();
   }
 
   async function onGenerateAi() {
@@ -105,12 +181,16 @@ export function ScansPage() {
         endpointIds: selectedIds,
         allowPersonaSeed: true,
       });
+      const next: Record<string, boolean> = {};
+      for (const c of result.cases) next[c.id] = false;
       setAiCases(result.cases);
       setRejectedAi(result.rejected);
       setGenMode(result.mode);
-      const next: Record<string, boolean> = {};
-      for (const c of result.cases) next[c.id] = false;
       setApproved(next);
+      await persistAiCases(result.cases, next, {
+        genMode: result.mode,
+        rejected: result.rejected,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Geração AI falhou");
     } finally {
@@ -118,17 +198,62 @@ export function ScansPage() {
     }
   }
 
-  async function onRunApprovedAi() {
-    if (!project || !environmentId || approvedCases.length === 0) return;
+  async function onToggleApproved(caseId: string) {
+    const next = { ...approved, [caseId]: !approved[caseId] };
+    setApproved(next);
+    try {
+      await persistAiCases(aiCases, next);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Falha ao persistir aprovação",
+      );
+    }
+  }
+
+  async function onClearAiCases() {
+    if (!project) return;
+    if (
+      !window.confirm(
+        "Limpar casos AI salvos deste projeto? Aprovações também serão apagadas.",
+      )
+    ) {
+      return;
+    }
     setBusy(true);
     setError(null);
-    setLastResult(null);
     try {
-      const stamped = approvedCases.map((c) => ({
-        ...c,
-        tags: [...c.tags.filter((t) => t !== "needs-review"), "approved"],
-      }));
-      const result = await api.runScan({
+      await api.clearAiCases(project.id);
+      setAiCases([]);
+      setApproved({});
+      setRejectedAi([]);
+      setGenMode(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao limpar casos");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onRunApprovedAi() {
+    if (!project || !environmentId || approvedCases.length === 0) return;
+    const stamped = approvedCases.map((c) => ({
+      ...c,
+      tags: [...c.tags.filter((t) => t !== "needs-review"), "approved"],
+    }));
+    const stampedIds = new Set(stamped.map((c) => c.id));
+    const nextCases = aiCases.map((c) =>
+      stampedIds.has(c.id)
+        ? (stamped.find((s) => s.id === c.id) ?? c)
+        : c,
+    );
+    setAiCases(nextCases);
+    try {
+      await persistAiCases(nextCases, approved);
+    } catch {
+      // scan ainda pode rodar; persistência best-effort
+    }
+    await runScanJob(
+      {
         projectId: project.id,
         environmentId,
         endpointIds: selectedIds,
@@ -136,31 +261,39 @@ export function ScansPage() {
         approvedAiCases: stamped,
         aiOnly: true,
         variables: parseVariables(),
-      });
-      setLastResult(
+      },
+      (result) =>
         `AI Lab: ${result.totalCases} casos aprovados, ${result.findings.length} findings.`,
-      );
-      setRuns(await api.listRuns(project.id));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Scan AI falhou");
-    } finally {
-      setBusy(false);
-    }
+    );
   }
 
-  async function onAddPersona() {
+  async function onSavePersona() {
     if (!project || !personaName.trim()) return;
     setBusy(true);
     setError(null);
     try {
       const fields = JSON.parse(personaFieldsJson) as Record<string, unknown>;
-      await api.upsertPersona(project.id, {
-        name: personaName.trim(),
-        fields,
-        tags: ["custom"],
-      });
+      if (editingPersonaId) {
+        const existing = personas.find((p) => p.id === editingPersonaId);
+        await api.updatePersona(project.id, editingPersonaId, {
+          name: personaName.trim(),
+          fields,
+          tags: existing?.tags ?? ["custom"],
+          description: existing?.description,
+        });
+      } else {
+        await api.upsertPersona(project.id, {
+          name: personaName.trim(),
+          fields,
+          tags: ["custom"],
+        });
+      }
       setPersonas(await api.listPersonas(project.id));
       setPersonaName("");
+      setPersonaFieldsJson(
+        '{\n  "email": "edge@example.com",\n  "role": "user"\n}',
+      );
+      setEditingPersonaId(null);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Falha ao salvar persona",
@@ -168,6 +301,12 @@ export function ScansPage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  function onEditPersona(persona: TestPersona) {
+    setEditingPersonaId(persona.id);
+    setPersonaName(persona.name);
+    setPersonaFieldsJson(JSON.stringify(persona.fields, null, 2));
   }
 
   async function onDeletePersona(id: string) {
@@ -185,27 +324,32 @@ export function ScansPage() {
 
   if (!project) {
     return (
-      <section className="max-w-4xl">
-        <h2 className="text-3xl font-semibold tracking-tight">Scans</h2>
-        <p className="mt-4 text-sm text-[var(--muted)]">
-          Selecione um projeto ativo em Projects.
-        </p>
-      </section>
+      <PageShell title="Scans">
+        <PageEmptyState
+          icon={FolderKanban}
+          title="Nenhum projeto ativo"
+          description="Selecione um projeto em Projects para rodar scans e AI Lab."
+          action={
+            <Button render={<Link to="/" />}>Ir para Projects</Button>
+          }
+        />
+      </PageShell>
     );
   }
 
   return (
-    <section className="max-w-4xl">
-      <header className="mb-8">
-        <h2 className="text-3xl font-semibold tracking-tight">Scans</h2>
-        <p className="mt-2 text-[var(--muted)]">
-          Casos determinísticos + AI Test Lab (gerar → revisar → só aprovados).
-        </p>
-      </header>
+    <PageShell title="Scans">
 
       {error && (
         <p className="mb-4 rounded-md border border-[var(--danger)]/40 bg-[var(--danger)]/10 px-3 py-2 text-sm text-[var(--danger)]">
           {error}
+        </p>
+      )}
+      {scanPhase !== "idle" && (
+        <p className="mb-4 text-sm text-[var(--warn)]">
+          {scanPhase === "cancelling"
+            ? "Cancelando scan…"
+            : "Scan em execução…"}
         </p>
       )}
       {lastResult && (
@@ -296,14 +440,26 @@ export function ScansPage() {
           )}
         </div>
 
-        <button
-          type="button"
-          disabled={busy || !environmentId || selectedIds.length === 0}
-          onClick={() => void onRun()}
-          className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[#062016] disabled:opacity-50"
-        >
-          {busy ? "Executando…" : "Run scan"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={busy || !environmentId || selectedIds.length === 0}
+            onClick={() => void onRun()}
+            className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[#062016] disabled:opacity-50"
+          >
+            {scanPhase === "running" ? "Executando…" : "Run scan"}
+          </button>
+          {scanPhase !== "idle" && (
+            <button
+              type="button"
+              disabled={scanPhase === "cancelling"}
+              onClick={onCancelScan}
+              className="rounded-md border border-[var(--danger)]/40 px-4 py-2 text-sm text-[var(--danger)] disabled:opacity-50"
+            >
+              {scanPhase === "cancelling" ? "Cancelando…" : "Cancelar"}
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="mb-6 space-y-4 rounded-lg border border-[var(--line)] bg-[var(--panel)] p-5">
@@ -311,7 +467,8 @@ export function ScansPage() {
           <h3 className="text-lg font-medium">AI Test Lab</h3>
           <p className="mt-1 text-sm text-[var(--muted)]">
             Gera casos (Ollama ou seed de personas), review gate obrigatório,
-            safety filter no servidor. Nenhum caso AI roda sem aprovação.
+            safety filter no servidor. Aprovações persistem em{" "}
+            <code className="text-[var(--accent)]">data/ai-cases/</code>.
           </p>
         </div>
 
@@ -324,6 +481,16 @@ export function ScansPage() {
           >
             Gerar casos AI
           </button>
+          {aiCases.length > 0 && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void onClearAiCases()}
+              className="rounded-md border border-[var(--line)] px-4 py-2 text-sm disabled:opacity-50"
+            >
+              Limpar casos salvos
+            </button>
+          )}
           <button
             type="button"
             disabled={
@@ -334,6 +501,16 @@ export function ScansPage() {
           >
             Run aprovados ({approvedCases.length})
           </button>
+          {scanPhase !== "idle" && (
+            <button
+              type="button"
+              disabled={scanPhase === "cancelling"}
+              onClick={onCancelScan}
+              className="rounded-md border border-[var(--danger)]/40 px-4 py-2 text-sm text-[var(--danger)] disabled:opacity-50"
+            >
+              {scanPhase === "cancelling" ? "Cancelando…" : "Cancelar"}
+            </button>
+          )}
         </div>
 
         {genMode && (
@@ -357,12 +534,7 @@ export function ScansPage() {
                     type="checkbox"
                     className="mt-1"
                     checked={Boolean(approved[testCase.id])}
-                    onChange={() =>
-                      setApproved((prev) => ({
-                        ...prev,
-                        [testCase.id]: !prev[testCase.id],
-                      }))
-                    }
+                    onChange={() => void onToggleApproved(testCase.id)}
                   />
                   <span>
                     <span className="font-medium">{testCase.name}</span>
@@ -410,14 +582,24 @@ export function ScansPage() {
                     {persona.tags.join(", ")}
                   </span>
                 </span>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void onDeletePersona(persona.id)}
-                  className="text-xs text-[var(--danger)]"
-                >
-                  Apagar
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => onEditPersona(persona)}
+                    className="text-xs text-[var(--accent)]"
+                  >
+                    Editar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void onDeletePersona(persona.id)}
+                    className="text-xs text-[var(--danger)]"
+                  >
+                    Apagar
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
@@ -440,14 +622,31 @@ export function ScansPage() {
               />
             </label>
           </div>
-          <button
-            type="button"
-            disabled={busy || !personaName.trim()}
-            onClick={() => void onAddPersona()}
-            className="mt-2 rounded-md border border-[var(--line)] px-3 py-1.5 text-sm disabled:opacity-50"
-          >
-            Adicionar persona
-          </button>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={busy || !personaName.trim()}
+              onClick={() => void onSavePersona()}
+              className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm disabled:opacity-50"
+            >
+              {editingPersonaId ? "Salvar persona" : "Adicionar persona"}
+            </button>
+            {editingPersonaId && (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingPersonaId(null);
+                  setPersonaName("");
+                  setPersonaFieldsJson(
+                    '{\n  "email": "edge@example.com",\n  "role": "user"\n}',
+                  );
+                }}
+                className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm"
+              >
+                Cancelar edição
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -481,6 +680,6 @@ export function ScansPage() {
           </ul>
         )}
       </div>
-    </section>
+    </PageShell>
   );
 }
