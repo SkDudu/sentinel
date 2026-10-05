@@ -82,6 +82,7 @@ export const api = {
       name: string;
       baseUrl: string;
       authType?: string;
+      headers?: Record<string, string>;
       productionSafetyMode?: boolean;
     },
   ) =>
@@ -96,6 +97,7 @@ export const api = {
       name?: string;
       baseUrl?: string;
       authType?: string;
+      headers?: Record<string, string>;
       productionSafetyMode?: boolean;
     },
   ) =>
@@ -124,6 +126,9 @@ export const api = {
   listEndpoints: (projectId: string) =>
     request<Endpoint[]>(`/api/projects/${projectId}/endpoints`),
 
+  deleteEndpoint: (id: string) =>
+    request<void>(`/api/endpoints/${id}`, { method: "DELETE" }),
+
   importOpenApi: (projectId: string, document: unknown) =>
     request<{ imported: number; endpoints: Endpoint[] }>(
       `/api/projects/${projectId}/openapi/import`,
@@ -145,25 +150,30 @@ export const api = {
   listRuns: (projectId: string) =>
     request<ScanRun[]>(`/api/projects/${projectId}/runs`),
 
-  runScan: (input: {
-    projectId: string;
-    environmentId: string;
-    endpointIds?: string[];
-    bearerToken?: string;
-    approvedAiCases?: TestCase[];
-    aiOnly?: boolean;
-    variables?: Variable[];
-    rateLimit?: Partial<RateLimitConfig>;
-  }) =>
+  runScan: (
+    input: {
+      projectId: string;
+      environmentId: string;
+      endpointIds?: string[];
+      bearerToken?: string;
+      approvedAiCases?: TestCase[];
+      aiOnly?: boolean;
+      variables?: Variable[];
+      rateLimit?: Partial<RateLimitConfig>;
+    },
+    init?: { signal?: AbortSignal },
+  ) =>
     request<{
       run: ScanRun;
       findings: Finding[];
       endpointsScanned: number;
       totalCases: number;
       variables?: Variable[];
+      cancelled?: boolean;
     }>("/api/scans", {
       method: "POST",
       body: JSON.stringify(input),
+      signal: init?.signal,
     }),
 
   getAiSettings: () => request<AiSettingsDto>("/api/ai/settings"),
@@ -201,6 +211,42 @@ export const api = {
       body: JSON.stringify(input),
     }),
 
+  getAiCases: (projectId: string) =>
+    request<{
+      cases: TestCase[];
+      approvedIds: string[];
+      genMode?: string | null;
+      rejected?: Array<{ id: string; name: string; reason: string }>;
+      updatedAt: string;
+    }>(`/api/projects/${projectId}/ai-cases`),
+
+  saveAiCases: (
+    projectId: string,
+    input: {
+      cases: TestCase[];
+      approvedIds: string[];
+      genMode?: string | null;
+      rejected?: Array<{ id: string; name: string; reason: string }>;
+    },
+  ) =>
+    request<{
+      cases: TestCase[];
+      approvedIds: string[];
+      genMode?: string | null;
+      rejected?: Array<{ id: string; name: string; reason: string }>;
+      updatedAt: string;
+    }>(`/api/projects/${projectId}/ai-cases`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+    }),
+
+  clearAiCases: (projectId: string) =>
+    request<{
+      cases: TestCase[];
+      approvedIds: string[];
+      updatedAt: string;
+    }>(`/api/projects/${projectId}/ai-cases`, { method: "DELETE" }),
+
   listPersonas: (projectId: string) =>
     request<TestPersona[]>(`/api/projects/${projectId}/personas`),
 
@@ -218,6 +264,24 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input),
     }),
+
+  updatePersona: (
+    projectId: string,
+    personaId: string,
+    input: {
+      name: string;
+      description?: string;
+      fields: Record<string, unknown>;
+      tags?: string[];
+    },
+  ) =>
+    request<TestPersona>(
+      `/api/projects/${projectId}/personas/${personaId}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(input),
+      },
+    ),
 
   deletePersona: (projectId: string, personaId: string) =>
     request<void>(`/api/projects/${projectId}/personas/${personaId}`, {

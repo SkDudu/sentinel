@@ -42,6 +42,7 @@ interface ProjectState {
       name: string;
       baseUrl: string;
       authType?: string;
+      headers?: Record<string, string>;
       productionSafetyMode?: boolean;
       secret?: string;
     },
@@ -52,6 +53,7 @@ interface ProjectState {
       name?: string;
       baseUrl?: string;
       authType?: string;
+      headers?: Record<string, string>;
       productionSafetyMode?: boolean;
     },
   ) => Promise<void>;

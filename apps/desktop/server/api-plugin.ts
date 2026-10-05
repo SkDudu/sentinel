@@ -17,6 +17,7 @@ import {
   EnvironmentRepository,
   FindingRepository,
   ProjectRepository,
+  TestResultRepository,
   TestRunRepository,
   type SqliteHandle,
 } from "@sw/database";
@@ -32,6 +33,11 @@ import {
   toPublicAiSettings,
   type AiSettingsFile,
 } from "./ai-settings.js";
+import {
+  clearAiCases,
+  loadAiCases,
+  saveAiCases,
+} from "./ai-cases-store.js";
 import {
   deletePersona,
   listPersonas,
@@ -101,6 +107,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
       const endpoints = new EndpointRepository(handle.db);
       const findings = new FindingRepository(handle.db);
       const runs = new TestRunRepository(handle.db);
+      const testResults = new TestResultRepository(handle.db);
 
       server.httpServer?.once("close", () => {
         handle?.close();
@@ -336,6 +343,14 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
             }
           }
 
+          const endpointMatch = path.match(/^\/api\/endpoints\/([^/]+)$/);
+          if (endpointMatch && method === "DELETE") {
+            const id = decodeURIComponent(endpointMatch[1]!);
+            if (!(await endpoints.delete(id))) return notFound(res);
+            sendJson(res, 204);
+            return;
+          }
+
           const importMatch = path.match(
             /^\/api\/projects\/([^/]+)\/openapi\/import$/,
           );
@@ -429,6 +444,12 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
               return;
             }
 
+            const abort = new AbortController();
+            const onClientGone = () => {
+              if (!res.writableFinished) abort.abort();
+            };
+            res.on("close", onClientGone);
+
             try {
               const result = await runProjectScan(
                 {
@@ -440,15 +461,31 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                   aiOnly: body.aiOnly,
                   variables: body.variables,
                   rateLimit: body.rateLimit,
+                  signal: abort.signal,
                 },
-                { projects, environments, endpoints, findings, runs },
+                {
+                  projects,
+                  environments,
+                  endpoints,
+                  findings,
+                  runs,
+                  testResults,
+                },
                 secrets,
               );
               sendJson(res, 201, result);
             } catch (error) {
+              if (abort.signal.aborted) {
+                if (!res.writableEnded) {
+                  sendJson(res, 499, { error: "Scan cancelled" });
+                }
+                return;
+              }
               sendJson(res, 400, {
                 error: error instanceof Error ? error.message : "Scan failed",
               });
+            } finally {
+              res.off("close", onClientGone);
             }
             return;
           }
@@ -566,6 +603,50 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
               });
             }
             return;
+          }
+
+          const aiCasesMatch = path.match(
+            /^\/api\/projects\/([^/]+)\/ai-cases$/,
+          );
+          if (aiCasesMatch) {
+            const projectId = decodeURIComponent(aiCasesMatch[1]!);
+            if (!(await projects.getById(projectId))) return notFound(res);
+
+            if (method === "GET") {
+              sendJson(res, 200, loadAiCases(dataDir, projectId));
+              return;
+            }
+
+            if (method === "PUT") {
+              const body = await readJson<{
+                cases?: TestCase[];
+                approvedIds?: string[];
+                genMode?: string | null;
+                rejected?: Array<{ id: string; name: string; reason: string }>;
+              }>(req);
+              if (!Array.isArray(body.cases) || !Array.isArray(body.approvedIds)) {
+                sendJson(res, 400, {
+                  error: "cases and approvedIds arrays are required",
+                });
+                return;
+              }
+              sendJson(
+                res,
+                200,
+                saveAiCases(dataDir, projectId, {
+                  cases: body.cases,
+                  approvedIds: body.approvedIds,
+                  genMode: body.genMode,
+                  rejected: body.rejected,
+                }),
+              );
+              return;
+            }
+
+            if (method === "DELETE") {
+              sendJson(res, 200, clearAiCases(dataDir, projectId));
+              return;
+            }
           }
 
           const personasMatch = path.match(
