@@ -1,0 +1,124 @@
+/**
+ * Sentinel — color tokens
+ *
+ * 1. Primitive — Malachite (brand) + Storm Dust (neutro / contraste)
+ * 2. Semantic  — papel na UI
+ * 3. Compat    — aliases legados (--bg, --accent…) das páginas atuais
+ *
+ * Papéis:
+ * - Malachite  · accent / primary / success / glow · base 500 (#13E010)
+ * - Storm Dust · bg / surface / texto / borda · base 600 (#616161)
+ */
+
+@theme {
+  /* ── Malachite ──────────────────────────────────────── */
+  --color-malachite-50: #e9ffe6;
+  --color-malachite-100: #cdfec9;
+  --color-malachite-200: #9ffd99;
+  --color-malachite-300: #66f75f;
+  --color-malachite-400: #34ed2e;
+  --color-malachite-500: #13e010;
+  --color-malachite-600: #07a908;
+  --color-malachite-700: #0b800d;
+  --color-malachite-800: #0f6511;
+  --color-malachite-900: #125515;
+  --color-malachite-950: #033006;
+
+  /* ── Storm Dust ─────────────────────────────────────── */
+  --color-storm-50: #fafafa;
+  --color-storm-100: #f5f5f5;
+  --color-storm-200: #e6e6e6;
+  --color-storm-300: #d3d3d3;
+  --color-storm-400: #a3a3a3;
+  --color-storm-500: #727272;
+  --color-storm-600: #616161;
+  --color-storm-700: #404040;
+  --color-storm-800: #272727;
+  --color-storm-900: #1a1a1a;
+  --color-storm-950: #0b0b0b;
+
+  /* Semantic → utilities Tailwind (bg-primary, text-muted-foreground…) */
+  --color-primary: var(--color-malachite-500);
+  --color-primary-foreground: #ffffff;
+
+  --color-background: var(--color-storm-950);
+  --color-foreground: var(--color-storm-50);
+
+  --color-card: var(--color-storm-900);
+  --color-card-foreground: var(--color-storm-50);
+
+  --color-muted: var(--color-storm-800);
+  --color-muted-foreground: var(--color-storm-400);
+
+  --color-accent: var(--color-malachite-500);
+  --color-accent-foreground: #ffffff;
+
+  --color-border: var(--color-storm-700);
+  --color-ring: var(--color-malachite-400);
+
+  --color-destructive: #e26d6d;
+  --color-warning: #e6b35a;
+}
+
+:root {
+  /* ── 1. Primitive aliases ───────────────────────────── */
+  --malachite-50: var(--color-malachite-50);
+  --malachite-100: var(--color-malachite-100);
+  --malachite-200: var(--color-malachite-200);
+  --malachite-300: var(--color-malachite-300);
+  --malachite-400: var(--color-malachite-400);
+  --malachite-500: var(--color-malachite-500);
+  --malachite-600: var(--color-malachite-600);
+  --malachite-700: var(--color-malachite-700);
+  --malachite-800: var(--color-malachite-800);
+  --malachite-900: var(--color-malachite-900);
+  --malachite-950: var(--color-malachite-950);
+
+  --storm-50: var(--color-storm-50);
+  --storm-100: var(--color-storm-100);
+  --storm-200: var(--color-storm-200);
+  --storm-300: var(--color-storm-300);
+  --storm-400: var(--color-storm-400);
+  --storm-500: var(--color-storm-500);
+  --storm-600: var(--color-storm-600);
+  --storm-700: var(--color-storm-700);
+  --storm-800: var(--color-storm-800);
+  --storm-900: var(--color-storm-900);
+  --storm-950: var(--color-storm-950);
+
+  /* ── 2. Semantic (Storm = contraste; Malachite = brand) ── */
+  --color-bg: var(--storm-950);
+  --color-bg-elevated: var(--storm-900);
+  --color-surface: var(--storm-800);
+  --color-surface-hover: var(--storm-700);
+  --color-fg: var(--storm-50);
+  --color-fg-muted: var(--storm-400);
+  --color-fg-subtle: var(--storm-500);
+
+  --color-primary-hover: var(--malachite-400);
+  --color-primary-active: var(--malachite-600);
+  --color-primary-muted: var(--malachite-700);
+
+  --color-focus: var(--malachite-300);
+  --color-success: var(--malachite-500);
+  --color-danger: var(--color-destructive);
+
+  /* Glow brand sutil sobre fundo Storm */
+  --color-glow: color-mix(in srgb, var(--malachite-600) 40%, transparent);
+  --color-glow-soft: color-mix(in srgb, var(--malachite-800) 28%, transparent);
+
+  /* ── 3. Compat (páginas atuais) ─────────────────────── */
+  --bg: var(--color-bg);
+  --bg-elevated: var(--color-bg-elevated);
+  --panel: var(--color-surface);
+  --line: var(--color-border);
+  --text: var(--color-fg);
+  --muted: var(--color-fg-muted);
+  --accent: var(--color-primary);
+  --accent-dim: var(--color-primary-muted);
+  --warn: var(--color-warning);
+  --danger: var(--color-danger);
+
+  --font-display: "Segoe UI", "IBM Plex Sans", sans-serif;
+  --font-mono: "Cascadia Code", "Consolas", monospace;
+}
