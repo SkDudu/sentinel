@@ -174,7 +174,7 @@ export function SettingsPage() {
                 type="button"
                 disabled={busy}
                 onClick={() => void onSave()}
-                className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[#062016] disabled:opacity-50"
+                className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
               >
                 {busy ? "Salvando…" : "Salvar AI settings"}
               </button>

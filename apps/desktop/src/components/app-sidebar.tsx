@@ -1,9 +1,12 @@
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
-  FolderKanban,
-  Route,
-  Radar,
+  ArrowLeft,
   Bug,
+  FolderKanban,
+  LayoutDashboard,
+  Radar,
+  Route,
+  Server,
   Settings,
   Shield,
 } from "lucide-react";
@@ -19,22 +22,66 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
+import { useProjectStore } from "@/stores/project";
 
-const links = [
-  { to: "/", label: "Projects", icon: FolderKanban, end: true },
-  { to: "/endpoints", label: "Endpoints", icon: Route },
-  { to: "/scans", label: "Scans / AI Lab", icon: Radar },
-  { to: "/findings", label: "Findings", icon: Bug },
-  { to: "/settings", label: "Settings", icon: Settings },
+const globalLinks = [
+  { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
+  { to: "/projects", label: "Projetos", icon: FolderKanban },
+  { to: "/settings", label: "Configurações", icon: Settings },
 ] as const;
 
+function projectLinks(projectId: string) {
+  return [
+    {
+      to: `/projects/${projectId}`,
+      label: "Dashboard",
+      icon: LayoutDashboard,
+      end: true,
+    },
+    {
+      to: `/projects/${projectId}/environments`,
+      label: "Ambientes",
+      icon: Server,
+    },
+    {
+      to: `/projects/${projectId}/endpoints`,
+      label: "Endpoints",
+      icon: Route,
+    },
+    {
+      to: `/projects/${projectId}/scans`,
+      label: "Scans / AI Lab",
+      icon: Radar,
+    },
+    {
+      to: `/projects/${projectId}/findings`,
+      label: "Findings",
+      icon: Bug,
+    },
+  ] as const;
+}
+
+function parseProjectId(pathname: string): string | null {
+  const match = pathname.match(/^\/projects\/([^/]+)/);
+  return match?.[1] ?? null;
+}
+
 function pathActive(pathname: string, to: string, end?: boolean) {
-  if (end || to === "/") return pathname === to;
+  if (end) return pathname === to;
   return pathname === to || pathname.startsWith(`${to}/`);
 }
 
 export function AppSidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const projects = useProjectStore((s) => s.projects);
+  const projectId = parseProjectId(location.pathname);
+  const project = projectId
+    ? projects.find((p) => p.id === projectId)
+    : undefined;
+  const inProject = Boolean(projectId);
+
+  const links = inProject && projectId ? projectLinks(projectId) : globalLinks;
 
   return (
     <Sidebar collapsible="icon" variant="sidebar">
@@ -54,7 +101,9 @@ export function AppSidebar() {
                   Sentinel
                 </span>
                 <span className="truncate text-xs text-sidebar-foreground/70">
-                  Local workbench
+                  {inProject
+                    ? (project?.name ?? "Projeto")
+                    : "Local workbench"}
                 </span>
               </div>
             </SidebarMenuButton>
@@ -63,12 +112,34 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
+        {inProject ? (
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    tooltip="Voltar a Projetos"
+                    onClick={() => {
+                      void navigate("/projects");
+                    }}
+                  >
+                    <ArrowLeft />
+                    <span>Projetos</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ) : null}
+
         <SidebarGroup>
-          <SidebarGroupLabel>Navegação</SidebarGroupLabel>
+          <SidebarGroupLabel>
+            {inProject ? "Projeto" : "App"}
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {links.map((link) => {
-                const end = "end" in link ? link.end : false;
+                const end = "end" in link ? Boolean(link.end) : false;
                 const isActive = pathActive(location.pathname, link.to, end);
                 return (
                   <SidebarMenuItem key={link.to}>
@@ -86,6 +157,26 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {inProject ? (
+          <SidebarGroup>
+            <SidebarGroupLabel>App</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    tooltip="Configurações"
+                    isActive={pathActive(location.pathname, "/settings")}
+                    render={<NavLink to="/settings" />}
+                  >
+                    <Settings />
+                    <span>Configurações</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ) : null}
       </SidebarContent>
       <SidebarRail />
     </Sidebar>

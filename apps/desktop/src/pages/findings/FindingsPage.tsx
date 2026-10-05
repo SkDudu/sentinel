@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { Bug, FolderKanban, Filter } from "lucide-react";
 import {
   FindingStatus,
@@ -90,8 +90,9 @@ function HttpEvidence({
 }
 
 export function FindingsPage() {
-  const { projects, activeProjectId, loadProjects } = useProjectStore();
-  const project = projects.find((p) => p.id === activeProjectId);
+  const { projectId } = useParams<{ projectId: string }>();
+  const { projects, loadProjects, setActiveProject } = useProjectStore();
+  const project = projects.find((p) => p.id === projectId);
 
   const [findings, setFindings] = useState<Finding[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -102,11 +103,11 @@ export function FindingsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  async function refresh(projectId: string) {
+  async function refresh(id: string) {
     setLoading(true);
     setError(null);
     try {
-      setFindings(await api.listFindings(projectId));
+      setFindings(await api.listFindings(id));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao carregar");
     } finally {
@@ -119,12 +120,16 @@ export function FindingsPage() {
   }, [loadProjects]);
 
   useEffect(() => {
-    if (!activeProjectId) {
+    if (projectId) setActiveProject(projectId);
+  }, [projectId, setActiveProject]);
+
+  useEffect(() => {
+    if (!projectId) {
       setFindings([]);
       return;
     }
-    void refresh(activeProjectId);
-  }, [activeProjectId]);
+    void refresh(projectId);
+  }, [projectId]);
 
   const filtered = useMemo(() => {
     return findings.filter((finding) => {
@@ -180,9 +185,9 @@ export function FindingsPage() {
         <PageEmptyState
           icon={FolderKanban}
           title="Nenhum projeto ativo"
-          description="Selecione um projeto em Projects para ver findings."
+          description="Abra um projeto em Projetos para ver findings."
           action={
-            <Button render={<Link to="/" />}>Ir para Projects</Button>
+            <Button render={<Link to="/projects" />}>Ir para Projetos</Button>
           }
         />
       </PageShell>
@@ -289,7 +294,9 @@ export function FindingsPage() {
           title="Nenhum finding ainda"
           description="Rode um scan em Scans para gerar findings neste projeto."
           action={
-            <Button render={<Link to="/scans" />}>Ir para Scans</Button>
+            <Button render={<Link to={`/projects/${project.id}/scans`} />}>
+              Ir para Scans
+            </Button>
           }
         />
       ) : filtered.length === 0 ? (

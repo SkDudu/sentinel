@@ -1,5 +1,5 @@
 import { useEffect, useState, type ChangeEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { FolderKanban, Route } from "lucide-react";
 import type { Endpoint } from "@sw/core";
 import { api } from "@/services/api";
@@ -9,8 +9,9 @@ import { PageEmptyState } from "@/components/layout/page-empty-state";
 import { PageShell } from "@/components/layout/page-shell";
 
 export function EndpointsPage() {
-  const { projects, activeProjectId, loadProjects } = useProjectStore();
-  const project = projects.find((p) => p.id === activeProjectId);
+  const { projectId } = useParams<{ projectId: string }>();
+  const { projects, loadProjects, setActiveProject } = useProjectStore();
+  const project = projects.find((p) => p.id === projectId);
 
   const [endpoints, setEndpoints] = useState<Endpoint[]>([]);
   const [loading, setLoading] = useState(false);
@@ -24,7 +25,11 @@ export function EndpointsPage() {
   }, [loadProjects]);
 
   useEffect(() => {
-    if (!activeProjectId) {
+    if (projectId) setActiveProject(projectId);
+  }, [projectId, setActiveProject]);
+
+  useEffect(() => {
+    if (!projectId) {
       setEndpoints([]);
       setSelectedId(null);
       return;
@@ -32,7 +37,7 @@ export function EndpointsPage() {
     setLoading(true);
     setError(null);
     void api
-      .listEndpoints(activeProjectId)
+      .listEndpoints(projectId)
       .then((items) => {
         setEndpoints(items);
         setSelectedId((current) =>
@@ -45,13 +50,13 @@ export function EndpointsPage() {
         setError(err instanceof Error ? err.message : "Falha ao carregar"),
       )
       .finally(() => setLoading(false));
-  }, [activeProjectId]);
+  }, [projectId]);
 
   const selected = endpoints.find((endpoint) => endpoint.id === selectedId);
 
   async function onFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
-    if (!file || !activeProjectId) return;
+    if (!file || !projectId) return;
 
     setError(null);
     setImported(null);
@@ -59,7 +64,7 @@ export function EndpointsPage() {
     try {
       const text = await file.text();
       const document = JSON.parse(text) as unknown;
-      const result = await api.importOpenApi(activeProjectId, document);
+      const result = await api.importOpenApi(projectId, document);
       setEndpoints(result.endpoints);
       setImported(result.imported);
       setSelectedId(null);
@@ -98,9 +103,9 @@ export function EndpointsPage() {
         <PageEmptyState
           icon={FolderKanban}
           title="Nenhum projeto ativo"
-          description="Selecione ou crie um projeto em Projects para importar OpenAPI."
+          description="Abra um projeto em Projetos para importar OpenAPI."
           action={
-            <Button render={<Link to="/" />}>Ir para Projects</Button>
+            <Button render={<Link to="/projects" />}>Ir para Projetos</Button>
           }
         />
       </PageShell>

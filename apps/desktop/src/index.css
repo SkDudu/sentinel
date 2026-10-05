@@ -31,21 +31,20 @@
   --color-destructive: var(--destructive);
   --color-warning: var(--warning);
 
-  /* Direto das escalas — não depender de --muted/--accent (compat de páginas) */
-  --color-accent-foreground: var(--storm-50);
-  --color-accent: var(--storm-800);
-  --color-muted-foreground: var(--storm-400);
-  --color-muted: var(--storm-800);
-  --color-secondary-foreground: var(--storm-50);
-  --color-secondary: var(--storm-800);
-  --color-primary-foreground: #ffffff;
-  --color-primary: var(--malachite-500);
   --color-popover-foreground: var(--storm-50);
-  --color-popover: var(--storm-900);
+  --color-popover: var(--storm-700);
   --color-card-foreground: var(--storm-50);
-  --color-card: var(--storm-900);
+  --color-card: var(--storm-700);
   --color-foreground: var(--storm-50);
-  --color-background: var(--storm-950);
+  --color-background: var(--storm-800);
+  --color-accent-foreground: var(--storm-50);
+  --color-accent: var(--storm-700);
+  --color-muted-foreground: var(--storm-400);
+  --color-muted: var(--storm-700);
+  --color-secondary-foreground: var(--storm-50);
+  --color-secondary: var(--storm-700);
+  --color-primary-foreground: #ffffff;
+  --color-primary: var(--malachite-600);
 
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
@@ -57,45 +56,45 @@
 }
 
 :root {
-  /* App dark-first — Malachite + Storm Dust */
-  --background: var(--storm-950);
+  /* App dark-first — Malachite + Storm Dust (carvão, não preto) */
+  --background: var(--storm-800);
   --foreground: var(--storm-50);
-  --card: var(--storm-900);
+  --card: var(--storm-700);
   --card-foreground: var(--storm-50);
-  --popover: var(--storm-900);
+  --popover: var(--storm-700);
   --popover-foreground: var(--storm-50);
-  --primary: var(--malachite-500);
+  --primary: var(--malachite-600);
   --primary-foreground: #ffffff;
-  --secondary: var(--storm-800);
+  --secondary: var(--storm-700);
   --secondary-foreground: var(--storm-50);
-  --muted: var(--storm-800);
+  --muted: var(--storm-700);
   --muted-foreground: var(--storm-400);
-  --accent: var(--storm-800);
+  --accent: var(--storm-700);
   --accent-foreground: var(--storm-50);
   --destructive: #e26d6d;
   --warning: #e6b35a;
-  --border: var(--storm-700);
-  --input: var(--storm-700);
-  --ring: var(--malachite-400);
-  --chart-1: var(--malachite-400);
-  --chart-2: var(--malachite-600);
+  --border: var(--storm-600);
+  --input: var(--storm-600);
+  --ring: var(--malachite-500);
+  --chart-1: var(--malachite-500);
+  --chart-2: var(--malachite-700);
   --chart-3: var(--storm-400);
   --chart-4: var(--storm-600);
-  --chart-5: var(--storm-800);
+  --chart-5: var(--storm-700);
   --radius: 0.625rem;
 
-  --sidebar: var(--storm-900);
+  --sidebar: var(--storm-800);
   --sidebar-foreground: var(--storm-50);
-  --sidebar-primary: var(--malachite-500);
+  --sidebar-primary: var(--malachite-600);
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: var(--storm-800);
+  --sidebar-accent: var(--storm-700);
   --sidebar-accent-foreground: var(--storm-50);
-  --sidebar-border: var(--storm-700);
+  --sidebar-border: var(--storm-600);
   --sidebar-ring: var(--malachite-400);
 
   /* Compat páginas legadas (Tailwind usa --color-* do @theme, não estes) */
   --bg: var(--background);
-  --bg-elevated: var(--sidebar);
+  --bg-elevated: var(--card);
   --panel: var(--card);
   --line: var(--border);
   --text: var(--foreground);
@@ -111,36 +110,36 @@
 }
 
 .dark {
-  --background: var(--storm-950);
+  --background: var(--storm-800);
   --foreground: var(--storm-50);
-  --card: var(--storm-900);
+  --card: var(--storm-700);
   --card-foreground: var(--storm-50);
-  --popover: var(--storm-900);
+  --popover: var(--storm-700);
   --popover-foreground: var(--storm-50);
-  --primary: var(--malachite-500);
+  --primary: var(--malachite-600);
   --primary-foreground: #ffffff;
-  --secondary: var(--storm-800);
+  --secondary: var(--storm-700);
   --secondary-foreground: var(--storm-50);
-  --muted: var(--storm-800);
+  --muted: var(--storm-700);
   --muted-foreground: var(--storm-400);
-  --accent: var(--storm-800);
+  --accent: var(--storm-700);
   --accent-foreground: var(--storm-50);
   --destructive: #e26d6d;
   --warning: #e6b35a;
-  --border: var(--storm-700);
-  --input: var(--storm-700);
-  --ring: var(--malachite-400);
-  --sidebar: var(--storm-900);
+  --border: var(--storm-600);
+  --input: var(--storm-600);
+  --ring: var(--malachite-500);
+  --sidebar: var(--storm-800);
   --sidebar-foreground: var(--storm-50);
-  --sidebar-primary: var(--malachite-500);
+  --sidebar-primary: var(--malachite-600);
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: var(--storm-800);
+  --sidebar-accent: var(--storm-700);
   --sidebar-accent-foreground: var(--storm-50);
-  --sidebar-border: var(--storm-700);
+  --sidebar-border: var(--storm-600);
   --sidebar-ring: var(--malachite-400);
 
   --bg: var(--background);
-  --bg-elevated: var(--sidebar);
+  --bg-elevated: var(--card);
   --panel: var(--card);
   --line: var(--border);
   --text: var(--foreground);

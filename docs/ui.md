@@ -30,6 +30,7 @@ Shell com contexto do projeto ativo (nome visível; saída clara de volta a Proj
 | Destino | Papel |
 | --- | --- |
 | **Dashboard do projeto** | Home do projeto: indicadores e atalhos do próprio projeto |
+| **Ambientes** | CRUD de ambientes (base URL, auth, safety, secrets) |
 | **Endpoints** | Import OpenAPI / lista / detalhe |
 | **Scans / AI Lab** | Execução, histórico, geração e review de casos AI |
 | **Findings** | Lista, filtros, evidência |
@@ -41,6 +42,7 @@ Rotas sugeridas (implementação futura):
 /projects                 → Lista de projetos
 /settings                 → Configurações
 /projects/:projectId      → Dashboard do projeto
+/projects/:projectId/environments
 /projects/:projectId/endpoints
 /projects/:projectId/scans
 /projects/:projectId/findings
@@ -52,6 +54,7 @@ O `projectId` na URL é a fonte de verdade do contexto. Evitar depender só de `
 App open
   ├─ Dashboard (global)
   ├─ Projetos ──click card──► Dialog (detalhe) ──Abrir──► Dashboard do projeto
+  │                                                      ├─ Ambientes
   │                                                      ├─ Endpoints
   │                                                      ├─ Scans / AI Lab
   │                                                      └─ Findings
@@ -80,6 +83,38 @@ Arquivo: `apps/desktop/src/components/layout/page-shell.tsx`
 </PageShell>
 ```
 
+## Cards de lista (decisão de UI)
+
+Padrão **obrigatório** para listas de entidades (projetos, ambientes, e o que vier no mesmo espírito).
+
+Arquivo: `apps/desktop/src/components/ui/card.tsx`
+
+### Layout
+
+- Grid responsivo: `grid gap-3 sm:grid-cols-2`
+- Cada item = `Card` + `CardHeader` (+ `CardAction` para o ⋯)
+- Conteúdo do card: ícone (opcional) → título → descrição/meta curta
+- Sem formulário inline no card; sem links “editar / secret / remover” no corpo
+
+### Ações
+
+| Ação | Onde |
+| --- | --- |
+| Abrir / detalhar | Clique no card (ou área principal) → `Dialog` de detalhe, se o fluxo precisar de preview |
+| Editar / excluir / secret | Menu ⋯ (`DropdownMenu`) e/ou botões no `Dialog` |
+| Criar | Botão do `PageShell` (ou só no empty state quando a lista está vazia) |
+| Forms | Sempre `Dialog` / `AlertDialog` — nunca expandir o card |
+
+### Atalhos do dashboard do projeto
+
+Mesma linguagem visual (tile com ícone + título + meta), em grid `sm:grid-cols-2`. Podem ser `Button variant="outline"` com `Link` ou `Card` — manter hierarquia e densidade parecidas com os cards de lista.
+
+### Referências
+
+- `ProjectsPage` — cards de projeto + dialog de detalhe
+- `EnvironmentsPage` — cards de ambiente + CRUD via dialogs
+- `ProjectDashboardPage` — atalhos em grid
+
 ## Empty state
 
 Arquivo: `apps/desktop/src/components/layout/page-empty-state.tsx`
@@ -99,15 +134,19 @@ Usar quando:
 />
 ```
 
+No empty state: **um** CTA no centro. Esconder o botão duplicado do header do `PageShell` enquanto a lista estiver vazia; mostrar o botão do header quando já existir pelo menos um item.
+
 ## Demais padrões
 
 | Padrão | Componente |
 | --- | --- |
-| Cards de lista | `Card` (`components/ui/card`) |
+| Cards de lista | `Card` — ver secção acima |
 | Ações do item | `DropdownMenu` (⋯) |
 | Criar / editar form | `Dialog` |
 | Confirmar destrutivo | `AlertDialog` + `Alert` destructive |
+| Select em dialog | `Select` com `SelectContent portalled={false}` |
+| Lista scrollável em dialog | `ScrollArea` |
 | Loading em botão | `Spinner` com `data-icon="inline-start"` |
 | Erro de página | `Alert` variant `destructive` |
 
-Referência viva: `ProjectsPage`.
+Referências vivas: `ProjectsPage`, `EnvironmentsPage`.

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { FolderKanban } from "lucide-react";
 import type { Endpoint, ScanRun, TestCase, TestPersona } from "@sw/core";
 import { api } from "@/services/api";
@@ -9,8 +9,9 @@ import { PageEmptyState } from "@/components/layout/page-empty-state";
 import { PageShell } from "@/components/layout/page-shell";
 
 export function ScansPage() {
-  const { projects, activeProjectId, loadProjects } = useProjectStore();
-  const project = projects.find((p) => p.id === activeProjectId);
+  const { projectId } = useParams<{ projectId: string }>();
+  const { projects, loadProjects, setActiveProject } = useProjectStore();
+  const project = projects.find((p) => p.id === projectId);
 
   const [endpoints, setEndpoints] = useState<Endpoint[]>([]);
   const [runs, setRuns] = useState<ScanRun[]>([]);
@@ -44,6 +45,10 @@ export function ScansPage() {
   useEffect(() => {
     void loadProjects();
   }, [loadProjects]);
+
+  useEffect(() => {
+    if (projectId) setActiveProject(projectId);
+  }, [projectId, setActiveProject]);
 
   useEffect(() => {
     if (!project) return;
@@ -328,9 +333,30 @@ export function ScansPage() {
         <PageEmptyState
           icon={FolderKanban}
           title="Nenhum projeto ativo"
-          description="Selecione um projeto em Projects para rodar scans e AI Lab."
+          description="Abra um projeto em Projetos para rodar scans e AI Lab."
           action={
-            <Button render={<Link to="/" />}>Ir para Projects</Button>
+            <Button render={<Link to="/projects" />}>Ir para Projetos</Button>
+          }
+        />
+      </PageShell>
+    );
+  }
+
+  if (project.environments.length === 0) {
+    return (
+      <PageShell title="Scans">
+        <PageEmptyState
+          icon={FolderKanban}
+          title="Nenhum ambiente"
+          description="Adicione um ambiente no dashboard do projeto antes de rodar scans."
+          action={
+            <Button
+              render={
+                <Link to={`/projects/${project.id}/environments?newEnv=1`} />
+              }
+            >
+              Adicionar ambiente
+            </Button>
           }
         />
       </PageShell>
@@ -445,7 +471,7 @@ export function ScansPage() {
             type="button"
             disabled={busy || !environmentId || selectedIds.length === 0}
             onClick={() => void onRun()}
-            className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[#062016] disabled:opacity-50"
+            className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
           >
             {scanPhase === "running" ? "Executando…" : "Run scan"}
           </button>
@@ -497,7 +523,7 @@ export function ScansPage() {
               busy || !environmentId || approvedCases.length === 0
             }
             onClick={() => void onRunApprovedAi()}
-            className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[#062016] disabled:opacity-50"
+            className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
           >
             Run aprovados ({approvedCases.length})
           </button>
