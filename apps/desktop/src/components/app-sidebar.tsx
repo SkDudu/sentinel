@@ -5,7 +5,6 @@ import {
   FolderKanban,
   LayoutDashboard,
   Radar,
-  Route,
   Server,
   Settings,
   Shield,
@@ -42,11 +41,6 @@ function projectLinks(projectId: string) {
       to: `/projects/${projectId}/environments`,
       label: "Ambientes",
       icon: Server,
-    },
-    {
-      to: `/projects/${projectId}/endpoints`,
-      label: "Endpoints",
-      icon: Route,
     },
     {
       to: `/projects/${projectId}/scans`,

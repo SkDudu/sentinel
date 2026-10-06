@@ -92,15 +92,15 @@ Deterministic  AI Generator (opcional)
 ```
 Project
 ├── environments (baseUrl, auth, safety mode)
+│   └── endpoints (contrato OpenAPI daquele ambiente)
 ├── authentication (refs de secret)
-├── endpoints
 ├── test suites
 ├── variables ({{token}}, {{userId}})
 ├── findings
 └── scan history
 ```
 
-Ambiente troca o target **sem** alterar a definição dos testes.
+Cada ambiente tem o próprio contrato. O scan usa os endpoints daquele ambiente.
 
 ## Test plugin contract
 

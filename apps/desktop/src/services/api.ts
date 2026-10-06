@@ -126,12 +126,15 @@ export const api = {
   listEndpoints: (projectId: string) =>
     request<Endpoint[]>(`/api/projects/${projectId}/endpoints`),
 
+  listEnvironmentEndpoints: (environmentId: string) =>
+    request<Endpoint[]>(`/api/environments/${environmentId}/endpoints`),
+
   deleteEndpoint: (id: string) =>
     request<void>(`/api/endpoints/${id}`, { method: "DELETE" }),
 
-  importOpenApi: (projectId: string, document: unknown) =>
+  importEnvironmentOpenApi: (environmentId: string, document: unknown) =>
     request<{ imported: number; endpoints: Endpoint[] }>(
-      `/api/projects/${projectId}/openapi/import`,
+      `/api/environments/${environmentId}/openapi/import`,
       {
         method: "POST",
         body: JSON.stringify({ document }),

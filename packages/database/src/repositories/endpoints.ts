@@ -7,6 +7,7 @@ function mapEndpoint(row: typeof endpoints.$inferSelect): Endpoint {
   return {
     id: row.id,
     projectId: row.projectId,
+    environmentId: row.environmentId ?? undefined,
     method: row.method as Endpoint["method"],
     path: row.path,
     operationId: row.operationId ?? undefined,
@@ -31,6 +32,14 @@ export class EndpointRepository {
     return rows.map(mapEndpoint);
   }
 
+  async listByEnvironment(environmentId: string): Promise<Endpoint[]> {
+    const rows = await this.db
+      .select()
+      .from(endpoints)
+      .where(eq(endpoints.environmentId, environmentId));
+    return rows.map(mapEndpoint);
+  }
+
   async getById(id: string): Promise<Endpoint | null> {
     const row = await this.db
       .select()
@@ -42,9 +51,10 @@ export class EndpointRepository {
 
   async replaceOpenApiEndpoints(
     projectId: string,
+    environmentId: string,
     items: Endpoint[],
   ): Promise<Endpoint[]> {
-    const existing = await this.listByProject(projectId);
+    const existing = await this.listByEnvironment(environmentId);
     for (const item of existing.filter((e) => e.source === "openapi")) {
       await this.db.delete(endpoints).where(eq(endpoints.id, item.id));
     }
@@ -53,6 +63,7 @@ export class EndpointRepository {
       await this.db.insert(endpoints).values({
         id: item.id,
         projectId,
+        environmentId,
         method: item.method,
         path: item.path,
         operationId: item.operationId ?? null,
@@ -66,7 +77,7 @@ export class EndpointRepository {
       });
     }
 
-    return this.listByProject(projectId);
+    return this.listByEnvironment(environmentId);
   }
 
   async delete(id: string): Promise<boolean> {

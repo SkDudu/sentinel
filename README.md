@@ -13,7 +13,7 @@ Não é um scanner na nuvem. É uma ferramenta **pessoal**, com engine própria 
 Testar segurança de API costuma ser manual, inconsistente ou preso a ferramentas externas sem fluxo de produto. O Sentinel une o ciclo completo:
 
 ```
-Projeto → Endpoints (OpenAPI) → Casos de teste → Execução → Findings
+Projeto → Ambiente (OpenAPI) → Casos de teste → Execução → Findings
 ```
 
 | Em vez de… | Sentinel faz… |
@@ -104,7 +104,7 @@ Plugins: `--plugins examples/plugins` · ZAP: `--executor zap --zap-url http://1
 ```
 sentinel/
 ├── apps/
-│   ├── desktop/     # Workbench (Projects, Endpoints, AI Test Lab, Findings)
+│   ├── desktop/     # Workbench (Projects, Ambientes, AI Test Lab, Findings)
 │   └── cli/         # Scan headless
 ├── packages/
 │   ├── core/              # Tipos e schemas Zod
@@ -153,7 +153,7 @@ Novos testes de segurança entram em `@sw/test-registry` como plugins — não n
 ## MVP (fluxo atual)
 
 1. Crie um projeto e ambiente em **Projects**  
-2. Importe `openapi.json` em **Endpoints** (ex.: `examples/sample-openapi.json`)  
+2. Abra um ambiente e importe `openapi.json` no dialog (ex.: `examples/sample-openapi.json`)  
 3. Rode o scan em **Scans** (Bearer opcional só da execução)  
 4. Revise e atualize status em **Findings**
 

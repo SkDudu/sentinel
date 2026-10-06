@@ -60,6 +60,7 @@ import {
   EnvironmentFormDialog,
   type EnvironmentFormValues,
 } from "@/pages/projects/EnvironmentFormDialog";
+import { EnvironmentDetailDialog } from "@/pages/environments/EnvironmentDetailDialog";
 
 export function EnvironmentsPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -84,6 +85,7 @@ export function EnvironmentsPage() {
   const [secretUsername, setSecretUsername] = useState("");
   const [secretPassword, setSecretPassword] = useState("");
   const [deleteEnv, setDeleteEnv] = useState<EnvironmentDto | null>(null);
+  const [detailEnvId, setDetailEnvId] = useState<string | null>(null);
 
   useEffect(() => {
     void loadProjects();
@@ -216,6 +218,8 @@ export function EnvironmentsPage() {
   }
 
   const hasEnvironments = project.environments.length > 0;
+  const detailEnv =
+    project.environments.find((env) => env.id === detailEnvId) ?? null;
 
   return (
     <PageShell
@@ -264,9 +268,18 @@ export function EnvironmentsPage() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {project.environments.map((env) => (
-            <Card key={env.id}>
-              <CardHeader>
-                <div className="min-w-0">
+            <Card key={env.id} className="relative">
+              <button
+                type="button"
+                aria-label={`Abrir ${env.name}`}
+                onClick={() => {
+                  setError(null);
+                  setDetailEnvId(env.id);
+                }}
+                className="absolute inset-0 z-0 cursor-pointer rounded-xl"
+              />
+              <CardHeader className="pointer-events-none relative z-10">
+                <div className="min-w-0 text-left">
                   <Server className="mb-1 size-4 text-muted-foreground" />
                   <CardTitle className="flex flex-wrap items-center gap-2">
                     <span className="truncate">{env.name}</span>
@@ -291,7 +304,7 @@ export function EnvironmentsPage() {
                       : ""}
                   </p>
                 </div>
-                <CardAction>
+                <CardAction className="pointer-events-auto">
                   <DropdownMenu>
                     <DropdownMenuTrigger
                       render={
@@ -344,6 +357,31 @@ export function EnvironmentsPage() {
           ))}
         </div>
       )}
+
+      <EnvironmentDetailDialog
+        environment={detailEnv}
+        open={detailEnvId !== null && detailEnv !== null}
+        onOpenChange={(open) => {
+          if (!open) setDetailEnvId(null);
+        }}
+        onEdit={() => {
+          if (!detailEnv) return;
+          setError(null);
+          setEditingEnv(detailEnv);
+        }}
+        onSecret={() => {
+          if (!detailEnv) return;
+          setError(null);
+          setSecretValue("");
+          setSecretUsername("");
+          setSecretPassword("");
+          setSecretEnv(detailEnv);
+        }}
+        onDelete={() => {
+          if (!detailEnv) return;
+          setDeleteEnv(detailEnv);
+        }}
+      />
 
       <EnvironmentFormDialog
         open={createOpen}

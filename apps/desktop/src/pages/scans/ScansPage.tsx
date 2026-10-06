@@ -51,13 +51,31 @@ export function ScansPage() {
   }, [projectId, setActiveProject]);
 
   useEffect(() => {
-    if (!project) return;
-    setEnvironmentId(project.environments[0]?.id ?? "");
-    void api.listEndpoints(project.id).then((items) => {
+    if (!environmentId) {
+      setEndpoints([]);
+      setSelected({});
+      return;
+    }
+    let cancelled = false;
+    void api.listEnvironmentEndpoints(environmentId).then((items) => {
+      if (cancelled) return;
       setEndpoints(items);
       const next: Record<string, boolean> = {};
       for (const item of items) next[item.id] = true;
       setSelected(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [environmentId]);
+
+  useEffect(() => {
+    if (!project) return;
+    setEnvironmentId((current) => {
+      if (current && project.environments.some((env) => env.id === current)) {
+        return current;
+      }
+      return project.environments[0]?.id ?? "";
     });
     void api.listRuns(project.id).then(setRuns);
     void api.listPersonas(project.id).then(setPersonas);
@@ -439,7 +457,7 @@ export function ScansPage() {
           </p>
           {endpoints.length === 0 ? (
             <p className="text-sm text-[var(--muted)]">
-              Importe um OpenAPI em Endpoints primeiro.
+              Importe o OpenAPI no ambiente primeiro.
             </p>
           ) : (
             <ul className="max-h-56 space-y-1 overflow-auto">

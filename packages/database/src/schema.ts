@@ -40,6 +40,9 @@ export const endpoints = sqliteTable("endpoints", {
   projectId: text("project_id")
     .notNull()
     .references(() => projects.id, { onDelete: "cascade" }),
+  environmentId: text("environment_id").references(() => environments.id, {
+    onDelete: "cascade",
+  }),
   method: text("method").notNull(),
   path: text("path").notNull(),
   operationId: text("operation_id"),

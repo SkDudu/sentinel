@@ -15,7 +15,7 @@ Rodar o desktop (`pnpm --filter @sw/desktop dev` ou script do monorepo) contra A
 | # | Fluxo | O que fazer | Resultado esperado | Gap conhecido |
 | --- | --- | --- | --- | --- |
 | 1 | **Projects** | Criar projeto → ambiente (baseUrl, auth, safety) → gravar secret no vault → selecionar projeto ativo | Projeto + env persistem após reload; `secretConfigured` true | ✅ Editar ambiente (nome, baseUrl, auth, safety, headers) na UI |
-| 2 | **Endpoints** | Importar OpenAPI (`examples/sample-openapi.json` ou contrato real) | Lista de endpoints com method/path; reimport substitui source OpenAPI | ✅ Delete + detalhe mínimo (params/schema); sem CRUD manual/YAML |
+| 2 | **Endpoints** | Importar OpenAPI no dialog do ambiente (`examples/sample-openapi.json` ou contrato real) | Lista method/path no ambiente; reimport substitui o OpenAPI só daquele ambiente | ✅ Delete + detalhe mínimo no dialog; sem página Endpoints / CRUD manual/YAML |
 | 3 | **Scans (determinístico)** | Escolher env + endpoints → vars JSON se precisar → Run | Run no histórico; findings novos no projeto | ✅ Cancel + status rodando/cancelado/falhou; `test_results` gravados; store órfão removido |
 | 4 | **Findings** | Abrir lista → mudar status (OPEN → …) → refresh | Status persiste no SQLite | ✅ Evidência HTTP + filtros severity/status + export JSON/SARIF na UI |
 | 5 | **AI Lab** | Settings AI (ou seed offline) → gerar casos → aprovar subset → run `aiOnly` | Só casos aprovados disparam; findings aparecem | ✅ Persona edit + casos/aprovações em `data/ai-cases/` |
@@ -43,7 +43,7 @@ Ao achar problema, anotar:
 | --- | --- | --- |
 | ✅ Editar ambiente (nome, baseUrl, authType, safety, headers) | `ProjectsPage`, `api.updateEnvironment`, `PATCH /api/environments/:id` | UI de edição + `headers` no client/store/create |
 | ✅ Findings com evidência + filtros básicos | `FindingsPage`, `FindingRepository` | Request/response na UI; filtro severity/status (client-side) |
-| ✅ Endpoints: delete (+ detalhe mínimo) | `api-plugin`, `EndpointRepository`, `EndpointsPage` | `DELETE /api/endpoints/:id` + painel de detalhe |
+| ✅ Endpoints: delete (+ detalhe mínimo) | `api-plugin`, `EndpointRepository`, `EnvironmentDetailDialog` | `DELETE /api/endpoints/:id` + detalhe no dialog do ambiente |
 | ✅ Export findings na desktop | UI + `@sw/findings` | Export JSON/SARIF na FindingsPage (lista filtrada) |
 
 ### P1 — execução e histórico
@@ -85,7 +85,7 @@ Schema em `packages/database` tem entidades sem repo/API/UI. Só implementar se 
 | Fluxo | UI | API (Vite plugin) | Packages |
 | --- | --- | --- | --- |
 | Projects | `apps/desktop/src/pages/projects/ProjectsPage.tsx` | `/api/projects`, `/api/environments`, `.../secret` | `@sw/database`, `@sw/auth` |
-| Endpoints | `.../endpoints/EndpointsPage.tsx` | `/api/projects/:id/endpoints`, `.../openapi/import` | `@sw/api-parser`, `@sw/database` |
+| Endpoints | `.../environments/EnvironmentDetailDialog.tsx` | `/api/environments/:id/endpoints`, `.../openapi/import` | `@sw/api-parser`, `@sw/database` |
 | Scans | `.../scans/ScansPage.tsx` | `POST /api/scans`, `GET .../runs` | `@sw/scan-runner`, `@sw/security-engine`, `@sw/test-registry` |
 | Findings | `.../findings/FindingsPage.tsx` | `GET .../findings`, `PATCH /api/findings/:id/status` | `@sw/database`, `@sw/findings` (CLI/export) |
 | AI Lab | Scans + Settings | `/api/ai/*`, `/api/projects/:id/personas` | `@sw/ai-data-generator`, `@sw/ai` |

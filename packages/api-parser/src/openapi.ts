@@ -58,6 +58,7 @@ function bodyParameters(schema: JsonSchema | undefined): Parameter[] {
 export function parseOpenApi(
   document: unknown,
   projectId: string,
+  environmentId?: string,
 ): Endpoint[] {
   const doc = document as OpenApiDocument;
   if (!doc?.paths || typeof doc.paths !== "object") {
@@ -94,6 +95,7 @@ export function parseOpenApi(
       endpoints.push({
         id: randomUUID(),
         projectId,
+        environmentId,
         method: method.toUpperCase() as Endpoint["method"],
         path,
         operationId: operation.operationId,

@@ -1,13 +1,17 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useParams } from "react-router-dom";
 import { Shell } from "@/components/layout/Shell";
 import { DashboardPage } from "@/pages/dashboard/DashboardPage";
 import { ProjectsPage } from "@/pages/projects/ProjectsPage";
 import { ProjectDashboardPage } from "@/pages/projects/ProjectDashboardPage";
 import { EnvironmentsPage } from "@/pages/environments/EnvironmentsPage";
-import { EndpointsPage } from "@/pages/endpoints/EndpointsPage";
 import { ScansPage } from "@/pages/scans/ScansPage";
 import { FindingsPage } from "@/pages/findings/FindingsPage";
 import { SettingsPage } from "@/pages/settings/SettingsPage";
+
+function LegacyEndpointsRedirect() {
+  const { projectId } = useParams();
+  return <Navigate to={`/projects/${projectId}/environments`} replace />;
+}
 
 export default function App() {
   return (
@@ -23,7 +27,7 @@ export default function App() {
         />
         <Route
           path="projects/:projectId/endpoints"
-          element={<EndpointsPage />}
+          element={<LegacyEndpointsRedirect />}
         />
         <Route path="projects/:projectId/scans" element={<ScansPage />} />
         <Route

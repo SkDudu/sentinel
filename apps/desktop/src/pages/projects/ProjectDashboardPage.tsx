@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Bug, FolderKanban, Radar, Route, Server } from "lucide-react";
+import { Bug, FolderKanban, Radar, Server } from "lucide-react";
 import { useProjectStore } from "@/stores/project";
 import { Button } from "@/components/ui/button";
 import { PageEmptyState } from "@/components/layout/page-empty-state";
@@ -65,17 +65,6 @@ export function ProjectDashboardPage() {
             {project.environments.length === 0
               ? "Configure base URL e auth"
               : `${project.environments.length} ambiente${project.environments.length === 1 ? "" : "s"}`}
-          </span>
-        </Button>
-        <Button
-          variant="outline"
-          className="h-auto flex-col items-start gap-1 px-4 py-3"
-          render={<Link to={`${base}/endpoints`} />}
-        >
-          <Route className="size-4 text-muted-foreground" />
-          <span className="font-medium">Endpoints</span>
-          <span className="text-xs font-normal text-muted-foreground">
-            Import OpenAPI e lista
           </span>
         </Button>
         <Button

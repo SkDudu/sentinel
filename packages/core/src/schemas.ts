@@ -45,6 +45,8 @@ export type Parameter = z.infer<typeof ParameterSchema>;
 export const EndpointSchema = z.object({
   id: z.string().uuid(),
   projectId: z.string().uuid(),
+  /** Contrato OpenAPI pertence a um ambiente. Ausente só em scans efêmeros da CLI. */
+  environmentId: z.string().uuid().optional(),
   method: z.enum([
     "GET",
     "POST",

@@ -351,12 +351,23 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
             return;
           }
 
-          const importMatch = path.match(
-            /^\/api\/projects\/([^/]+)\/openapi\/import$/,
+          const envEndpointsMatch = path.match(
+            /^\/api\/environments\/([^/]+)\/endpoints$/,
           );
-          if (importMatch && method === "POST") {
-            const projectId = decodeURIComponent(importMatch[1]!);
-            if (!(await projects.getById(projectId))) return notFound(res);
+          if (envEndpointsMatch && method === "GET") {
+            const id = decodeURIComponent(envEndpointsMatch[1]!);
+            if (!(await environments.getById(id))) return notFound(res);
+            sendJson(res, 200, await endpoints.listByEnvironment(id));
+            return;
+          }
+
+          const envImportMatch = path.match(
+            /^\/api\/environments\/([^/]+)\/openapi\/import$/,
+          );
+          if (envImportMatch && method === "POST") {
+            const id = decodeURIComponent(envImportMatch[1]!);
+            const environment = await environments.getById(id);
+            if (!environment) return notFound(res);
 
             const body = await readJson<{ document?: unknown }>(req);
             if (!body.document) {
@@ -365,9 +376,14 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
             }
 
             try {
-              const parsed = parseOpenApi(body.document, projectId);
+              const parsed = parseOpenApi(
+                body.document,
+                environment.projectId,
+                environment.id,
+              );
               const saved = await endpoints.replaceOpenApiEndpoints(
-                projectId,
+                environment.projectId,
+                environment.id,
                 parsed,
               );
               sendJson(res, 201, {

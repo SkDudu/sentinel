@@ -74,13 +74,17 @@ export async function runProjectScan(
     throw new Error("Environment not found for project");
   }
 
-  let targetEndpoints = await repos.endpoints.listByProject(input.projectId);
+  let targetEndpoints = await repos.endpoints.listByEnvironment(
+    input.environmentId,
+  );
   if (input.endpointIds?.length) {
     const allow = new Set(input.endpointIds);
     targetEndpoints = targetEndpoints.filter((e) => allow.has(e.id));
   }
   if (targetEndpoints.length === 0) {
-    throw new Error("No endpoints to scan — import OpenAPI first");
+    throw new Error(
+      "No endpoints to scan — import OpenAPI on this environment first",
+    );
   }
 
   const approved = input.approvedAiCases ?? [];

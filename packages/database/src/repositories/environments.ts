@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { AuthType, type Environment } from "@sw/core";
 import type { SentinelDb } from "../client.js";
 import { mapEnvironment } from "../mappers.js";
-import { environments, projects } from "../schema.js";
+import { endpoints, environments, findings, projects, testResults } from "../schema.js";
 
 export interface CreateEnvironmentInput {
   projectId: string;
@@ -101,6 +101,21 @@ export class EnvironmentRepository {
     const existing = await this.getById(id);
     if (!existing) return false;
 
+    const owned = await this.db
+      .select({ id: endpoints.id })
+      .from(endpoints)
+      .where(eq(endpoints.environmentId, id));
+    for (const row of owned) {
+      await this.db
+        .update(findings)
+        .set({ endpointId: null })
+        .where(eq(findings.endpointId, row.id));
+      await this.db
+        .update(testResults)
+        .set({ endpointId: null })
+        .where(eq(testResults.endpointId, row.id));
+    }
+    await this.db.delete(endpoints).where(eq(endpoints.environmentId, id));
     await this.db.delete(environments).where(eq(environments.id, id));
     await this.touchProject(existing.projectId);
     return true;

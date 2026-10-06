@@ -25,6 +25,7 @@ export function applyMigrations(sqlite: DatabaseSync) {
     CREATE TABLE IF NOT EXISTS endpoints (
       id TEXT PRIMARY KEY NOT NULL,
       project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      environment_id TEXT REFERENCES environments(id) ON DELETE CASCADE,
       method TEXT NOT NULL,
       path TEXT NOT NULL,
       operation_id TEXT,
@@ -97,4 +98,16 @@ export function applyMigrations(sqlite: DatabaseSync) {
     CREATE INDEX IF NOT EXISTS idx_endpoints_project ON endpoints(project_id);
     CREATE INDEX IF NOT EXISTS idx_findings_project ON findings(project_id);
   `);
+
+  const endpointColumns = sqlite
+    .prepare("PRAGMA table_info(endpoints)")
+    .all() as Array<{ name: string }>;
+  if (!endpointColumns.some((column) => column.name === "environment_id")) {
+    sqlite.exec(
+      "ALTER TABLE endpoints ADD COLUMN environment_id TEXT REFERENCES environments(id) ON DELETE CASCADE",
+    );
+  }
+  sqlite.exec(
+    "CREATE INDEX IF NOT EXISTS idx_endpoints_environment ON endpoints(environment_id)",
+  );
 }
