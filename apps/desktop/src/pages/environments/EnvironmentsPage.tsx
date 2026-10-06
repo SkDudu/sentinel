@@ -81,6 +81,8 @@ export function EnvironmentsPage() {
   const [editingEnv, setEditingEnv] = useState<EnvironmentDto | null>(null);
   const [secretEnv, setSecretEnv] = useState<EnvironmentDto | null>(null);
   const [secretValue, setSecretValue] = useState("");
+  const [secretUsername, setSecretUsername] = useState("");
+  const [secretPassword, setSecretPassword] = useState("");
   const [deleteEnv, setDeleteEnv] = useState<EnvironmentDto | null>(null);
 
   useEffect(() => {
@@ -128,6 +130,9 @@ export function EnvironmentsPage() {
         headers: values.headers,
         productionSafetyMode: values.productionSafetyMode,
       });
+      if (values.secret?.trim()) {
+        await setEnvironmentSecret(editingEnv.id, values.secret.trim());
+      }
       setEditingEnv(null);
     } catch (err) {
       setError(
@@ -139,15 +144,32 @@ export function EnvironmentsPage() {
     }
   }
 
+  function resetSecretForm() {
+    setSecretEnv(null);
+    setSecretValue("");
+    setSecretUsername("");
+    setSecretPassword("");
+  }
+
   async function onSaveSecret(event: FormEvent) {
     event.preventDefault();
     if (!secretEnv) return;
     setBusy(true);
     setError(null);
     try {
-      await setEnvironmentSecret(secretEnv.id, secretValue);
-      setSecretEnv(null);
-      setSecretValue("");
+      const nextSecret =
+        secretEnv.authType === AuthType.BASIC
+          ? `${secretUsername.trim()}:${secretPassword}`
+          : secretValue.trim();
+      if (secretEnv.authType === AuthType.BASIC) {
+        if (!secretUsername.trim() || !secretPassword) {
+          throw new Error("Basic auth precisa de usuário e senha");
+        }
+      } else if (!nextSecret) {
+        throw new Error("Secret é obrigatório");
+      }
+      await setEnvironmentSecret(secretEnv.id, nextSecret);
+      resetSecretForm();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao salvar secret");
     } finally {
@@ -344,10 +366,7 @@ export function EnvironmentsPage() {
       <Dialog
         open={secretEnv !== null}
         onOpenChange={(open) => {
-          if (!open) {
-            setSecretEnv(null);
-            setSecretValue("");
-          }
+          if (!open) resetSecretForm();
         }}
       >
         <DialogContent className="sm:max-w-md">
@@ -358,17 +377,44 @@ export function EnvironmentsPage() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={onSaveSecret} className="space-y-4">
-            <label className="block text-sm">
-              Token / API key
-              <Input
-                type="password"
-                required
-                value={secretValue}
-                onChange={(e) => setSecretValue(e.target.value)}
-                className="mt-1 font-mono text-xs"
-                autoFocus
-              />
-            </label>
+            {secretEnv?.authType === AuthType.BASIC ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block text-sm">
+                  Usuário
+                  <Input
+                    required
+                    autoComplete="username"
+                    value={secretUsername}
+                    onChange={(e) => setSecretUsername(e.target.value)}
+                    className="mt-1 font-mono text-xs"
+                    autoFocus
+                  />
+                </label>
+                <label className="block text-sm">
+                  Senha
+                  <Input
+                    required
+                    type="password"
+                    autoComplete="new-password"
+                    value={secretPassword}
+                    onChange={(e) => setSecretPassword(e.target.value)}
+                    className="mt-1 font-mono text-xs"
+                  />
+                </label>
+              </div>
+            ) : (
+              <label className="block text-sm">
+                Token / API key
+                <Input
+                  type="password"
+                  required
+                  value={secretValue}
+                  onChange={(e) => setSecretValue(e.target.value)}
+                  className="mt-1 font-mono text-xs"
+                  autoFocus
+                />
+              </label>
+            )}
             <DialogFooter className="sm:justify-between">
               {secretEnv?.secretConfigured ? (
                 <Button
@@ -379,8 +425,7 @@ export function EnvironmentsPage() {
                   onClick={() => {
                     if (!secretEnv) return;
                     void clearEnvironmentSecret(secretEnv.id).then(() => {
-                      setSecretEnv(null);
-                      setSecretValue("");
+                      resetSecretForm();
                     });
                   }}
                 >
@@ -393,11 +438,19 @@ export function EnvironmentsPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setSecretEnv(null)}
+                  onClick={resetSecretForm}
                 >
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={busy || !secretValue.trim()}>
+                <Button
+                  type="submit"
+                  disabled={
+                    busy ||
+                    (secretEnv?.authType === AuthType.BASIC
+                      ? !secretUsername.trim() || !secretPassword
+                      : !secretValue.trim())
+                  }
+                >
                   {busy ? <Spinner data-icon="inline-start" /> : null}
                   Salvar
                 </Button>

@@ -82,9 +82,14 @@ export async function resolveAuthHeaders(
     case AuthType.BEARER:
       headers.Authorization = `Bearer ${secret}`;
       break;
-    case AuthType.BASIC:
-      headers.Authorization = `Basic ${secret}`;
+    case AuthType.BASIC: {
+      // Vault stores `user:pass`. Legacy entries without `:` stay as pre-encoded Basic material.
+      const encoded = secret.includes(":")
+        ? Buffer.from(secret, "utf8").toString("base64")
+        : secret;
+      headers.Authorization = `Basic ${encoded}`;
       break;
+    }
     case AuthType.API_KEY:
       headers["X-API-Key"] = secret;
       break;

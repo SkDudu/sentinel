@@ -31,6 +31,16 @@ const SAFETY_ITEMS = [
   { label: "Sim", value: "true" },
 ] as const;
 
+const SECRET_HINT: Partial<Record<string, string>> = {
+  [AuthType.BEARER]: "Bearer token",
+  [AuthType.API_KEY]: "API key",
+  [AuthType.COOKIE]: "Cookie header value",
+  [AuthType.OAUTH2]: "Access token OAuth2",
+};
+
+/** Display-only mask. Never submitted as a real credential. */
+const SAVED_MASK = "••••••••";
+
 export function parseHeadersJson(raw: string): Record<string, string> {
   const trimmed = raw.trim();
   if (!trimmed) return {};
@@ -74,6 +84,34 @@ type Mode =
   | { kind: "create" }
   | { kind: "edit"; environment: EnvironmentDto };
 
+function liveValue(value: string, locked: boolean) {
+  if (locked || value === SAVED_MASK) return "";
+  return value;
+}
+
+function buildSecret(
+  authType: string,
+  secret: string,
+  username: string,
+  password: string,
+  locked: boolean,
+): string | undefined {
+  if (authType === AuthType.NONE) return undefined;
+
+  if (authType === AuthType.BASIC) {
+    const user = liveValue(username, locked).trim();
+    const pass = liveValue(password, locked);
+    if (!user && !pass) return undefined;
+    if (!user || !pass) {
+      throw new Error("Basic auth precisa de usuário e senha");
+    }
+    return `${user}:${pass}`;
+  }
+
+  const trimmed = liveValue(secret, locked).trim();
+  return trimmed || undefined;
+}
+
 export function EnvironmentFormDialog({
   open,
   mode,
@@ -94,6 +132,9 @@ export function EnvironmentFormDialog({
   const [safety, setSafety] = useState(false);
   const [headers, setHeaders] = useState("");
   const [secret, setSecret] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [secretLocked, setSecretLocked] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -101,39 +142,71 @@ export function EnvironmentFormDialog({
     setFormError(null);
     if (mode.kind === "edit") {
       const env = mode.environment;
+      const locked = Boolean(env.secretConfigured);
       setName(env.name);
       setBaseUrl(env.baseUrl);
       setAuthType(env.authType);
       setSafety(env.productionSafetyMode);
       setHeaders(headersToJson(env.headers));
-      setSecret("");
+      setSecretLocked(locked);
+      setSecret(locked ? SAVED_MASK : "");
+      setUsername(locked ? SAVED_MASK : "");
+      setPassword(locked ? SAVED_MASK : "");
     } else {
       setName("Development");
       setBaseUrl("http://localhost:3000");
       setAuthType(AuthType.NONE);
       setSafety(false);
       setHeaders("");
+      setSecretLocked(false);
       setSecret("");
+      setUsername("");
+      setPassword("");
     }
   }, [open, mode]);
+
+  function unlockSecret() {
+    if (!secretLocked) return;
+    setSecretLocked(false);
+    setSecret("");
+    setUsername("");
+    setPassword("");
+  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setFormError(null);
     try {
       const parsedHeaders = parseHeadersJson(headers);
+      const nextSecret = buildSecret(
+        authType,
+        secret,
+        username,
+        password,
+        secretLocked,
+      );
+      if (!isEdit && authType === AuthType.BASIC && !nextSecret) {
+        throw new Error("Basic auth precisa de usuário e senha");
+      }
       await onSubmit({
         name,
         baseUrl,
         authType,
         headers: parsedHeaders,
         productionSafetyMode: safety,
-        secret: !isEdit && secret.trim() ? secret.trim() : undefined,
+        secret: nextSecret,
       });
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Erro ao salvar");
     }
   }
+
+  const needsSecret = authType !== AuthType.NONE;
+  const isBasic = authType === AuthType.BASIC;
+  const secretConfigured =
+    isEdit && mode.kind === "edit"
+      ? Boolean(mode.environment.secretConfigured)
+      : false;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -184,7 +257,12 @@ export function EnvironmentFormDialog({
                 items={AUTH_TYPE_ITEMS}
                 value={authType}
                 onValueChange={(value) => {
-                  if (value != null) setAuthType(value);
+                  if (value == null) return;
+                  setAuthType(value);
+                  setSecretLocked(false);
+                  setSecret("");
+                  setUsername("");
+                  setPassword("");
                 }}
               >
                 <SelectTrigger className="w-full">
@@ -224,6 +302,76 @@ export function EnvironmentFormDialog({
                 </SelectContent>
               </Select>
             </div>
+
+            {needsSecret && isBasic ? (
+              <>
+                <label className="block text-sm">
+                  Usuário
+                  <Input
+                    required={!isEdit || !secretConfigured}
+                    autoComplete="username"
+                    value={username}
+                    onFocus={unlockSecret}
+                    onChange={(e) => {
+                      unlockSecret();
+                      setUsername(e.target.value);
+                    }}
+                    className="mt-1 font-mono text-xs tracking-widest"
+                    placeholder="usuario"
+                  />
+                </label>
+                <label className="block text-sm">
+                  Senha
+                  <Input
+                    required={!isEdit || !secretConfigured}
+                    type="password"
+                    autoComplete="new-password"
+                    value={password}
+                    onFocus={unlockSecret}
+                    onChange={(e) => {
+                      unlockSecret();
+                      setPassword(e.target.value);
+                    }}
+                    className="mt-1 font-mono text-xs tracking-widest"
+                    placeholder="senha"
+                  />
+                </label>
+                {secretConfigured ? (
+                  <p className="text-xs text-muted-foreground sm:col-span-2">
+                    {secretLocked
+                      ? "Credencial salva no vault. Clique num campo para trocar."
+                      : "Digite usuário e senha novos para substituir o vault."}
+                  </p>
+                ) : null}
+              </>
+            ) : null}
+
+            {needsSecret && !isBasic ? (
+              <label className="block text-sm sm:col-span-2">
+                Secret (vault criptografado)
+                <Input
+                  type="password"
+                  required={!isEdit || !secretConfigured}
+                  autoComplete="new-password"
+                  value={secret}
+                  onFocus={unlockSecret}
+                  onChange={(e) => {
+                    unlockSecret();
+                    setSecret(e.target.value);
+                  }}
+                  className="mt-1 font-mono text-xs tracking-widest"
+                  placeholder={SECRET_HINT[authType] ?? "Secret"}
+                />
+                {secretConfigured ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {secretLocked
+                      ? "Secret salvo no vault. Clique no campo para trocar."
+                      : "Digite um valor novo para substituir o vault."}
+                  </p>
+                ) : null}
+              </label>
+            ) : null}
+
             <label className="block text-sm sm:col-span-2">
               Headers (JSON{isEdit ? "" : ", opcional"})
               <textarea
@@ -234,18 +382,6 @@ export function EnvironmentFormDialog({
                 className="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 font-mono text-xs"
               />
             </label>
-            {!isEdit && authType !== AuthType.NONE ? (
-              <label className="block text-sm sm:col-span-2">
-                Secret (vault criptografado)
-                <Input
-                  type="password"
-                  value={secret}
-                  onChange={(e) => setSecret(e.target.value)}
-                  className="mt-1 font-mono text-xs"
-                  placeholder="Bearer token ou API key"
-                />
-              </label>
-            ) : null}
           </div>
           <DialogFooter>
             <Button
