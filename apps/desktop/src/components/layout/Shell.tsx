@@ -6,6 +6,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
+import { Toaster } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useProjectStore } from "@/stores/project";
 
@@ -23,30 +24,32 @@ export function Shell() {
     : undefined;
 
   return (
-    <TooltipProvider>
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-1 h-4" />
-            <span className="truncate text-sm text-muted-foreground">
-              {project ? (
-                <>
-                  Sentinel
-                  <span className="mx-1.5 text-border">/</span>
-                  <span className="text-foreground">{project.name}</span>
-                </>
-              ) : (
-                "Sentinel"
-              )}
-            </span>
-          </header>
-          <main className="flex-1 px-8 py-8">
-            <Outlet />
-          </main>
-        </SidebarInset>
-      </SidebarProvider>
-    </TooltipProvider>
+    <Toaster>
+      <TooltipProvider>
+        <SidebarProvider>
+          <AppSidebar />
+          <SidebarInset>
+            <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
+              <SidebarTrigger className="-ml-1" />
+              <Separator orientation="vertical" className="mr-1 h-4" />
+              <span className="truncate text-sm text-muted-foreground">
+                {project ? (
+                  <>
+                    Sentinel
+                    <span className="mx-1.5 text-border">/</span>
+                    <span className="text-foreground">{project.name}</span>
+                  </>
+                ) : (
+                  "Sentinel"
+                )}
+              </span>
+            </header>
+            <main className="flex min-h-0 flex-1 flex-col px-8 py-8">
+              <Outlet />
+            </main>
+          </SidebarInset>
+        </SidebarProvider>
+      </TooltipProvider>
+    </Toaster>
   );
 }

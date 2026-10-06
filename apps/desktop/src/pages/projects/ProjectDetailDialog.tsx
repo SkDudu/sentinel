@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import {
   Bug,
   Pencil,
-  Plus,
   Radar,
   Route,
   ShieldAlert,
@@ -25,10 +24,6 @@ import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ProjectEditDialog } from "@/pages/projects/ProjectEditDialog";
-import {
-  EnvironmentFormDialog,
-  type EnvironmentFormValues,
-} from "@/pages/projects/EnvironmentFormDialog";
 
 type ProjectStats = {
   endpoints: number;
@@ -41,26 +36,27 @@ export function ProjectDetailDialog({
   open,
   onOpenChange,
   onDelete,
+  onActionSuccess,
+  onActionError,
 }: {
   project: ProjectDto | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onDelete: () => void;
+  onActionSuccess?: (message: string) => void;
+  onActionError?: (message: string) => void;
 }) {
   const navigate = useNavigate();
   const setActiveProject = useProjectStore((s) => s.setActiveProject);
   const updateProject = useProjectStore((s) => s.updateProject);
-  const createEnvironment = useProjectStore((s) => s.createEnvironment);
   const [stats, setStats] = useState<ProjectStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const [envOpen, setEnvOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setEditOpen(false);
-      setEnvOpen(false);
     }
   }, [open]);
 
@@ -143,63 +139,50 @@ export function ProjectDetailDialog({
                 />
               </div>
 
-              <Separator />
-
-              <div>
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <h3 className="text-sm font-medium">Ambientes</h3>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setEnvOpen(true)}
-                  >
-                    <Plus />
-                    Ambiente
-                  </Button>
-                </div>
-                {project.environments.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    Nenhum ambiente. Adicione Development ou Staging antes de
-                    escanear.
-                  </p>
-                ) : (
-                  <ScrollArea className="h-40 rounded-md">
-                    <ul className="space-y-2 pr-3">
-                      {project.environments.map((env) => (
-                        <li
-                          key={env.id}
-                          className="rounded-lg border border-border px-3 py-2"
-                        >
-                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <span className="text-sm font-medium">{env.name}</span>
-                            {env.productionSafetyMode ? (
-                              <span className="inline-flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400">
-                                <ShieldAlert className="size-3" />
-                                safety
+              {project.environments.length > 0 ? (
+                <>
+                  <Separator />
+                  <div>
+                    <h3 className="mb-2 text-sm font-medium">Ambientes</h3>
+                    <ScrollArea className="h-40 rounded-md">
+                      <ul className="space-y-2 pr-3">
+                        {project.environments.map((env) => (
+                          <li
+                            key={env.id}
+                            className="rounded-lg border border-border px-3 py-2"
+                          >
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                              <span className="text-sm font-medium">
+                                {env.name}
                               </span>
-                            ) : null}
-                          </div>
-                          <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
-                            {env.baseUrl}
-                          </p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            Auth {env.authType}
-                            {env.secretConfigured
-                              ? " · secret ✓"
-                              : env.authType !== "NONE"
-                                ? " · sem secret"
+                              {env.productionSafetyMode ? (
+                                <span className="inline-flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400">
+                                  <ShieldAlert className="size-3" />
+                                  safety
+                                </span>
+                              ) : null}
+                            </div>
+                            <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
+                              {env.baseUrl}
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Auth {env.authType}
+                              {env.secretConfigured
+                                ? " · secret ✓"
+                                : env.authType !== "NONE"
+                                  ? " · sem secret"
+                                  : ""}
+                              {Object.keys(env.headers ?? {}).length > 0
+                                ? ` · ${Object.keys(env.headers).length} header(s)`
                                 : ""}
-                            {Object.keys(env.headers ?? {}).length > 0
-                              ? ` · ${Object.keys(env.headers).length} header(s)`
-                              : ""}
-                          </p>
-                        </li>
-                      ))}
-                    </ul>
-                  </ScrollArea>
-                )}
-              </div>
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    </ScrollArea>
+                  </div>
+                </>
+              ) : null}
 
               <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between">
                 <div className="flex flex-wrap gap-2">
@@ -247,23 +230,12 @@ export function ProjectDetailDialog({
           try {
             await updateProject(project.id, values);
             setEditOpen(false);
-          } finally {
-            setBusy(false);
-          }
-        }}
-      />
-
-      <EnvironmentFormDialog
-        open={envOpen}
-        mode={envOpen ? { kind: "create" } : null}
-        busy={busy}
-        onOpenChange={setEnvOpen}
-        onSubmit={async (values: EnvironmentFormValues) => {
-          if (!project) return;
-          setBusy(true);
-          try {
-            await createEnvironment(project.id, values);
-            setEnvOpen(false);
+            onActionSuccess?.("Projeto atualizado.");
+          } catch (err) {
+            onActionError?.(
+              err instanceof Error ? err.message : "Erro ao atualizar",
+            );
+            throw err;
           } finally {
             setBusy(false);
           }

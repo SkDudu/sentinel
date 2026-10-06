@@ -52,10 +52,23 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { toast } from "@/components/ui/toast";
 import { PageEmptyState } from "@/components/layout/page-empty-state";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectDetailDialog } from "@/pages/projects/ProjectDetailDialog";
 import { ProjectEditDialog } from "@/pages/projects/ProjectEditDialog";
+
+function showSuccess(message: string) {
+  toast.add({ title: message, type: "success" });
+}
+
+function showError(message: string) {
+  toast.add({
+    title: "Algo deu errado",
+    description: message,
+    type: "error",
+  });
+}
 
 export function ProjectsPage() {
   const navigate = useNavigate();
@@ -72,7 +85,6 @@ export function ProjectsPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [detailProjectId, setDetailProjectId] = useState<string | null>(null);
@@ -100,7 +112,6 @@ export function ProjectsPage() {
 
   async function onCreateProject(event: FormEvent) {
     event.preventDefault();
-    setFormError(null);
     setBusy(true);
     try {
       await createProject({
@@ -110,8 +121,9 @@ export function ProjectsPage() {
       setName("");
       setDescription("");
       setCreateOpen(false);
+      showSuccess("Projeto criado.");
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Erro ao criar");
+      showError(err instanceof Error ? err.message : "Erro ao criar");
     } finally {
       setBusy(false);
     }
@@ -120,12 +132,12 @@ export function ProjectsPage() {
   async function onConfirmDelete() {
     if (!confirmDelete) return;
     setBusy(true);
-    setFormError(null);
     try {
       await deleteProject(confirmDelete.id);
       setConfirmDelete(null);
+      showSuccess("Projeto excluído.");
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Erro ao excluir");
+      showError(err instanceof Error ? err.message : "Erro ao excluir");
       setConfirmDelete(null);
     } finally {
       setBusy(false);
@@ -149,10 +161,7 @@ export function ProjectsPage() {
           </div>
           <Button
             type="button"
-            onClick={() => {
-              setFormError(null);
-              setCreateOpen(true);
-            }}
+            onClick={() => setCreateOpen(true)}
           >
             <Plus />
             Adicionar projeto
@@ -160,11 +169,11 @@ export function ProjectsPage() {
         </>
       }
     >
-      {(error || formError) && (
+      {error && (
         <Alert variant="destructive" className="mb-4">
           <AlertCircle />
           <AlertTitle>Algo deu errado</AlertTitle>
-          <AlertDescription>{formError ?? error}</AlertDescription>
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
@@ -175,7 +184,6 @@ export function ProjectsPage() {
           if (!open) {
             setName("");
             setDescription("");
-            setFormError(null);
           }
         }}
       >
@@ -238,6 +246,8 @@ export function ProjectsPage() {
           });
           setDetailProjectId(null);
         }}
+        onActionSuccess={showSuccess}
+        onActionError={showError}
       />
 
       <ProjectEditDialog
@@ -254,12 +264,12 @@ export function ProjectsPage() {
         onSubmit={async (values) => {
           if (!editingId) return;
           setBusy(true);
-          setFormError(null);
           try {
             await updateProject(editingId, values);
             setEditingId(null);
+            showSuccess("Projeto atualizado.");
           } catch (err) {
-            setFormError(
+            showError(
               err instanceof Error ? err.message : "Erro ao atualizar",
             );
             throw err;
@@ -316,10 +326,7 @@ export function ProjectsPage() {
           action={
             <Button
               type="button"
-              onClick={() => {
-                setFormError(null);
-                setCreateOpen(true);
-              }}
+              onClick={() => setCreateOpen(true)}
             >
               <Plus />
               Adicionar projeto

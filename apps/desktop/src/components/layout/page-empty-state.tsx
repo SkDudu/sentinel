@@ -28,20 +28,22 @@ export function PageEmptyState({
   className?: string;
 }) {
   return (
-    <Empty
-      className={cn(
-        "border border-dashed border-border bg-card/40 py-14",
-        className,
-      )}
-    >
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <Icon />
-        </EmptyMedia>
-        <EmptyTitle>{title}</EmptyTitle>
-        <EmptyDescription>{description}</EmptyDescription>
-      </EmptyHeader>
-      {action ? <EmptyContent>{action}</EmptyContent> : null}
-    </Empty>
+    <div className="flex flex-1 flex-col items-center justify-center">
+      <Empty
+        className={cn(
+          "w-full max-w-lg flex-none border border-dashed border-border bg-card/40 py-14",
+          className,
+        )}
+      >
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <Icon />
+          </EmptyMedia>
+          <EmptyTitle>{title}</EmptyTitle>
+          <EmptyDescription>{description}</EmptyDescription>
+        </EmptyHeader>
+        {action ? <EmptyContent>{action}</EmptyContent> : null}
+      </Empty>
+    </div>
   );
 }

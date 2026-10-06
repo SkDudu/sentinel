@@ -67,7 +67,7 @@ Arquivo: `apps/desktop/src/components/layout/page-shell.tsx`
 
 - Título grande à esquerda
 - Ações (busca, botão primário) à direita
-- Corpo abaixo, `max-w-4xl`
+- Largura total (`w-full`); empty state centralizado no corpo (`PageEmptyState`)
 
 ```tsx
 <PageShell
@@ -148,5 +148,6 @@ No empty state: **um** CTA no centro. Esconder o botão duplicado do header do `
 | Lista scrollável em dialog | `ScrollArea` |
 | Loading em botão | `Spinner` com `data-icon="inline-start"` |
 | Erro de página | `Alert` variant `destructive` |
+| Sucesso / erro de ação | `toast.add({ type: "success" | "error" })` + `Toaster` no `Shell` |
 
 Referências vivas: `ProjectsPage`, `EnvironmentsPage`.
