@@ -347,13 +347,15 @@ export function ProjectsPage() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {filteredProjects.map((project) => (
-            <Card key={project.id}>
-              <CardHeader>
-                <button
-                  type="button"
-                  onClick={() => setDetailProjectId(project.id)}
-                  className="min-w-0 text-left"
-                >
+            <Card key={project.id} className="relative">
+              <button
+                type="button"
+                aria-label={`Abrir ${project.name}`}
+                onClick={() => setDetailProjectId(project.id)}
+                className="absolute inset-0 z-0 cursor-pointer rounded-xl"
+              />
+              <CardHeader className="pointer-events-none relative z-10">
+                <div className="min-w-0 text-left">
                   <CardTitle className="flex flex-wrap items-center gap-2">
                     <span className="truncate">{project.name}</span>
                   </CardTitle>
@@ -365,8 +367,8 @@ export function ProjectsPage() {
                       ? "Sem ambientes"
                       : `${project.environments.length} ambiente${project.environments.length === 1 ? "" : "s"}`}
                   </p>
-                </button>
-                <CardAction>
+                </div>
+                <CardAction className="pointer-events-auto">
                   <DropdownMenu>
                     <DropdownMenuTrigger
                       render={
