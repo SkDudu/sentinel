@@ -13,7 +13,8 @@
 | HTTP | **fetch** (Node 20+ / undici) | Simples; HttpExecutor abstraído |
 | DB | **SQLite** | Local, zero ops |
 | ORM | **Drizzle** | Leve, SQL-friendly |
-| OpenAPI | parser próprio (`@sw/api-parser`) | Controle do modelo interno |
+| OpenAPI | parser próprio (`@sw/api-parser`) + YAML | Controle do modelo interno |
+| Login gravado | **Playwright** (`playwright-core`, Chrome instalado) | Grava o login; o scan repete a receita via fetch |
 | Security engine | próprio | Independente de ZAP |
 | AI local | **Ollama / LM Studio** | Sem cloud obrigatória |
 | AI cloud | OpenAI-compatible (opcional) | Fallback |

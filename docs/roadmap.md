@@ -77,6 +77,16 @@ Detalhe operacional (checklist humano + gaps P0–P3 para agentes): **[hardening
 
 **Critério de pronto:** ver seção “Critério de hardening pronto” em [hardening.md](./hardening.md).
 
+## Fase 7 — Login Recorder (planejado, pedido explícito)
+
+Plano: **[login-recorder.md](./login-recorder.md)**.
+
+- [x] Import OpenAPI YAML
+- [x] Executor: redirect manual + `Set-Cookie` múltiplo
+- [x] `AuthType.LOGIN_RECIPE` reproduzido no scan (sem browser)
+- [x] Buscar OpenAPI protegido por login
+- [x] Gravação de login via browser (Playwright) + wizard no ambiente
+
 ## Não-objetivos (por enquanto)
 
 - SaaS multi-tenant na nuvem

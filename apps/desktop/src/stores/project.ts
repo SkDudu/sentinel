@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { LoginRecipe } from "@sw/core";
 import { api, type ProjectDto } from "@/services/api";
 
 const ACTIVE_KEY = "sentinel.activeProjectId";
@@ -44,6 +45,7 @@ interface ProjectState {
       authType?: string;
       headers?: Record<string, string>;
       productionSafetyMode?: boolean;
+      loginRecipe?: LoginRecipe | null;
       secret?: string;
     },
   ) => Promise<void>;
@@ -55,6 +57,7 @@ interface ProjectState {
       authType?: string;
       headers?: Record<string, string>;
       productionSafetyMode?: boolean;
+      loginRecipe?: LoginRecipe | null;
     },
   ) => Promise<void>;
   deleteEnvironment: (id: string) => Promise<void>;

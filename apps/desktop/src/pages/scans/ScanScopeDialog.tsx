@@ -248,7 +248,6 @@ export function ScanScopeDialog({
   useEffect(() => {
     if (!open) return;
     setSelectedIds(new Set(endpoints.map((e) => e.id)));
-    setSelectedSuites(ALL_SCAN_SUITE_IDS);
     setGroupFilter([]);
     setQuery("");
     setExpanded(expandedTopLevel(buildEndpointTree(endpoints)));
@@ -281,10 +280,14 @@ export function ScanScopeDialog({
   }, [filteredTree]);
 
   function toggleGroupFilter(groupId: string) {
+    const adding = !groupFilter.includes(groupId);
+    if (adding) {
+      const node = fullTree.find((n) => n.id === groupId);
+      const ids = node ? collectEndpointIdsFromNode(node) : [];
+      setSelectedIds((prev) => new Set([...prev, ...ids]));
+    }
     setGroupFilter((prev) =>
-      prev.includes(groupId)
-        ? prev.filter((id) => id !== groupId)
-        : [...prev, groupId],
+      adding ? [...prev, groupId] : prev.filter((id) => id !== groupId),
     );
   }
 
@@ -381,7 +384,10 @@ export function ScanScopeDialog({
                 <button
                   type="button"
                   disabled={busy}
-                  onClick={() => setGroupFilter([])}
+                  onClick={() => {
+                    setGroupFilter([]);
+                    setSelectedIds(new Set(endpoints.map((e) => e.id)));
+                  }}
                   className="outline-none"
                 >
                   <Badge

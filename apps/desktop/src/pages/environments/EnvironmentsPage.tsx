@@ -130,6 +130,7 @@ export function EnvironmentsPage() {
         authType: values.authType,
         headers: values.headers,
         productionSafetyMode: values.productionSafetyMode,
+        loginRecipe: values.loginRecipe,
       });
       if (values.secret?.trim()) {
         await setEnvironmentSecret(editingEnv.id, values.secret.trim());
@@ -416,7 +417,9 @@ export function EnvironmentsPage() {
               </div>
             ) : (
               <label className="block text-sm">
-                Token / API key
+                {secretEnv?.authType === AuthType.LOGIN_RECIPE
+                  ? "Senha"
+                  : "Token / API key"}
                 <Input
                   type="password"
                   required

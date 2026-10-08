@@ -2,6 +2,9 @@ import type {
   Endpoint,
   Environment,
   Finding,
+  HttpRequest,
+  HttpResponse,
+  LoginRecipe,
   RateLimitConfig,
   ScanRun,
   TestCase,
@@ -12,6 +15,29 @@ import type {
 
 export type EnvironmentDto = Environment & {
   secretConfigured?: boolean;
+};
+
+export type LoginStepReport = {
+  label: string;
+  method: string;
+  url: string;
+  status: number;
+  location?: string;
+  cookies: string[];
+  extracted: string[];
+};
+
+export type LoginTestResult = {
+  ok: boolean;
+  error?: string;
+  steps: LoginStepReport[];
+  spec?: { url: string; bytes: number };
+};
+
+export type RecorderSnapshot = {
+  id: string;
+  open: boolean;
+  steps: Array<{ method: string; url: string; status: number }>;
 };
 
 export interface ProjectDto {
@@ -196,6 +222,7 @@ export const api = {
       authType?: string;
       headers?: Record<string, string>;
       productionSafetyMode?: boolean;
+      loginRecipe?: LoginRecipe | null;
     },
   ) =>
     request<Environment>(`/api/projects/${projectId}/environments`, {
@@ -211,6 +238,7 @@ export const api = {
       authType?: string;
       headers?: Record<string, string>;
       productionSafetyMode?: boolean;
+      loginRecipe?: LoginRecipe | null;
     },
   ) =>
     request<Environment>(`/api/environments/${id}`, {
@@ -244,12 +272,40 @@ export const api = {
   deleteEndpoint: (id: string) =>
     request<void>(`/api/endpoints/${id}`, { method: "DELETE" }),
 
-  importEnvironmentOpenApi: (environmentId: string, document: unknown) =>
+  testEnvironmentLogin: (environmentId: string) =>
+    request<LoginTestResult>(
+      `/api/environments/${environmentId}/login/test`,
+      { method: "POST" },
+    ),
+
+  fetchEnvironmentOpenApi: (environmentId: string) =>
+    request<{ imported: number; endpoints: Endpoint[] }>(
+      `/api/environments/${environmentId}/openapi/fetch`,
+      { method: "POST" },
+    ),
+
+  startRecorder: (baseUrl: string) =>
+    request<RecorderSnapshot>("/api/recorder/start", {
+      method: "POST",
+      body: JSON.stringify({ baseUrl }),
+    }),
+
+  recorderStatus: (id: string) =>
+    request<RecorderSnapshot>(`/api/recorder/${id}`),
+
+  stopRecorder: (id: string) =>
+    request<{
+      recipe: LoginRecipe;
+      secrets: Record<string, string>;
+      specCandidates: string[];
+    }>(`/api/recorder/${id}/stop`, { method: "POST" }),
+
+  importEnvironmentOpenApi: (environmentId: string, text: string) =>
     request<{ imported: number; endpoints: Endpoint[] }>(
       `/api/environments/${environmentId}/openapi/import`,
       {
         method: "POST",
-        body: JSON.stringify({ document }),
+        body: JSON.stringify({ text }),
       },
     ),
 
@@ -295,6 +351,17 @@ export const api = {
         failed: number;
         total: number;
         byTest: Array<{ testId: string; passed: number; failed: number }>;
+        items: Array<{
+          id: string;
+          endpointId?: string;
+          testId: string;
+          testCaseId: string;
+          passed: boolean;
+          request?: HttpRequest;
+          response?: HttpResponse;
+          notes?: string;
+          createdAt: string;
+        }>;
       };
     }>(`/api/runs/${runId}`),
 

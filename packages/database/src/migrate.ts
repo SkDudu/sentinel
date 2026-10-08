@@ -120,4 +120,18 @@ export function applyMigrations(sqlite: DatabaseSync) {
   sqlite.exec(
     "CREATE INDEX IF NOT EXISTS idx_endpoints_environment ON endpoints(environment_id)",
   );
+
+  const environmentColumns = sqlite
+    .prepare("PRAGMA table_info(environments)")
+    .all() as Array<{ name: string }>;
+  if (!environmentColumns.some((column) => column.name === "login_recipe_json")) {
+    sqlite.exec("ALTER TABLE environments ADD COLUMN login_recipe_json TEXT");
+  }
+
+  const runColumns = sqlite
+    .prepare("PRAGMA table_info(test_runs)")
+    .all() as Array<{ name: string }>;
+  if (!runColumns.some((column) => column.name === "categories_json")) {
+    sqlite.exec("ALTER TABLE test_runs ADD COLUMN categories_json TEXT");
+  }
 }

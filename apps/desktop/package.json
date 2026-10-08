@@ -24,6 +24,7 @@
     "@sw/database": "workspace:*",
     "@sw/findings": "workspace:*",
     "@sw/http-client": "workspace:*",
+    "@sw/login-recorder": "workspace:*",
     "@sw/scan-runner": "workspace:*",
     "@sw/security-engine": "workspace:*",
     "@tanstack/react-table": "^9.2.6",

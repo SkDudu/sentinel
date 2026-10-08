@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { AuthType } from "@sw/core";
+import { AuthType, LoginRecipeSchema, type LoginRecipe } from "@sw/core";
 import type { EnvironmentDto } from "@/services/api";
+import { api } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -41,6 +42,51 @@ const SECRET_HINT: Partial<Record<string, string>> = {
 /** Display-only mask. Never submitted as a real credential. */
 const SAVED_MASK = "••••••••";
 
+const RECIPE_PLACEHOLDER = `{
+  "version": 1,
+  "spec": { "url": "/openapi.yaml" },
+  "steps": [
+    {
+      "label": "Abrir login",
+      "role": "spec-access",
+      "request": { "method": "GET", "url": "/docs/login" },
+      "extract": [{ "kind": "hiddenInput", "name": "_token", "as": "csrf" }]
+    },
+    {
+      "label": "Enviar senha",
+      "role": "spec-access",
+      "request": {
+        "method": "POST",
+        "url": "/docs/login",
+        "bodyType": "form",
+        "fields": {
+          "_token": { "kind": "var", "name": "csrf" },
+          "password": { "kind": "secret", "key": "password" }
+        }
+      },
+      "failIfLocationIncludes": "/login"
+    }
+  ]
+}`;
+
+export function parseLoginRecipeJson(raw: string): LoginRecipe {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error("Receita de login não é JSON válido");
+  }
+  const result = LoginRecipeSchema.safeParse(parsed);
+  if (!result.success) {
+    const detail = result.error.issues
+      .slice(0, 3)
+      .map((issue) => `${issue.path.join(".") || "receita"}: ${issue.message}`)
+      .join("; ");
+    throw new Error(`Receita de login inválida. ${detail}`);
+  }
+  return result.data;
+}
+
 export function parseHeadersJson(raw: string): Record<string, string> {
   const trimmed = raw.trim();
   if (!trimmed) return {};
@@ -77,6 +123,7 @@ export type EnvironmentFormValues = {
   authType: string;
   headers: Record<string, string>;
   productionSafetyMode: boolean;
+  loginRecipe?: LoginRecipe | null;
   secret?: string;
 };
 
@@ -108,6 +155,11 @@ function buildSecret(
     return `${user}:${pass}`;
   }
 
+  if (authType === AuthType.LOGIN_RECIPE) {
+    const pass = liveValue(password, locked);
+    return pass || undefined;
+  }
+
   const trimmed = liveValue(secret, locked).trim();
   return trimmed || undefined;
 }
@@ -134,6 +186,12 @@ export function EnvironmentFormDialog({
   const [secret, setSecret] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [recipeJson, setRecipeJson] = useState("");
+  const [recorderId, setRecorderId] = useState<string | null>(null);
+  const [captured, setCaptured] = useState<
+    Array<{ method: string; url: string; status: number }>
+  >([]);
+  const [recording, setRecording] = useState(false);
   const [secretLocked, setSecretLocked] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -148,6 +206,9 @@ export function EnvironmentFormDialog({
       setAuthType(env.authType);
       setSafety(env.productionSafetyMode);
       setHeaders(headersToJson(env.headers));
+      setRecipeJson(
+        env.loginRecipe ? JSON.stringify(env.loginRecipe, null, 2) : "",
+      );
       setSecretLocked(locked);
       setSecret(locked ? SAVED_MASK : "");
       setUsername(locked ? SAVED_MASK : "");
@@ -158,6 +219,8 @@ export function EnvironmentFormDialog({
       setAuthType(AuthType.NONE);
       setSafety(false);
       setHeaders("");
+      setRecipeJson("");
+      setCaptured([]);
       setSecretLocked(false);
       setSecret("");
       setUsername("");
@@ -165,12 +228,75 @@ export function EnvironmentFormDialog({
     }
   }, [open, mode]);
 
+  useEffect(() => {
+    if (!recorderId) return;
+    let cancelled = false;
+    const timer = setInterval(() => {
+      void api
+        .recorderStatus(recorderId)
+        .then((snap) => {
+          if (!cancelled) setCaptured(snap.steps);
+        })
+        .catch(() => undefined);
+    }, 1000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [recorderId]);
+
+  useEffect(() => {
+    if (open || !recorderId) return;
+    const id = recorderId;
+    setRecorderId(null);
+    setCaptured([]);
+    void api.stopRecorder(id).catch(() => undefined);
+  }, [open, recorderId]);
+
   function unlockSecret() {
     if (!secretLocked) return;
     setSecretLocked(false);
     setSecret("");
     setUsername("");
     setPassword("");
+  }
+
+  async function beginRecording() {
+    setFormError(null);
+    setRecording(true);
+    try {
+      const snap = await api.startRecorder(baseUrl.trim());
+      setRecorderId(snap.id);
+      setCaptured(snap.steps);
+    } catch (err) {
+      setFormError(
+        err instanceof Error ? err.message : "Falha ao abrir o navegador",
+      );
+    } finally {
+      setRecording(false);
+    }
+  }
+
+  async function finishRecording() {
+    if (!recorderId) return;
+    const id = recorderId;
+    setRecorderId(null);
+    setRecording(true);
+    try {
+      const derived = await api.stopRecorder(id);
+      setRecipeJson(JSON.stringify(derived.recipe, null, 2));
+      setCaptured([]);
+      if (derived.secrets.password) {
+        setSecretLocked(false);
+        setPassword(derived.secrets.password);
+      }
+    } catch (err) {
+      setFormError(
+        err instanceof Error ? err.message : "Falha ao concluir a gravação",
+      );
+    } finally {
+      setRecording(false);
+    }
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -185,15 +311,23 @@ export function EnvironmentFormDialog({
         password,
         secretLocked,
       );
+      const isRecipe = authType === AuthType.LOGIN_RECIPE;
       if (!isEdit && authType === AuthType.BASIC && !nextSecret) {
         throw new Error("Basic auth precisa de usuário e senha");
       }
+      if (!isEdit && isRecipe && !nextSecret) {
+        throw new Error("Login com senha precisa da senha");
+      }
+      const loginRecipe = isRecipe
+        ? parseLoginRecipeJson(recipeJson)
+        : null;
       await onSubmit({
         name,
         baseUrl,
         authType,
         headers: parsedHeaders,
         productionSafetyMode: safety,
+        loginRecipe,
         secret: nextSecret,
       });
     } catch (err) {
@@ -203,6 +337,7 @@ export function EnvironmentFormDialog({
 
   const needsSecret = authType !== AuthType.NONE;
   const isBasic = authType === AuthType.BASIC;
+  const isRecipe = authType === AuthType.LOGIN_RECIPE;
   const secretConfigured =
     isEdit && mode.kind === "edit"
       ? Boolean(mode.environment.secretConfigured)
@@ -263,6 +398,12 @@ export function EnvironmentFormDialog({
                   setSecret("");
                   setUsername("");
                   setPassword("");
+                  if (recorderId) {
+                    const id = recorderId;
+                    setRecorderId(null);
+                    setCaptured([]);
+                    void api.stopRecorder(id).catch(() => undefined);
+                  }
                 }}
               >
                 <SelectTrigger className="w-full">
@@ -346,7 +487,7 @@ export function EnvironmentFormDialog({
               </>
             ) : null}
 
-            {needsSecret && !isBasic ? (
+            {needsSecret && !isBasic && !isRecipe ? (
               <label className="block text-sm sm:col-span-2">
                 Secret (vault criptografado)
                 <Input
@@ -370,6 +511,83 @@ export function EnvironmentFormDialog({
                   </p>
                 ) : null}
               </label>
+            ) : null}
+
+            {isRecipe ? (
+              <>
+                <div className="space-y-2 sm:col-span-2">
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={recording || Boolean(recorderId) || !baseUrl.trim()}
+                      onClick={() => void beginRecording()}
+                    >
+                      {recording && !recorderId ? (
+                        <Spinner data-icon="inline-start" />
+                      ) : null}
+                      Abrir navegador
+                    </Button>
+                    {recorderId ? (
+                      <Button
+                        type="button"
+                        disabled={recording}
+                        onClick={() => void finishRecording()}
+                      >
+                        {recording ? <Spinner data-icon="inline-start" /> : null}
+                        Concluir gravação
+                      </Button>
+                    ) : null}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Abre o Chrome na base URL. Faça o login nessa janela.
+                    Concluir monta a receita e preenche a senha para o vault.
+                  </p>
+                  {captured.length > 0 ? (
+                    <ul className="max-h-28 space-y-0.5 overflow-auto rounded-md border px-2 py-1 font-mono text-xs">
+                      {captured.slice(-8).map((step, index) => (
+                        <li key={`${step.url}-${index}`} className="truncate">
+                          {step.status} {step.method} {step.url}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+                <label className="block text-sm sm:col-span-2">
+                  Senha
+                  <Input
+                    required={!isEdit || !secretConfigured}
+                    type="password"
+                    autoComplete="new-password"
+                    value={password}
+                    onFocus={unlockSecret}
+                    onChange={(e) => {
+                      unlockSecret();
+                      setPassword(e.target.value);
+                    }}
+                    className="mt-1 font-mono text-xs tracking-widest"
+                    placeholder="senha do login"
+                  />
+                  {secretConfigured ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {secretLocked
+                        ? "Senha salva no vault. Clique no campo para trocar."
+                        : "Digite a senha nova para substituir o vault."}
+                    </p>
+                  ) : null}
+                </label>
+                <label className="block text-sm sm:col-span-2">
+                  Receita de login (JSON)
+                  <textarea
+                    required
+                    value={recipeJson}
+                    onChange={(e) => setRecipeJson(e.target.value)}
+                    rows={8}
+                    placeholder={RECIPE_PLACEHOLDER}
+                    className="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 font-mono text-xs"
+                  />
+                </label>
+              </>
             ) : null}
 
             <label className="block text-sm sm:col-span-2">

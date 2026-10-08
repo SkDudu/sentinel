@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { AuthType, type Environment } from "@sw/core";
+import { AuthType, type Environment, type LoginRecipe } from "@sw/core";
 import type { SentinelDb } from "../client.js";
 import { mapEnvironment } from "../mappers.js";
 import { endpoints, environments, findings, projects, testResults } from "../schema.js";
@@ -13,6 +13,7 @@ export interface CreateEnvironmentInput {
   secretRef?: string;
   headers?: Record<string, string>;
   productionSafetyMode?: boolean;
+  loginRecipe?: LoginRecipe;
 }
 
 export interface UpdateEnvironmentInput {
@@ -22,6 +23,7 @@ export interface UpdateEnvironmentInput {
   secretRef?: string | null;
   headers?: Record<string, string>;
   productionSafetyMode?: boolean;
+  loginRecipe?: LoginRecipe | null;
 }
 
 export class EnvironmentRepository {
@@ -64,6 +66,9 @@ export class EnvironmentRepository {
       secretRef: input.secretRef ?? `env:${id}:auth`,
       headersJson: JSON.stringify(input.headers ?? {}),
       productionSafetyMode: input.productionSafetyMode ?? false,
+      loginRecipeJson: input.loginRecipe
+        ? JSON.stringify(input.loginRecipe)
+        : null,
     });
 
     await this.touchProject(input.projectId);
@@ -90,6 +95,14 @@ export class EnvironmentRepository {
         headersJson: JSON.stringify(input.headers ?? existing.headers),
         productionSafetyMode:
           input.productionSafetyMode ?? existing.productionSafetyMode,
+        loginRecipeJson:
+          input.loginRecipe === undefined
+            ? existing.loginRecipe
+              ? JSON.stringify(existing.loginRecipe)
+              : null
+            : input.loginRecipe
+              ? JSON.stringify(input.loginRecipe)
+              : null,
       })
       .where(eq(environments.id, id));
 

@@ -63,6 +63,7 @@ export class HttpExecutor implements RequestExecutor {
       const init: RequestInit = {
         method: request.method,
         headers: request.headers,
+        redirect: request.redirect ?? "follow",
         signal,
       };
 
@@ -90,12 +91,14 @@ export class HttpExecutor implements RequestExecutor {
 
       const response = await fetch(request.url, init);
       const body = await parseBody(response);
+      const setCookies = response.headers.getSetCookie();
 
       return {
         status: response.status,
         headers: headersToRecord(response.headers),
         body,
         durationMs: Math.round(performance.now() - started),
+        ...(setCookies.length ? { setCookies } : {}),
       };
     } finally {
       clearTimeout(timer);

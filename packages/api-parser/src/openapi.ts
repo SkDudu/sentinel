@@ -106,6 +106,16 @@ function asSchema(
     : schema;
 }
 
+function mapParameters(
+  document: OpenApiDocument,
+  parameters: OpenApiParameter[] | undefined,
+): Parameter[] {
+  return (parameters ?? [])
+    .map((raw) => resolveRef(document, raw) as OpenApiParameter)
+    .filter((parameter) => Boolean(parameter?.name && parameter?.in))
+    .map((parameter) => mapParameter(document, parameter));
+}
+
 function mapParameter(
   document: OpenApiDocument,
   parameter: OpenApiParameter,
@@ -148,7 +158,10 @@ function mapResponses(
   operation: OpenApiOperation,
 ): EndpointResponse[] {
   const responses = operation.responses ?? {};
-  return Object.entries(responses).map(([status, response]) => {
+  return Object.entries(responses).map(([status, raw]) => {
+    const response = resolveRef(document, raw) as
+      | { description?: string; content?: Record<string, { schema?: JsonSchema }> }
+      | undefined;
     const content = response?.content ?? {};
     const contentType =
       "application/json" in content
@@ -195,12 +208,8 @@ export function parseOpenApi(
       if (!operation) continue;
 
       const parameters: Parameter[] = [
-        ...(pathItem.parameters ?? []).map((parameter) =>
-          mapParameter(doc, parameter),
-        ),
-        ...(operation.parameters ?? []).map((parameter) =>
-          mapParameter(doc, parameter),
-        ),
+        ...mapParameters(doc, pathItem.parameters),
+        ...mapParameters(doc, operation.parameters),
       ];
 
       const jsonSchema = pickJsonBodySchema(doc, operation);

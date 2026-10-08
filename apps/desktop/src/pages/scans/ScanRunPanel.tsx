@@ -29,7 +29,7 @@ import {
 import { ScanRunDetailDialog } from "./ScanRunDetailDialog";
 import { ScanScopeDialog } from "./ScanScopeDialog";
 import type { ScanProgress } from "./scan-progress";
-import type { ScanScopePayload } from "./scan-scope";
+import { scanSuitesLabel, type ScanScopePayload } from "./scan-scope";
 import { cn } from "@/lib/utils";
 
 export type { ScanScopePayload };
@@ -306,8 +306,12 @@ export function ScanRunPanel({
                       )}
                     >
                       <div className="min-w-0">
-                        <p className="font-mono text-xs text-muted-foreground">
-                          {run.id.slice(0, 8)}
+                        <p className="text-xs text-muted-foreground">
+                          <span className="font-mono">{run.id.slice(0, 8)}</span>
+                          {" · "}
+                          <span className="text-foreground">
+                            {scanSuitesLabel(run.categories)}
+                          </span>
                         </p>
                         <p className="text-muted-foreground text-xs">
                           {run.startedAt

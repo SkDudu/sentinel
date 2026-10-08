@@ -1,7 +1,22 @@
 import { AuthType, type Environment } from "@sw/core";
+import {
+  parseRecipeSecrets,
+  runLoginRecipe,
+  type LoginExecutor,
+  type LoginRecipeResult,
+} from "./login-recipe.js";
 import type { SecretStore } from "./types.js";
 
 export type { SecretStore } from "./types.js";
+export {
+  LoginRecipeError,
+  parseRecipeSecrets,
+  runLoginRecipe,
+  type LoginAudience,
+  type LoginExecutor,
+  type LoginRecipeResult,
+  type LoginStepReport,
+} from "./login-recipe.js";
 export {
   EncryptedFileSecretStore,
   environmentSecretRef,
@@ -65,11 +80,80 @@ export class OverlaySecretStore implements SecretStore {
   }
 }
 
+/** Runs the environment login recipe with secrets from the vault. */
+export async function loginWithRecipe(
+  environment: Environment,
+  store: SecretStore,
+  executor: LoginExecutor | undefined,
+): Promise<LoginRecipeResult> {
+  if (!environment.loginRecipe) {
+    throw new Error(`Ambiente "${environment.name}" sem receita de login`);
+  }
+  if (!executor) {
+    throw new Error("Receita de login precisa de um executor HTTP");
+  }
+  const raw = environment.secretRef
+    ? await store.get(environment.secretRef)
+    : undefined;
+  return runLoginRecipe(environment.loginRecipe, {
+    baseUrl: environment.baseUrl,
+    secrets: parseRecipeSecrets(raw),
+    executor,
+  });
+}
+
+/** Logs in with the recipe and downloads the OpenAPI document it points to. */
+export async function fetchSpecWithRecipe(
+  environment: Environment,
+  store: SecretStore,
+  executor: LoginExecutor,
+): Promise<{ text: string; url: string; login: LoginRecipeResult }> {
+  const specUrl = environment.loginRecipe?.spec?.url;
+  if (!specUrl) {
+    throw new Error("Receita de login não tem URL do OpenAPI");
+  }
+  const login = await loginWithRecipe(environment, store, executor);
+  const url = new URL(specUrl, environment.baseUrl).toString();
+  const response = await executor.execute({
+    method: "GET",
+    url,
+    headers: {
+      ...environment.headers,
+      ...login.headersFor("spec", url),
+      Accept: "application/json, application/yaml, text/yaml, */*",
+    },
+    redirect: "manual",
+  });
+  if (response.status >= 300 && response.status < 400) {
+    throw new Error(
+      `OpenAPI redirecionou para ${response.headers.location ?? "?"} — sessão não aceita`,
+    );
+  }
+  if (response.status >= 400) {
+    throw new Error(`OpenAPI respondeu ${response.status}`);
+  }
+  const text =
+    typeof response.body === "string"
+      ? response.body
+      : JSON.stringify(response.body);
+  return { text, url, login };
+}
+
 export async function resolveAuthHeaders(
   environment: Environment,
   store: SecretStore,
+  options: { executor?: LoginExecutor } = {},
 ): Promise<Record<string, string>> {
   const headers: Record<string, string> = { ...environment.headers };
+
+  if (environment.authType === AuthType.LOGIN_RECIPE) {
+    return {
+      ...headers,
+      ...(await loginWithRecipe(environment, store, options.executor)).headersFor(
+        "api",
+      ),
+    };
+  }
 
   if (environment.authType === AuthType.NONE || !environment.secretRef) {
     return headers;

@@ -6,12 +6,24 @@ import {
   AiProviderKind,
   AuthType,
   FindingStatus,
+  LoginRecipeSchema,
   TestCategory,
+  type LoginRecipe,
   type TestCase,
   type Variable,
 } from "@sw/core";
-import { parseOpenApi } from "@sw/api-parser";
-import { createSecretStore, environmentSecretRef } from "@sw/auth";
+import { parseOpenApi, parseSpecText } from "@sw/api-parser";
+import {
+  createSecretStore,
+  environmentSecretRef,
+  fetchSpecWithRecipe,
+  loginWithRecipe,
+  LoginRecipeError,
+} from "@sw/auth";
+import {
+  startLoginRecording,
+  type RecorderHandle,
+} from "@sw/login-recorder";
 import {
   createSqliteDb,
   EndpointRepository,
@@ -80,6 +92,24 @@ function parseAuthType(value: unknown) {
     : AuthType.NONE;
 }
 
+/** `undefined` = untouched, `null` = clear. */
+function parseLoginRecipe(value: unknown): {
+  value?: LoginRecipe | null;
+  error?: string;
+} {
+  if (value === undefined) return {};
+  if (value === null) return { value: null };
+  const parsed = LoginRecipeSchema.safeParse(value);
+  if (!parsed.success) {
+    return {
+      error: `loginRecipe inválida: ${parsed.error.issues
+        .map((issue) => `${issue.path.join(".")} ${issue.message}`)
+        .join("; ")}`,
+    };
+  }
+  return { value: parsed.data };
+}
+
 function parseFindingStatus(value: unknown) {
   if (typeof value !== "string") return null;
   return (Object.values(FindingStatus) as string[]).includes(value)
@@ -109,6 +139,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
       const findings = new FindingRepository(handle.db);
       const runs = new TestRunRepository(handle.db);
       const testResults = new TestResultRepository(handle.db);
+      const recorders = new Map<string, RecorderHandle>();
 
       server.httpServer?.once("close", () => {
         handle?.close();
@@ -128,6 +159,58 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
 
           if (path === "/api/health" && method === "GET") {
             sendJson(res, 200, { ok: true });
+            return;
+          }
+
+          if (path === "/api/recorder/start" && method === "POST") {
+            const body = await readJson<{ baseUrl?: string }>(req);
+            if (!body.baseUrl?.trim()) {
+              sendJson(res, 400, { error: "baseUrl is required" });
+              return;
+            }
+            try {
+              const handle = await startLoginRecording({
+                baseUrl: body.baseUrl.trim(),
+              });
+              recorders.set(handle.id, handle);
+              sendJson(res, 201, handle.snapshot());
+            } catch (error) {
+              sendJson(res, 400, {
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : "Falha ao abrir o navegador",
+              });
+            }
+            return;
+          }
+
+          const recorderStopMatch = path.match(
+            /^\/api\/recorder\/([^/]+)\/stop$/,
+          );
+          if (recorderStopMatch && method === "POST") {
+            const id = decodeURIComponent(recorderStopMatch[1]!);
+            const handle = recorders.get(id);
+            if (!handle) return notFound(res);
+            recorders.delete(id);
+            try {
+              sendJson(res, 200, await handle.stop());
+            } catch (error) {
+              sendJson(res, 400, {
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : "Falha ao concluir a gravação",
+              });
+            }
+            return;
+          }
+
+          const recorderMatch = path.match(/^\/api\/recorder\/([^/]+)$/);
+          if (recorderMatch && method === "GET") {
+            const handle = recorders.get(decodeURIComponent(recorderMatch[1]!));
+            if (!handle) return notFound(res);
+            sendJson(res, 200, handle.snapshot());
             return;
           }
 
@@ -225,10 +308,17 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                 secretRef?: string;
                 headers?: Record<string, string>;
                 productionSafetyMode?: boolean;
+                loginRecipe?: unknown;
               }>(req);
 
               if (!body.name?.trim() || !body.baseUrl?.trim()) {
                 sendJson(res, 400, { error: "name and baseUrl are required" });
+                return;
+              }
+
+              const recipe = parseLoginRecipe(body.loginRecipe);
+              if (recipe.error) {
+                sendJson(res, 400, { error: recipe.error });
                 return;
               }
 
@@ -244,6 +334,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                     secretRef: body.secretRef,
                     headers: body.headers,
                     productionSafetyMode: body.productionSafetyMode,
+                    loginRecipe: recipe.value ?? undefined,
                   }),
                 );
               } catch (error) {
@@ -291,12 +382,19 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                 secretRef?: string | null;
                 headers?: Record<string, string>;
                 productionSafetyMode?: boolean;
+                loginRecipe?: unknown;
               }>(req);
+              const recipe = parseLoginRecipe(body.loginRecipe);
+              if (recipe.error) {
+                sendJson(res, 400, { error: recipe.error });
+                return;
+              }
               const updated = await environments.update(id, {
                 ...body,
                 authType: body.authType
                   ? parseAuthType(body.authType)
                   : undefined,
+                loginRecipe: recipe.value,
               });
               if (!updated) return notFound(res);
               sendJson(res, 200, updated);
@@ -394,15 +492,21 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
             const environment = await environments.getById(id);
             if (!environment) return notFound(res);
 
-            const body = await readJson<{ document?: unknown }>(req);
-            if (!body.document) {
-              sendJson(res, 400, { error: "document is required" });
+            const body = await readJson<{ document?: unknown; text?: string }>(
+              req,
+            );
+            if (!body.document && !body.text) {
+              sendJson(res, 400, { error: "document or text is required" });
               return;
             }
 
             try {
+              const document =
+                typeof body.text === "string"
+                  ? parseSpecText(body.text)
+                  : body.document;
               const parsed = parseOpenApi(
-                body.document,
+                document,
                 environment.projectId,
                 environment.id,
               );
@@ -421,6 +525,82 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                   error instanceof Error
                     ? error.message
                     : "Invalid OpenAPI document",
+              });
+            }
+            return;
+          }
+
+          const envLoginTestMatch = path.match(
+            /^\/api\/environments\/([^/]+)\/login\/test$/,
+          );
+          if (envLoginTestMatch && method === "POST") {
+            const id = decodeURIComponent(envLoginTestMatch[1]!);
+            const environment = await environments.getById(id);
+            if (!environment) return notFound(res);
+            const executor = new HttpExecutor({ timeoutMs: 15_000 });
+            try {
+              if (environment.loginRecipe?.spec) {
+                const fetched = await fetchSpecWithRecipe(
+                  environment,
+                  secrets,
+                  executor,
+                );
+                sendJson(res, 200, {
+                  ok: true,
+                  steps: fetched.login.steps,
+                  spec: { url: fetched.url, bytes: fetched.text.length },
+                });
+              } else {
+                const login = await loginWithRecipe(
+                  environment,
+                  secrets,
+                  executor,
+                );
+                sendJson(res, 200, { ok: true, steps: login.steps });
+              }
+            } catch (error) {
+              sendJson(res, 200, {
+                ok: false,
+                error: error instanceof Error ? error.message : "Falha no login",
+                steps: error instanceof LoginRecipeError ? error.steps : [],
+              });
+            }
+            return;
+          }
+
+          const envFetchSpecMatch = path.match(
+            /^\/api\/environments\/([^/]+)\/openapi\/fetch$/,
+          );
+          if (envFetchSpecMatch && method === "POST") {
+            const id = decodeURIComponent(envFetchSpecMatch[1]!);
+            const environment = await environments.getById(id);
+            if (!environment) return notFound(res);
+            try {
+              const fetched = await fetchSpecWithRecipe(
+                environment,
+                secrets,
+                new HttpExecutor({ timeoutMs: 30_000 }),
+              );
+              const parsed = parseOpenApi(
+                parseSpecText(fetched.text),
+                environment.projectId,
+                environment.id,
+              );
+              const saved = await endpoints.replaceOpenApiEndpoints(
+                environment.projectId,
+                environment.id,
+                parsed,
+              );
+              sendJson(res, 201, {
+                imported: saved.filter((e) => e.source === "openapi").length,
+                endpoints: saved,
+              });
+            } catch (error) {
+              sendJson(res, 400, {
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : "Falha ao buscar OpenAPI",
               });
             }
             return;
@@ -517,6 +697,9 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                 total: resultRows.length,
                 byTest: [...byTest.values()].sort(
                   (a, b) => b.failed - a.failed || a.testId.localeCompare(b.testId),
+                ),
+                items: resultRows.sort((a, b) =>
+                  a.createdAt.localeCompare(b.createdAt),
                 ),
               },
             });
