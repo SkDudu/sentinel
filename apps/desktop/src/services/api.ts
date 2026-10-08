@@ -676,6 +676,45 @@ export const api = {
       body: JSON.stringify({ environmentId }),
     }),
 
+  streamBodyChat: async (
+    input: {
+      method: string;
+      path: string;
+      summary?: string;
+      requestBodySchema?: unknown;
+      messages: Array<{ role: "user" | "assistant"; content: string }>;
+    },
+    onEvent: (event: string, data: Record<string, unknown>) => void,
+  ) => {
+    const response = await fetch("/api/ai/body-chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!response.ok || !response.body) {
+      const data = (await response.json().catch(() => ({}))) as { error?: string };
+      throw new Error(data.error ?? "Não consegui falar com a IA. Tente de novo.");
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    const consume = (chunk: string) => {
+      const event = chunk.match(/^event: (.+)$/m)?.[1];
+      const dataLine = chunk.match(/^data: (.+)$/m)?.[1];
+      if (!event || !dataLine) return;
+      onEvent(event, JSON.parse(dataLine) as Record<string, unknown>);
+    };
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const chunks = buffer.split("\n\n");
+      buffer = chunks.pop() ?? "";
+      for (const chunk of chunks) consume(chunk);
+    }
+    if (buffer.trim()) consume(buffer);
+  },
+
   generateStepBody: (input: {
     method: string;
     path: string;

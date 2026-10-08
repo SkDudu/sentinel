@@ -28,8 +28,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { api } from "@/services/api";
-import { toast } from "@/components/ui/toast";
 import {
   canConnect,
   flowToGraph,
@@ -41,6 +39,7 @@ import {
   type NodeRunStatus,
   type StepNode,
 } from "./flow-graph";
+import { BodyChatDialog } from "./BodyChatDialog";
 import { StepPanel } from "./StepPanel";
 
 const SAFE = new Set(["GET", "HEAD", "OPTIONS"]);
@@ -151,7 +150,7 @@ export function FlowCanvas({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [bodySyncKey, setBodySyncKey] = useState(0);
-  const [generatingBody, setGeneratingBody] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
 
   const base = useMemo(
     () => ({ id: flow.id, name: flow.name, description: flow.description }),
@@ -299,36 +298,14 @@ export function FlowCanvas({
     );
   }
 
-  async function generateBody() {
+  function useGeneratedBody(body: unknown) {
     if (!selected) return;
-    const { method, path } = selected.data.step.request;
-    const endpoint = endpoints.find((e) => e.method === method && shape(e.path) === shape(path));
-    setGeneratingBody(true);
-    try {
-      const { body } = await api.generateStepBody({
-        method,
-        path,
-        summary: endpoint?.summary,
-        requestBodySchema: endpoint?.requestBodySchema,
-      });
-      updateStep(selected.id, {
-        ...selected.data.step,
-        request: { ...selected.data.step.request, body },
-      });
-      setBodySyncKey((n) => n + 1);
-    } catch (error) {
-      const raw = error instanceof Error ? error.message : "";
-      const technical = !raw || /not found/i.test(raw) || /\/api\//.test(raw);
-      toast.add({
-        title: "Não deu para gerar o body",
-        description: technical
-          ? "Tente de novo. Se continuar, reinicie o Sentinel."
-          : raw,
-        type: "error",
-      });
-    } finally {
-      setGeneratingBody(false);
-    }
+    updateStep(selected.id, {
+      ...selected.data.step,
+      request: { ...selected.data.step.request, body },
+    });
+    setBodySyncKey((n) => n + 1);
+    setChatOpen(false);
   }
 
   function updateStep(id: string, step: FlowStep, phase?: FlowPhase) {
@@ -441,8 +418,7 @@ export function FlowCanvas({
             onSuggest={applySuggestion}
             bodyHint={bodyHint}
             bodySyncKey={bodySyncKey}
-            generatingBody={generatingBody}
-            onGenerateBody={() => void generateBody()}
+            onGenerateBody={() => setChatOpen(true)}
             onChange={(step, phase) => updateStep(selected.id, step, phase)}
             onRemove={() => removeStep(selected.id)}
           />
@@ -454,6 +430,29 @@ export function FlowCanvas({
           </p>
         )}
       </div>
+      {selected ? (
+        <BodyChatDialog
+          open={chatOpen}
+          onOpenChange={setChatOpen}
+          method={selected.data.step.request.method}
+          path={selected.data.step.request.path}
+          summary={
+            endpoints.find(
+              (endpoint) =>
+                endpoint.method === selected.data.step.request.method &&
+                shape(endpoint.path) === shape(selected.data.step.request.path),
+            )?.summary
+          }
+          requestBodySchema={
+            endpoints.find(
+              (endpoint) =>
+                endpoint.method === selected.data.step.request.method &&
+                shape(endpoint.path) === shape(selected.data.step.request.path),
+            )?.requestBodySchema
+          }
+          onUse={useGeneratedBody}
+        />
+      ) : null}
     </div>
   );
 }

@@ -16,6 +16,7 @@
     "@base-ui/react": "^1.8.0",
     "@fontsource-variable/geist": "^5.3.0",
     "@number-flow/react": "^0.6.2",
+    "@shadcn/react": "^0.3.1",
     "@sw/ai": "workspace:*",
     "@sw/ai-data-generator": "workspace:*",
     "@sw/api-parser": "workspace:*",

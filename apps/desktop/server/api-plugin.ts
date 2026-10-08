@@ -56,6 +56,7 @@ import {
   type SqliteHandle,
 } from "@sw/database";
 import {
+  blockedPattern,
   suggestAccessRules,
   generateStepBody,
   suggestFlows,
@@ -69,6 +70,8 @@ import {
   generateAiCasesForEndpoints,
   interpretProjectFindings,
 } from "./ai-lab.js";
+import { streamChatCompletion } from "./ai-stream.js";
+import { bodyChatPrompt } from "../shared/body-prompt.ts";
 import { openApiKey, sealApiKey } from "./ai-key-cipher.js";
 import {
   deleteAiSettingsRow,
@@ -125,6 +128,21 @@ async function listProviderModels(baseUrl: string, apiKey?: string): Promise<str
         .filter((id): id is string => Boolean(id)),
     ),
   ];
+}
+
+function extractChatBody(raw: string): unknown | null {
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  if (start === -1 || end === -1) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw.slice(start, end + 1));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    const serialized = JSON.stringify(parsed);
+    if (serialized.length > 8_000 || blockedPattern(serialized)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
 }
 
 function aiProbeMessage(error: unknown): string {
@@ -1287,6 +1305,98 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                     : "AI generation failed",
               });
             }
+            return;
+          }
+
+          if (path === "/api/ai/body-chat" && method === "POST") {
+            const body = await readJson<{
+              method?: string;
+              path?: string;
+              summary?: string;
+              requestBodySchema?: unknown;
+              messages?: Array<{ role?: string; content?: string }>;
+            }>(req);
+            if (!body.method || !body.path) {
+              sendJson(res, 400, { error: "Escolha um passo com método e path antes de gerar." });
+              return;
+            }
+            const { settings: aiSettings } = resolveAiSettings();
+            if (!aiSettings.saved) {
+              sendJson(res, 400, {
+                error: "Salve o provedor em Configurações → IA antes de gerar.",
+              });
+              return;
+            }
+            if (!aiSettings.enabled) {
+              sendJson(res, 400, {
+                error: "A IA está desligada. Ative em Configurações → IA e tente de novo.",
+              });
+              return;
+            }
+            if (!aiSettings.apiKey && aiSettings.kind !== "ollama") {
+              sendJson(res, 400, { error: "Informe a chave de API em Configurações." });
+              return;
+            }
+            const history = (body.messages ?? [])
+              .filter(
+                (message) =>
+                  (message.role === "user" || message.role === "assistant") &&
+                  typeof message.content === "string" &&
+                  message.content.trim(),
+              )
+              .map((message) => ({
+                role: message.role as "user" | "assistant",
+                content: message.content!.slice(0, 8_000),
+              }));
+            const prompt = bodyChatPrompt({
+              method: body.method,
+              path: body.path,
+              summary: body.summary,
+              requestBodySchema: body.requestBodySchema,
+            });
+            const messages = [
+              {
+                role: "system" as const,
+                content:
+                  "Você ajuda a montar bodies de teste de API autorizado. Responda em português quando explicar. O JSON do body vem sem markdown.",
+              },
+              ...(history.length > 0
+                ? history
+                : [{ role: "user" as const, content: prompt }]),
+            ];
+            res.statusCode = 200;
+            res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+            res.setHeader("Cache-Control", "no-cache, no-transform");
+            res.setHeader("X-Accel-Buffering", "no");
+            res.flushHeaders();
+            const write = (event: string, data: unknown) => {
+              if (!res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+            };
+            write("prompt", { text: history[0]?.content ?? prompt });
+            write("status", { text: "Pensando no body…" });
+            try {
+              const full = await streamChatCompletion(
+                {
+                  baseUrl: aiSettings.baseUrl,
+                  model: aiSettings.model,
+                  apiKey: aiSettings.apiKey,
+                },
+                messages,
+                (text) => write("delta", { text }),
+                (text) => write("status", { text }),
+              );
+              const generated = extractChatBody(full);
+              write("done", {
+                text: full,
+                body: generated,
+                note: generated
+                  ? null
+                  : "A resposta não trouxe um body utilizável. Peça um ajuste.",
+              });
+            } catch (error) {
+              write("error", { message: aiProbeMessage(error) });
+            }
+            res.end();
             return;
           }
 
