@@ -9,5 +9,6 @@ export * from "./repositories/findings.js";
 export * from "./repositories/test-runs.js";
 export * from "./repositories/test-results.js";
 export * from "./repositories/persona-bindings.js";
+export * from "./repositories/relations.js";
 
 export type DatabaseDriver = "sqlite-node" | "sqlite-tauri";

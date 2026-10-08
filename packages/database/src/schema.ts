@@ -145,3 +145,36 @@ export const personaBindings = sqliteTable(
   },
   (table) => [primaryKey({ columns: [table.environmentId, table.personaId] })],
 );
+
+export const resources = sqliteTable(
+  "resources",
+  {
+    environmentId: text("environment_id")
+      .notNull()
+      .references(() => environments.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    idParam: text("id_param"),
+    operationsJson: text("operations_json").notNull().default("{}"),
+  },
+  (table) => [primaryKey({ columns: [table.environmentId, table.name] })],
+);
+
+export const resourceRelations = sqliteTable(
+  "resource_relations",
+  {
+    environmentId: text("environment_id")
+      .notNull()
+      .references(() => environments.id, { onDelete: "cascade" }),
+    id: text("id").notNull(),
+    fromResource: text("from_resource").notNull(),
+    toResource: text("to_resource").notNull(),
+    kind: text("kind").notNull(),
+    via: text("via").notNull(),
+    source: text("source"),
+    evidenceJson: text("evidence_json").notNull().default("[]"),
+    confidence: real("confidence").notNull().default(0),
+    origin: text("origin").notNull(),
+    status: text("status").notNull().default("suggested"),
+  },
+  (table) => [primaryKey({ columns: [table.environmentId, table.id] })],
+);

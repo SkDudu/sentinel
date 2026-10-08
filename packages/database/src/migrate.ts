@@ -144,5 +144,28 @@ export function applyMigrations(sqlite: DatabaseSync) {
       fixtures_json TEXT NOT NULL DEFAULT '{}',
       PRIMARY KEY (environment_id, persona_id)
     );
+
+    CREATE TABLE IF NOT EXISTS resources (
+      environment_id TEXT NOT NULL REFERENCES environments(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      id_param TEXT,
+      operations_json TEXT NOT NULL DEFAULT '{}',
+      PRIMARY KEY (environment_id, name)
+    );
+
+    CREATE TABLE IF NOT EXISTS resource_relations (
+      environment_id TEXT NOT NULL REFERENCES environments(id) ON DELETE CASCADE,
+      id TEXT NOT NULL,
+      from_resource TEXT NOT NULL,
+      to_resource TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      via TEXT NOT NULL,
+      source TEXT,
+      evidence_json TEXT NOT NULL DEFAULT '[]',
+      confidence REAL NOT NULL DEFAULT 0,
+      origin TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'suggested',
+      PRIMARY KEY (environment_id, id)
+    );
   `);
 }
