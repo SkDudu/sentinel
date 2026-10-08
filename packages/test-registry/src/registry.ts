@@ -11,9 +11,11 @@ export class InMemoryTestRegistry implements TestRegistry {
     this.#tests.set(test.id, test);
   }
 
-  list(category?: TestCategory) {
+  list(...categories: TestCategory[]) {
     const all = [...this.#tests.values()];
-    return category ? all.filter((t) => t.category === category) : all;
+    if (categories.length === 0) return all;
+    const allow = new Set(categories);
+    return all.filter((t) => allow.has(t.category));
   }
 
   get(id: string) {

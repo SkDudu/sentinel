@@ -42,6 +42,14 @@ export const ParameterSchema = z.object({
 });
 export type Parameter = z.infer<typeof ParameterSchema>;
 
+export const EndpointResponseSchema = z.object({
+  status: z.string().min(1),
+  description: z.string().optional(),
+  contentType: z.string().optional(),
+  schema: z.unknown().optional(),
+});
+export type EndpointResponse = z.infer<typeof EndpointResponseSchema>;
+
 export const EndpointSchema = z.object({
   id: z.string().uuid(),
   projectId: z.string().uuid(),
@@ -59,8 +67,10 @@ export const EndpointSchema = z.object({
   path: z.string().min(1),
   operationId: z.string().optional(),
   summary: z.string().optional(),
+  description: z.string().optional(),
   parameters: z.array(ParameterSchema).default([]),
   requestBodySchema: z.unknown().optional(),
+  responses: z.array(EndpointResponseSchema).default([]),
   tags: z.array(z.string()).default([]),
   source: z.enum(["openapi", "manual", "import"]).default("manual"),
 });

@@ -47,8 +47,10 @@ export const endpoints = sqliteTable("endpoints", {
   path: text("path").notNull(),
   operationId: text("operation_id"),
   summary: text("summary"),
+  description: text("description"),
   parametersJson: text("parameters_json").notNull().default("[]"),
   requestBodySchemaJson: text("request_body_schema_json"),
+  responsesJson: text("responses_json").notNull().default("[]"),
   tagsJson: text("tags_json").notNull().default("[]"),
   source: text("source").notNull().default("manual"),
 });

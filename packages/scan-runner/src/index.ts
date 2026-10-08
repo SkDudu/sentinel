@@ -1,1 +1,5 @@
-export { runProjectScan, type ScanRequest } from "./project-scan.js";
+export {
+  runProjectScan,
+  type ScanProgressEvent,
+  type ScanRequest,
+} from "./project-scan.js";

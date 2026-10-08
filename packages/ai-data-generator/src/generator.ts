@@ -109,16 +109,18 @@ export async function generateTestData(
   const deterministic = generateDeterministicCases(analyzed, options).filter(
     (c) => c.source === TestCaseSource.DETERMINISTIC,
   );
-  const businessLogic = generateDeterministicCases(analyzed, {
-    ...options,
-    normal: false,
-    validationErrors: false,
-    edgeCases: false,
-    typeConfusion: false,
-    boundaryValues: false,
-    businessLogic: true,
-    aiGenerated: false,
-  }).filter((c) => c.source === TestCaseSource.BUSINESS_LOGIC);
+  const businessLogic = options.businessLogic
+    ? generateDeterministicCases(analyzed, {
+        ...options,
+        normal: false,
+        validationErrors: false,
+        edgeCases: false,
+        typeConfusion: false,
+        boundaryValues: false,
+        businessLogic: true,
+        aiGenerated: false,
+      }).filter((c) => c.source === TestCaseSource.BUSINESS_LOGIC)
+    : [];
 
   let aiGenerated: TestCase[] = [];
   let rejectedAi: GeneratedTestBundle["rejectedAi"] = [];

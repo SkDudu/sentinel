@@ -46,6 +46,16 @@ export class FindingRepository {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
+  async listByRun(runId: string): Promise<Finding[]> {
+    const rows = await this.db
+      .select()
+      .from(findings)
+      .where(eq(findings.runId, runId));
+    return rows
+      .map(mapFinding)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
   async createMany(items: Finding[], runId?: string): Promise<Finding[]> {
     const created: Finding[] = [];
     for (const item of items) {

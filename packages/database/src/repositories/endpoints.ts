@@ -12,10 +12,12 @@ function mapEndpoint(row: typeof endpoints.$inferSelect): Endpoint {
     path: row.path,
     operationId: row.operationId ?? undefined,
     summary: row.summary ?? undefined,
+    description: row.description ?? undefined,
     parameters: JSON.parse(row.parametersJson) as Endpoint["parameters"],
     requestBodySchema: row.requestBodySchemaJson
       ? (JSON.parse(row.requestBodySchemaJson) as unknown)
       : undefined,
+    responses: JSON.parse(row.responsesJson ?? "[]") as Endpoint["responses"],
     tags: JSON.parse(row.tagsJson) as string[],
     source: row.source as Endpoint["source"],
   };
@@ -68,16 +70,27 @@ export class EndpointRepository {
         path: item.path,
         operationId: item.operationId ?? null,
         summary: item.summary ?? null,
+        description: item.description ?? null,
         parametersJson: JSON.stringify(item.parameters ?? []),
         requestBodySchemaJson: item.requestBodySchema
           ? JSON.stringify(item.requestBodySchema)
           : null,
+        responsesJson: JSON.stringify(item.responses ?? []),
         tagsJson: JSON.stringify(item.tags ?? []),
         source: item.source ?? "openapi",
       });
     }
 
     return this.listByEnvironment(environmentId);
+  }
+
+  async clearOpenApiEndpoints(environmentId: string): Promise<number> {
+    const existing = await this.listByEnvironment(environmentId);
+    const openapi = existing.filter((item) => item.source === "openapi");
+    for (const item of openapi) {
+      await this.db.delete(endpoints).where(eq(endpoints.id, item.id));
+    }
+    return openapi.length;
   }
 
   async delete(id: string): Promise<boolean> {

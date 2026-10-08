@@ -37,6 +37,15 @@ export class TestRunRepository {
       .sort((a, b) => (b.startedAt ?? "").localeCompare(a.startedAt ?? ""));
   }
 
+  async getById(id: string): Promise<ScanRun | null> {
+    const row = await this.db
+      .select()
+      .from(testRuns)
+      .where(eq(testRuns.id, id))
+      .get();
+    return row ? mapRun(row) : null;
+  }
+
   async create(input: {
     projectId: string;
     environmentId: string;

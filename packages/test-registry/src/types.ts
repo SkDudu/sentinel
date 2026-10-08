@@ -53,6 +53,6 @@ export interface SecurityTest {
 
 export interface TestRegistry {
   register(test: SecurityTest): void;
-  list(category?: TestCategory): SecurityTest[];
+  list(...categories: TestCategory[]): SecurityTest[];
   get(id: string): SecurityTest | undefined;
 }

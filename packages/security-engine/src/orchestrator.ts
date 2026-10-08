@@ -9,6 +9,7 @@ import {
   type HttpResponse,
   type RateLimitConfig,
   type TestCase,
+  type TestCategory,
   type TestDataOptions,
   type Variable,
 } from "@sw/core";
@@ -50,6 +51,8 @@ export interface OrchestratorInput {
   executor: RequestExecutor;
   /** Skip registry plugins (AI-only run). */
   skipPlugins?: boolean;
+  /** When set, only registry plugins in these categories run. */
+  categories?: TestCategory[];
   productionSafetyMode?: boolean;
   rateLimit?: RateLimitConfig;
   /** Abort between cases / in-flight HTTP when supported. */
@@ -58,6 +61,7 @@ export interface OrchestratorInput {
     completed: number;
     total: number;
     testCase: TestCase;
+    findings: number;
   }) => void;
 }
 
@@ -124,7 +128,11 @@ export class TestOrchestrator {
     };
 
     if (!input.skipPlugins) {
-      for (const test of this.registry.list()) {
+      const plugins =
+        input.categories && input.categories.length > 0
+          ? this.registry.list(...input.categories)
+          : this.registry.list();
+      for (const test of plugins) {
         const cases = await test.generateCases(ctxPreview);
         pluginCases.push(
           ...cases.map((c) => ({
@@ -192,17 +200,18 @@ export class TestOrchestrator {
             input.executor,
           );
           executed += 1;
-          input.onProgress?.({
-            completed: executed,
-            total: prepared.cases.length,
-            testCase,
-          });
           const produced = result
             ? Array.isArray(result)
               ? result
               : [result]
             : [];
           if (produced.length) findings.push(...produced);
+          input.onProgress?.({
+            completed: executed,
+            total: prepared.cases.length,
+            testCase,
+            findings: produced.length,
+          });
           results.push({
             endpointId: prepared.context.endpoint.id,
             testId: resolvedTestId,
@@ -242,6 +251,12 @@ export class TestOrchestrator {
             notes:
               error instanceof Error ? error.message : "Unknown execution error",
           });
+          input.onProgress?.({
+            completed: executed,
+            total: prepared.cases.length,
+            testCase,
+            findings: 1,
+          });
         }
         continue;
       }
@@ -271,11 +286,6 @@ export class TestOrchestrator {
       try {
         const response = await input.executor.execute(request);
         executed += 1;
-        input.onProgress?.({
-          completed: executed,
-          total: prepared.cases.length,
-          testCase,
-        });
 
         applyExtracts(
           prepared.context.variables,
@@ -317,17 +327,18 @@ export class TestOrchestrator {
           response,
           notes: produced.length ? `${produced.length} finding(s)` : undefined,
         });
+        input.onProgress?.({
+          completed: executed,
+          total: prepared.cases.length,
+          testCase,
+          findings: produced.length,
+        });
       } catch (error) {
         if (input.signal?.aborted) {
           cancelled = true;
           break;
         }
         executed += 1;
-        input.onProgress?.({
-          completed: executed,
-          total: prepared.cases.length,
-          testCase,
-        });
         findings.push({
           id: randomUUID(),
           projectId: prepared.context.endpoint.projectId,
@@ -353,6 +364,12 @@ export class TestOrchestrator {
           request,
           notes:
             error instanceof Error ? error.message : "Unknown execution error",
+        });
+        input.onProgress?.({
+          completed: executed,
+          total: prepared.cases.length,
+          testCase,
+          findings: 1,
         });
       }
     }

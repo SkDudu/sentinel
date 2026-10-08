@@ -30,8 +30,10 @@ export function applyMigrations(sqlite: DatabaseSync) {
       path TEXT NOT NULL,
       operation_id TEXT,
       summary TEXT,
+      description TEXT,
       parameters_json TEXT NOT NULL DEFAULT '[]',
       request_body_schema_json TEXT,
+      responses_json TEXT NOT NULL DEFAULT '[]',
       tags_json TEXT NOT NULL DEFAULT '[]',
       source TEXT NOT NULL DEFAULT 'manual'
     );
@@ -105,6 +107,14 @@ export function applyMigrations(sqlite: DatabaseSync) {
   if (!endpointColumns.some((column) => column.name === "environment_id")) {
     sqlite.exec(
       "ALTER TABLE endpoints ADD COLUMN environment_id TEXT REFERENCES environments(id) ON DELETE CASCADE",
+    );
+  }
+  if (!endpointColumns.some((column) => column.name === "description")) {
+    sqlite.exec("ALTER TABLE endpoints ADD COLUMN description TEXT");
+  }
+  if (!endpointColumns.some((column) => column.name === "responses_json")) {
+    sqlite.exec(
+      "ALTER TABLE endpoints ADD COLUMN responses_json TEXT NOT NULL DEFAULT '[]'",
     );
   }
   sqlite.exec(

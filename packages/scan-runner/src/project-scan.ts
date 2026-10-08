@@ -5,6 +5,8 @@ import {
   type Environment,
   type RateLimitConfig,
   type TestCase,
+  type TestCategory,
+  type TestDataOptions,
   type Variable,
 } from "@sw/core";
 import {
@@ -37,6 +39,8 @@ export interface ScanRequest {
   approvedAiCases?: TestCase[];
   /** When true, skip deterministic plugins; run only approvedAiCases. */
   aiOnly?: boolean;
+  /** Limit registry plugins (+ deterministic options) to these suites. */
+  categories?: TestCategory[];
   /** Scan variables for {{token}} / {{userId}} interpolation + authz fixtures. */
   variables?: Variable[];
   rateLimit?: Partial<RateLimitConfig>;
@@ -45,7 +49,35 @@ export interface ScanRequest {
   registry?: TestRegistry;
   /** Cancel between endpoints/cases (and HTTP when executor supports it). */
   signal?: AbortSignal;
+  /** Live progress. Must not throw. */
+  onEvent?: (event: ScanProgressEvent) => void;
 }
+
+export type ScanProgressEvent =
+  | { type: "start"; endpoints: number; runId: string }
+  | {
+      type: "endpoint";
+      index: number;
+      total: number;
+      method: string;
+      path: string;
+    }
+  | {
+      type: "case";
+      method: string;
+      path: string;
+      name: string;
+      completed: number;
+      total: number;
+      findings: number;
+    }
+  | {
+      type: "endpoint-done";
+      method: string;
+      path: string;
+      executed: number;
+      findings: number;
+    };
 
 const DEFAULT_RATE_LIMIT: RateLimitConfig = {
   requests: 30,
@@ -130,7 +162,14 @@ export async function runProjectScan(
   const casesByEndpoint = groupCasesByEndpoint(approved, targetEndpoints);
   const sharedVariables: Variable[] = [...(input.variables ?? [])];
 
+  input.onEvent?.({
+    type: "start",
+    endpoints: targetEndpoints.length,
+    runId: run.id,
+  });
+
   try {
+    let index = 0;
     for (const endpoint of targetEndpoints as Endpoint[]) {
       if (input.signal?.aborted) {
         cancelled = true;
@@ -140,6 +179,15 @@ export async function runProjectScan(
       const extraCases = casesByEndpoint.get(endpoint.id) ?? [];
       if (input.aiOnly && extraCases.length === 0) continue;
 
+      index += 1;
+      input.onEvent?.({
+        type: "endpoint",
+        index,
+        total: targetEndpoints.length,
+        method: endpoint.method,
+        path: endpoint.path,
+      });
+
       const result = await orchestrator.run({
         endpoint,
         baseUrl: environment.baseUrl,
@@ -148,18 +196,22 @@ export async function runProjectScan(
         executor,
         extraCases,
         skipPlugins: Boolean(input.aiOnly),
+        categories: input.aiOnly ? undefined : input.categories,
         productionSafetyMode: environment.productionSafetyMode,
         rateLimit,
         signal: input.signal,
-        options: {
-          normal: !input.aiOnly,
-          validationErrors: !input.aiOnly,
-          edgeCases: !input.aiOnly,
-          typeConfusion: !input.aiOnly,
-          boundaryValues: false,
-          businessLogic: false,
-          aiGenerated: false,
+        onProgress: ({ completed, total, testCase, findings }) => {
+          input.onEvent?.({
+            type: "case",
+            method: endpoint.method,
+            path: endpoint.path,
+            name: testCase.name,
+            completed,
+            total,
+            findings,
+          });
         },
+        options: optionsForCategories(input.categories, Boolean(input.aiOnly)),
       });
 
       for (const [key, value] of Object.entries(result.context.variables)) {
@@ -172,6 +224,14 @@ export async function runProjectScan(
       completedCases += result.executed;
       allFindings.push(...result.findings);
       allResults.push(...result.results);
+
+      input.onEvent?.({
+        type: "endpoint-done",
+        method: endpoint.method,
+        path: endpoint.path,
+        executed: result.executed,
+        findings: result.findings.length,
+      });
 
       if (result.cancelled) {
         cancelled = true;
@@ -222,6 +282,46 @@ export async function runProjectScan(
     });
     throw error;
   }
+}
+
+function optionsForCategories(
+  categories: TestCategory[] | undefined,
+  aiOnly: boolean,
+): Partial<TestDataOptions> {
+  if (aiOnly) {
+    return {
+      normal: false,
+      validationErrors: false,
+      edgeCases: false,
+      typeConfusion: false,
+      boundaryValues: false,
+      businessLogic: false,
+      aiGenerated: false,
+    };
+  }
+  if (!categories?.length) {
+    return {
+      normal: true,
+      validationErrors: true,
+      edgeCases: true,
+      typeConfusion: true,
+      boundaryValues: false,
+      businessLogic: false,
+      aiGenerated: false,
+    };
+  }
+  const allow = new Set(categories);
+  const wantsValidation = allow.has("validation");
+  return {
+    // Sem suite de validação: não dispara matriz determinística genérica.
+    normal: wantsValidation,
+    validationErrors: wantsValidation,
+    edgeCases: wantsValidation,
+    typeConfusion: wantsValidation,
+    boundaryValues: false,
+    businessLogic: allow.has("business-logic"),
+    aiGenerated: allow.has("ai-generated"),
+  };
 }
 
 function groupCasesByEndpoint(
