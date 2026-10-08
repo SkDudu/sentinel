@@ -698,6 +698,9 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                 byTest: [...byTest.values()].sort(
                   (a, b) => b.failed - a.failed || a.testId.localeCompare(b.testId),
                 ),
+                items: resultRows.sort((a, b) =>
+                  a.createdAt.localeCompare(b.createdAt),
+                ),
               },
             });
             return;

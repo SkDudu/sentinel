@@ -2,6 +2,8 @@ import type {
   Endpoint,
   Environment,
   Finding,
+  HttpRequest,
+  HttpResponse,
   LoginRecipe,
   RateLimitConfig,
   ScanRun,
@@ -349,6 +351,17 @@ export const api = {
         failed: number;
         total: number;
         byTest: Array<{ testId: string; passed: number; failed: number }>;
+        items: Array<{
+          id: string;
+          endpointId?: string;
+          testId: string;
+          testCaseId: string;
+          passed: boolean;
+          request?: HttpRequest;
+          response?: HttpResponse;
+          notes?: string;
+          createdAt: string;
+        }>;
       };
     }>(`/api/runs/${runId}`),
 

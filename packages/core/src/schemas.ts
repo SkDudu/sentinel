@@ -212,6 +212,8 @@ export const ScanRunSchema = z.object({
   totalCases: z.number().int().default(0),
   completedCases: z.number().int().default(0),
   findingsCount: z.number().int().default(0),
+  /** Suites selecionadas; [] = todas; ausente = run anterior ao registro. */
+  categories: z.array(z.nativeEnum(TestCategory)).optional(),
 });
 export type ScanRun = z.infer<typeof ScanRunSchema>;
 

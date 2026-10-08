@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import type { Finding, ScanRun } from "@sw/core";
 import { CheckIcon, ChevronDownIcon, CopyIcon } from "lucide-react";
 import {
@@ -34,6 +34,7 @@ import { toast } from "@/components/ui/toast";
 import { api } from "@/services/api";
 import { findingDisplayPt, severityLabelPt, testLabelPt } from "@/lib/finding-pt";
 import { cn } from "@/lib/utils";
+import { scanSuitesLabel } from "./scan-scope";
 
 const SEVERITY_COLOR: Record<string, string> = {
   CRITICAL: "var(--destructive)",
@@ -161,6 +162,7 @@ function buildRunContextForAi(detail: {
     "## Run",
     `- id: ${run.id}`,
     `- status: ${run.status}`,
+    `- suites: ${scanSuitesLabel(run.categories)}`,
     `- projectId: ${run.projectId}`,
     `- environmentId: ${run.environmentId}`,
     `- startedAt: ${run.startedAt ?? "—"}`,
@@ -415,6 +417,96 @@ function FindingCard({ finding }: { finding: Finding }) {
 }
 
 type RunDetail = Awaited<ReturnType<typeof api.getRunDetail>>;
+type RunResultItem = RunDetail["results"]["items"][number];
+
+function ResultCaseItem({ item }: { item: RunResultItem }) {
+  const [open, setOpen] = useState(false);
+  const { request, response } = item;
+  const { path } = endpointFromUrl(request?.url);
+
+  return (
+    <li className="min-w-0 overflow-hidden rounded-lg ring-1 ring-foreground/10">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="flex w-full min-w-0 items-center gap-3 px-3 py-2 text-left outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring/50"
+      >
+        <StatusBadge
+          hideIcon
+          status={item.passed ? "operational" : "major"}
+          label={item.passed ? "Passou" : "Falhou"}
+        />
+        <p className="min-w-0 flex-1 truncate font-mono text-xs">
+          <span className="text-foreground/80">{request?.method ?? "—"}</span>{" "}
+          {path}
+        </p>
+        <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+          {response ? `HTTP ${response.status}` : "sem resposta"}
+          {typeof response?.durationMs === "number"
+            ? ` · ${response.durationMs} ms`
+            : ""}
+        </span>
+        <ChevronDownIcon
+          className={cn(
+            "size-4 shrink-0 text-muted-foreground transition-transform",
+            open && "rotate-180",
+          )}
+        />
+      </button>
+
+      {open ? (
+        <div className="min-w-0 space-y-3 border-t px-3 py-3">
+          <p className="text-muted-foreground truncate font-mono text-[11px]">
+            Caso: {item.testCaseId}
+          </p>
+          {item.notes ? (
+            <p className="text-xs break-words [overflow-wrap:anywhere]">
+              <span className="font-medium">Notas: </span>
+              {item.notes}
+            </p>
+          ) : null}
+          {request ? (
+            <div>
+              <p className="text-muted-foreground mb-1 text-[11px] font-medium uppercase tracking-wide">
+                Request
+              </p>
+              <ScrollArea className="h-40 rounded-lg bg-muted/40">
+                <pre className="px-3 py-2 font-mono text-[11px] leading-5 whitespace-pre-wrap">
+                  {`${request.method} ${request.url}\n`}
+                  {formatHeaders(request.headers)}
+                  {request.body !== undefined
+                    ? `\n\n${truncateText(formatBody(request.body))}`
+                    : ""}
+                </pre>
+              </ScrollArea>
+            </div>
+          ) : null}
+          {response ? (
+            <div>
+              <p className="text-muted-foreground mb-1 text-[11px] font-medium uppercase tracking-wide">
+                Response
+              </p>
+              <ScrollArea className="h-40 rounded-lg bg-muted/40">
+                <pre className="px-3 py-2 font-mono text-[11px] leading-5 whitespace-pre-wrap">
+                  {`HTTP ${response.status}\n`}
+                  {formatHeaders(response.headers)}
+                  {response.body !== undefined
+                    ? `\n\n${truncateText(formatBody(response.body))}`
+                    : ""}
+                </pre>
+              </ScrollArea>
+            </div>
+          ) : null}
+          {!request && !response ? (
+            <p className="text-muted-foreground text-xs">
+              Sem request/response gravados neste caso.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+    </li>
+  );
+}
 
 export function ScanRunDetailDialog({
   runId,
@@ -429,6 +521,7 @@ export function ScanRunDetailDialog({
   const [error, setError] = useState<string | null>(null);
   const [detail, setDetail] = useState<RunDetail | null>(null);
   const [copied, setCopied] = useState(false);
+  const [expandedTestId, setExpandedTestId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open || !runId) return;
@@ -437,6 +530,7 @@ export function ScanRunDetailDialog({
     setError(null);
     setDetail(null);
     setCopied(false);
+    setExpandedTestId(null);
     void api
       .getRunDetail(runId)
       .then((data) => {
@@ -485,6 +579,16 @@ export function ScanRunDetailDialog({
     return [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   }, [detail]);
 
+  const itemsByTest = useMemo(() => {
+    const groups = new Map<string, RunResultItem[]>();
+    for (const item of detail?.results.items ?? []) {
+      const list = groups.get(item.testId) ?? [];
+      list.push(item);
+      groups.set(item.testId, list);
+    }
+    return groups;
+  }, [detail]);
+
   const run = detail?.run;
 
   async function onCopyForAi() {
@@ -527,7 +631,7 @@ export function ScanRunDetailDialog({
             {loading
               ? "Carregando detalhe do run…"
               : run?.startedAt
-                ? `Início ${new Date(run.startedAt).toLocaleString("pt-BR")}${
+                ? `${scanSuitesLabel(run.categories)} · Início ${new Date(run.startedAt).toLocaleString("pt-BR")}${
                     run.finishedAt
                       ? ` · fim ${new Date(run.finishedAt).toLocaleTimeString("pt-BR", { hour12: false })}`
                       : ""
@@ -556,6 +660,9 @@ export function ScanRunDetailDialog({
                         </Property>
                         <Property label="Status">
                           {formatRunStatus(run.status)}
+                        </Property>
+                        <Property label="Suites">
+                          {scanSuitesLabel(run.categories)}
                         </Property>
                         <Property label="Início">
                           {run.startedAt
@@ -602,9 +709,13 @@ export function ScanRunDetailDialog({
 
                 {detail.results.byTest.length > 0 ? (
                   <div>
-                    <h3 className="mb-3 text-sm font-medium">
+                    <h3 className="mb-1 text-sm font-medium">
                       Resultados por teste
                     </h3>
+                    <p className="text-muted-foreground mb-3 text-xs">
+                      Clique num teste para ver cada caso executado (request e
+                      resposta).
+                    </p>
                     <div className="overflow-hidden rounded-xl ring-1 ring-foreground/10">
                       <Table>
                         <TableHeader>
@@ -615,28 +726,67 @@ export function ScanRunDetailDialog({
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {detail.results.byTest.map((row) => (
-                            <TableRow key={row.testId}>
-                              <TableCell>
-                                <p className="text-xs">{testLabelPt(row.testId)}</p>
-                                <p className="text-muted-foreground font-mono text-[11px]">
-                                  {row.testId}
-                                </p>
-                              </TableCell>
-                              <TableCell className="text-right tabular-nums">
-                                {row.passed}
-                              </TableCell>
-                              <TableCell
-                                className={cn(
-                                  "text-right tabular-nums",
-                                  row.failed > 0 &&
-                                    "text-amber-600 dark:text-amber-400",
-                                )}
-                              >
-                                {row.failed}
-                              </TableCell>
-                            </TableRow>
-                          ))}
+                          {detail.results.byTest.map((row) => {
+                            const expanded = expandedTestId === row.testId;
+                            const items = itemsByTest.get(row.testId) ?? [];
+                            return (
+                              <Fragment key={row.testId}>
+                                <TableRow
+                                  className="cursor-pointer"
+                                  onClick={() =>
+                                    setExpandedTestId(
+                                      expanded ? null : row.testId,
+                                    )
+                                  }
+                                >
+                                  <TableCell>
+                                    <div className="flex items-center gap-2">
+                                      <ChevronDownIcon
+                                        className={cn(
+                                          "size-3.5 shrink-0 text-muted-foreground transition-transform",
+                                          !expanded && "-rotate-90",
+                                        )}
+                                      />
+                                      <div>
+                                        <p className="text-xs">
+                                          {testLabelPt(row.testId)}
+                                        </p>
+                                        <p className="text-muted-foreground font-mono text-[11px]">
+                                          {row.testId}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-right tabular-nums">
+                                    {row.passed}
+                                  </TableCell>
+                                  <TableCell
+                                    className={cn(
+                                      "text-right tabular-nums",
+                                      row.failed > 0 &&
+                                        "text-amber-600 dark:text-amber-400",
+                                    )}
+                                  >
+                                    {row.failed}
+                                  </TableCell>
+                                </TableRow>
+                                {expanded ? (
+                                  <TableRow className="hover:bg-transparent">
+                                    <TableCell colSpan={3} className="whitespace-normal">
+                                      <ul className="space-y-2">
+                                        {items.map((item) => (
+                                          <ResultCaseItem
+                                            key={item.id}
+                                            item={item}
+                                          />
+                                        ))}
+                                      </ul>
+                                    </TableCell>
+                                  </TableRow>
+                                ) : null}
+                              </Fragment>
+                            );
+                          })}
                         </TableBody>
                       </Table>
                     </div>

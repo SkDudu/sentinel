@@ -16,6 +16,24 @@ export const ALL_SCAN_SUITE_IDS: TestCategory[] = SCAN_SUITE_OPTIONS.map(
   (s) => s.id,
 );
 
+const SUITE_LABELS: Record<TestCategory, string> = {
+  [TestCategory.AUTHENTICATION]: "Autenticação",
+  [TestCategory.AUTHORIZATION]: "Autorização",
+  [TestCategory.INJECTION]: "Injeção",
+  [TestCategory.VALIDATION]: "Validação",
+  [TestCategory.RATE_LIMIT]: "Rate limit",
+  [TestCategory.HTTP]: "HTTP",
+  [TestCategory.BUSINESS_LOGIC]: "Lógica de negócio",
+  [TestCategory.AI_GENERATED]: "Casos IA",
+};
+
+/** Rótulo das suites de um run; [] = scan completo, undefined = não registrado. */
+export function scanSuitesLabel(categories: TestCategory[] | undefined): string {
+  if (!categories) return "Não registrado";
+  if (categories.length === 0) return "Todas as suites";
+  return categories.map((id) => SUITE_LABELS[id] ?? id).join(", ");
+}
+
 export type ScanScopePayload = {
   endpointIds: string[];
   categories?: TestCategory[];

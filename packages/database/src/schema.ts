@@ -89,6 +89,7 @@ export const testRuns = sqliteTable("test_runs", {
   totalCases: integer("total_cases").notNull().default(0),
   completedCases: integer("completed_cases").notNull().default(0),
   findingsCount: integer("findings_count").notNull().default(0),
+  categoriesJson: text("categories_json"),
 });
 
 export const testResults = sqliteTable("test_results", {
