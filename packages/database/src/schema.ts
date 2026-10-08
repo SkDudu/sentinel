@@ -179,6 +179,17 @@ export const resourceRelations = sqliteTable(
   (table) => [primaryKey({ columns: [table.environmentId, table.id] })],
 );
 
+export const flows = sqliteTable("flows", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  definitionJson: text("definition_json").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
 export const accessRules = sqliteTable(
   "access_rules",
   {

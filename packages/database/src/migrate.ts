@@ -178,5 +178,14 @@ export function applyMigrations(sqlite: DatabaseSync) {
       path_fixtures_json TEXT,
       PRIMARY KEY (environment_id, endpoint_id, persona_id)
     );
+
+    CREATE TABLE IF NOT EXISTS flows (
+      id TEXT PRIMARY KEY NOT NULL,
+      project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      definition_json TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
 }
