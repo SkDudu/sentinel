@@ -26,6 +26,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "@/components/ui/toast";
+import { AccessMatrixSection } from "./AccessMatrixSection";
 import { PersonaBindingDialog } from "./PersonaBindingDialog";
 
 function showError(err: unknown, fallback: string) {
@@ -229,5 +230,32 @@ export function EnvironmentAccessPanel({
 }: {
   environment: EnvironmentDto;
 }) {
-  return <PersonasSection environment={environment} />;
+  const [view, setView] = useState<"personas" | "matrix">("personas");
+  return (
+    <div className="space-y-4">
+      <div className="inline-flex gap-1 rounded-lg border p-1">
+        <Button
+          type="button"
+          size="sm"
+          variant={view === "personas" ? "secondary" : "ghost"}
+          onClick={() => setView("personas")}
+        >
+          Personas
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={view === "matrix" ? "secondary" : "ghost"}
+          onClick={() => setView("matrix")}
+        >
+          Matriz
+        </Button>
+      </div>
+      {view === "personas" ? (
+        <PersonasSection environment={environment} />
+      ) : (
+        <AccessMatrixSection environment={environment} />
+      )}
+    </div>
+  );
 }

@@ -197,6 +197,7 @@ export function ScanScopeDialog({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [selectedSuites, setSelectedSuites] =
     useState<TestCategory[]>(ALL_SCAN_SUITE_IDS);
+  const [matrix, setMatrix] = useState(false);
   const [groupFilter, setGroupFilter] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -243,7 +244,7 @@ export function ScanScopeDialog({
 
   const visibleSelection = checkboxStateForIds(visibleIds, selectedIds);
   const canConfirm =
-    selectedCount > 0 && selectedSuites.length > 0 && !busy;
+    selectedCount > 0 && (selectedSuites.length > 0 || matrix) && !busy;
 
   useEffect(() => {
     if (!open) return;
@@ -346,6 +347,9 @@ export function ScanScopeDialog({
     onConfirm({
       endpointIds,
       categories: categoriesForRequest(selectedSuites),
+      ...(matrix
+        ? { matrix: true, matrixOnly: selectedSuites.length === 0 }
+        : {}),
     });
     onOpenChange(false);
   }
@@ -507,9 +511,25 @@ export function ScanScopeDialog({
                   );
                 })}
               </ul>
-              {selectedSuites.length === 0 ? (
+              <div className="flex items-center gap-2 border-t pt-3">
+                <Checkbox
+                  id="scope-matrix"
+                  checked={matrix}
+                  disabled={busy}
+                  onCheckedChange={(value) => setMatrix(value === true)}
+                />
+                <label htmlFor="scope-matrix" className="text-sm">
+                  Matriz de acesso
+                </label>
+              </div>
+              {matrix && selectedSuites.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  Só a matriz roda, nos endpoints com regra.
+                </p>
+              ) : null}
+              {selectedSuites.length === 0 && !matrix ? (
                 <p className="text-xs text-destructive">
-                  Selecione ao menos uma suite.
+                  Selecione ao menos uma suite ou a matriz.
                 </p>
               ) : null}
               {selectedCount === 0 ? (

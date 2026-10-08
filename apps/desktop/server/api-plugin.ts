@@ -6,6 +6,7 @@ import {
   AiProviderKind,
   AuthType,
   FindingStatus,
+  AccessRuleSchema,
   LoginRecipeSchema,
   RelationKindSchema,
   TestCategory,
@@ -21,6 +22,7 @@ import {
   parseOpenApi,
   parseSpecText,
   relationId,
+  suggestAccessFromGraph,
 } from "@sw/api-parser";
 import {
   assertPersonaRecipe,
@@ -42,6 +44,7 @@ import {
   EndpointRepository,
   EnvironmentRepository,
   FindingRepository,
+  AccessRuleRepository,
   PersonaBindingRepository,
   ProjectRepository,
   RelationRepository,
@@ -157,13 +160,15 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
       const testResults = new TestResultRepository(handle.db);
       const personaBindings = new PersonaBindingRepository(handle.db);
       const relationsRepo = new RelationRepository(handle.db);
+      const accessRulesRepo = new AccessRuleRepository(handle.db);
       const recorders = new Map<string, RecorderHandle>();
 
-      /** Contrato mudou: re-infere grafo e preserva revisão. */
+      /** Contrato mudou: re-infere grafo (preserva revisão) e reaponta a matriz. */
       const refreshRelations = async (
         environmentId: string,
         contract: Endpoint[],
       ) => {
+        await accessRulesRepo.remap(environmentId, contract);
         const inferred = inferRelations(contract);
         await relationsRepo.replace(
           environmentId,
@@ -681,6 +686,71 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
             return;
           }
 
+          const accessRulesMatch = path.match(
+            /^\/api\/environments\/([^/]+)\/access-rules(\/suggest)?$/,
+          );
+          if (accessRulesMatch) {
+            const environment = await environments.getById(
+              decodeURIComponent(accessRulesMatch[1]!),
+            );
+            if (!environment) return notFound(res);
+            const suggest = Boolean(accessRulesMatch[2]);
+
+            if (!suggest && method === "GET") {
+              sendJson(res, 200, {
+                rules: await accessRulesRepo.listByEnvironment(environment.id),
+              });
+              return;
+            }
+
+            if (!suggest && method === "PUT") {
+              const body = await readJson<{ rules?: unknown[] }>(req);
+              const parsed = AccessRuleSchema.array().safeParse(body.rules ?? []);
+              if (!parsed.success) {
+                sendJson(res, 400, {
+                  error: parsed.error.issues[0]?.message ?? "invalid rules",
+                });
+                return;
+              }
+              sendJson(res, 200, {
+                rules: await accessRulesRepo.replace(
+                  environment.id,
+                  parsed.data,
+                  await endpoints.listByEnvironment(environment.id),
+                ),
+              });
+              return;
+            }
+
+            if (suggest && method === "POST") {
+              const bindings = await personaBindings.listByEnvironment(
+                environment.id,
+              );
+              const resources = await relationsRepo.listResources(environment.id);
+              sendJson(res, 200, {
+                rules: suggestAccessFromGraph({
+                  endpoints: await endpoints.listByEnvironment(environment.id),
+                  resources,
+                  personas: listPersonas(dataDir, environment.projectId).flatMap(
+                    (persona) => {
+                      const binding = bindings.find((b) => b.personaId === persona.id);
+                      return binding
+                        ? [
+                            {
+                              id: persona.id,
+                              role: persona.role,
+                              fixtureKeys: Object.keys(binding.fixtures),
+                            },
+                          ]
+                        : [];
+                    },
+                  ),
+                }),
+              });
+              return;
+            }
+          }
+
           const envRelationsMatch = path.match(
             /^\/api\/environments\/([^/]+)\/relations(?:\/([^/]+))?$/,
           );
@@ -895,6 +965,8 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
               bearerToken?: string;
               approvedAiCases?: TestCase[];
               aiOnly?: boolean;
+              matrix?: boolean;
+              matrixOnly?: boolean;
               categories?: TestCategory[];
               variables?: Variable[];
               rateLimit?: {
@@ -931,6 +1003,8 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
               bearerToken: body.bearerToken,
               approvedAiCases: body.approvedAiCases,
               aiOnly: body.aiOnly,
+              matrix: body.matrix,
+              matrixOnly: body.matrixOnly,
               categories:
                 categories && categories.length > 0 ? categories : undefined,
               variables: body.variables,
@@ -946,6 +1020,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
               runs,
               testResults,
               personaBindings,
+              accessRules: accessRulesRepo,
             };
             if (stream) {
               res.statusCode = 200;
@@ -1224,6 +1299,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
               return notFound(res);
             }
             for (const environment of project.environments) {
+              await accessRulesRepo.deleteByPersona(environment.id, personaId);
               const binding = await personaBindings.get(environment.id, personaId);
               if (!binding) continue;
               await secrets.delete(bindingSecretRef(binding));

@@ -37,6 +37,9 @@ export function scanSuitesLabel(categories: TestCategory[] | undefined): string 
 export type ScanScopePayload = {
   endpointIds: string[];
   categories?: TestCategory[];
+  matrix?: boolean;
+  /** Matriz marcada sem nenhuma suite. */
+  matrixOnly?: boolean;
 };
 
 /** Todos os IDs de endpoint sob um nó (grupo ou folha). */

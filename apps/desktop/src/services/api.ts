@@ -1,4 +1,5 @@
 import type {
+  AccessRule,
   Endpoint,
   Environment,
   Finding,
@@ -117,6 +118,8 @@ async function runScanStream(
     bearerToken?: string;
     approvedAiCases?: TestCase[];
     aiOnly?: boolean;
+    matrix?: boolean;
+    matrixOnly?: boolean;
     categories?: TestCategory[];
     variables?: Variable[];
     rateLimit?: Partial<RateLimitConfig>;
@@ -389,6 +392,8 @@ export const api = {
       bearerToken?: string;
       approvedAiCases?: TestCase[];
       aiOnly?: boolean;
+      matrix?: boolean;
+      matrixOnly?: boolean;
       categories?: TestCategory[];
       variables?: Variable[];
       rateLimit?: Partial<RateLimitConfig>;
@@ -583,6 +588,21 @@ export const api = {
     request<void>(
       `/api/environments/${environmentId}/relations/${encodeURIComponent(relationId)}`,
       { method: "DELETE" },
+    ),
+
+  listAccessRules: (environmentId: string) =>
+    request<{ rules: AccessRule[] }>(`/api/environments/${environmentId}/access-rules`),
+
+  saveAccessRules: (environmentId: string, rules: AccessRule[]) =>
+    request<{ rules: AccessRule[] }>(`/api/environments/${environmentId}/access-rules`, {
+      method: "PUT",
+      body: JSON.stringify({ rules }),
+    }),
+
+  suggestAccessRulesFromGraph: (environmentId: string) =>
+    request<{ rules: AccessRule[] }>(
+      `/api/environments/${environmentId}/access-rules/suggest`,
+      { method: "POST" },
     ),
 };
 
