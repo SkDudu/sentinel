@@ -3,7 +3,14 @@ import { eq } from "drizzle-orm";
 import { AuthType, type Environment, type LoginRecipe } from "@sw/core";
 import type { SentinelDb } from "../client.js";
 import { mapEnvironment } from "../mappers.js";
-import { endpoints, environments, findings, projects, testResults } from "../schema.js";
+import {
+  endpoints,
+  environments,
+  findings,
+  projects,
+  testResults,
+  testRuns,
+} from "../schema.js";
 
 export interface CreateEnvironmentInput {
   projectId: string;
@@ -129,6 +136,17 @@ export class EnvironmentRepository {
         .where(eq(testResults.endpointId, row.id));
     }
     await this.db.delete(endpoints).where(eq(endpoints.environmentId, id));
+
+    // test_runs.environment_id não tem ON DELETE CASCADE; findings sobrevivem sem run.
+    const runs = await this.db
+      .select({ id: testRuns.id })
+      .from(testRuns)
+      .where(eq(testRuns.environmentId, id));
+    for (const run of runs) {
+      await this.db.update(findings).set({ runId: null }).where(eq(findings.runId, run.id));
+    }
+    await this.db.delete(testRuns).where(eq(testRuns.environmentId, id));
+
     await this.db.delete(environments).where(eq(environments.id, id));
     await this.touchProject(existing.projectId);
     return true;
