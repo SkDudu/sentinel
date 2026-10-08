@@ -144,9 +144,26 @@ export function makeFinding(
 }
 
 export function hasAuthHeaders(ctx: TestContext): boolean {
-  return Object.keys(ctx.authHeaders).some((k) =>
+  return carriesAuth(ctx.authHeaders);
+}
+
+export function carriesAuth(headers: Record<string, string>): boolean {
+  return Object.keys(headers).some((k) =>
     /authorization|x-api-key|api-key|^cookie$/i.test(k),
   );
+}
+
+export const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+/** Troca `{param}` / `:param` do path pelos valores dados. */
+export function fillPathParams(
+  path: string,
+  values: Record<string, string>,
+): string {
+  return path.replace(/\{(\w+)\}|:(\w+)\b/g, (match, a?: string, b?: string) => {
+    const value = values[(a ?? b)!];
+    return value === undefined ? match : encodeURIComponent(value);
+  });
 }
 
 export function pathIdParams(ctx: TestContext) {

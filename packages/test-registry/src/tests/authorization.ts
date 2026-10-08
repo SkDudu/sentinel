@@ -6,14 +6,18 @@ import {
 import type { SecurityTest } from "../types.js";
 import {
   buildJsonRequest,
+  carriesAuth,
   endpointUrl,
+  fillPathParams,
   hasAuthHeaders,
   makeFinding,
   pathIdParams,
+  SAFE_METHODS,
 } from "../utils.js";
 
 /**
- * Controlled fixtures:
+ * Com personas: objeto real da persona dona (fixture) pedido com a
+ * credencial de outra persona. Sem personas, fixtures controladas:
  * - {{userId}} own resource (optional)
  * - {{otherUserId}} foreign resource (default 999999 if unset)
  * - {{otherToken}} optional second-principal token for horizontal checks
@@ -30,22 +34,66 @@ export const idorTest: SecurityTest = {
   generateCases(ctx) {
     const ids = pathIdParams(ctx);
     if (ids.length === 0 || !hasAuthHeaders(ctx)) return [];
+    const personas = Object.values(ctx.personas ?? {});
 
-    return ids.map((param) => ({
-      id: `idor-${param.name}`,
-      name: `IDOR via path param ${param.name}`,
-      source: TestCaseSource.DETERMINISTIC,
-      category: TestCategory.AUTHORIZATION,
-      severityHint: Severity.CRITICAL,
-      mutations: {
-        pathParam: param.name,
-        otherUserId: ctx.variables.otherUserId ?? "999999",
-      },
-      tags: ["authorization", "idor", "fixture"],
-    }));
+    return ids.flatMap((param) => {
+      const owners = personas.filter(
+        (persona) => persona.fixtures[param.name] !== undefined,
+      );
+      if (owners.length === 0) {
+        return [
+          {
+            id: `idor-${param.name}`,
+            name: `IDOR via path param ${param.name}`,
+            source: TestCaseSource.DETERMINISTIC,
+            category: TestCategory.AUTHORIZATION,
+            severityHint: Severity.CRITICAL,
+            mutations: {
+              pathParam: param.name,
+              otherUserId: ctx.variables.otherUserId ?? "999999",
+            },
+            tags: ["authorization", "idor", "fixture"],
+          },
+        ];
+      }
+      // Objeto real de outra persona: escrita só fora do Safety.
+      if (ctx.productionSafetyMode && !SAFE_METHODS.has(ctx.endpoint.method)) {
+        return [];
+      }
+      return owners.map((owner) => {
+        const attacker = personas.find(
+          (persona) => persona.id !== owner.id && carriesAuth(persona.headers),
+        );
+        return {
+          id: `idor-${param.name}-${owner.id}`,
+          name: `IDOR via ${param.name}: objeto de ${owner.name}${attacker ? ` com ${attacker.name}` : ""}`,
+          source: TestCaseSource.DETERMINISTIC,
+          category: TestCategory.AUTHORIZATION,
+          severityHint: Severity.CRITICAL,
+          mutations: {
+            pathParam: param.name,
+            otherUserId: owner.fixtures[param.name]!,
+            ownerPersona: owner.id,
+            ...(attacker ? { attackerPersona: attacker.id } : {}),
+          },
+          tags: ["authorization", "idor", "persona"],
+        };
+      });
+    });
   },
 
   execute(ctx, testCase) {
+    const owner = ctx.personas?.[String(testCase.mutations.ownerPersona)];
+    if (owner) {
+      const attacker =
+        ctx.personas?.[String(testCase.mutations.attackerPersona)];
+      return buildJsonRequest(ctx, {
+        url: endpointUrl(ctx, fillPathParams(ctx.endpoint.path, owner.fixtures)),
+        body: {},
+        ...(attacker ? { stripAuth: true, headers: attacker.headers } : {}),
+      });
+    }
+
     const param = String(testCase.mutations.pathParam ?? "id");
     const foreign = String(
       testCase.mutations.otherUserId ?? ctx.variables.otherUserId ?? "999999",
@@ -76,13 +124,17 @@ export const idorTest: SecurityTest = {
     }
     if (response.status < 200 || response.status >= 300) return null;
 
+    const owner = ctx.personas?.[String(testCase.mutations.ownerPersona)];
+    const attacker = ctx.personas?.[String(testCase.mutations.attackerPersona)];
     return makeFinding(ctx, {
       testId: this.id,
       testCaseId: testCase.id,
       title: `Possible IDOR on ${ctx.endpoint.method} ${ctx.endpoint.path}`,
       severity: Severity.CRITICAL,
-      confidence: 65,
-      evidence: `Foreign fixture id=${String(testCase.mutations.otherUserId)} returned HTTP ${response.status}. Confirm object ownership checks.`,
+      confidence: owner ? (attacker ? 85 : 60) : 65,
+      evidence: owner
+        ? `Objeto ${String(testCase.mutations.pathParam)}=${String(testCase.mutations.otherUserId)} de ${owner.name} respondeu HTTP ${response.status} para ${attacker ? attacker.name : "a auth do ambiente"}.`
+        : `Foreign fixture id=${String(testCase.mutations.otherUserId)} returned HTTP ${response.status}. Confirm object ownership checks.`,
       request,
       response,
       recommendation:

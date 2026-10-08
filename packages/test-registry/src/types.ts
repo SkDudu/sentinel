@@ -10,6 +10,16 @@ import type {
 } from "@sw/core";
 import type { AnalyzedEndpoint } from "@sw/api-parser";
 
+/** Persona já autenticada no ambiente do scan. */
+export interface PersonaContext {
+  id: string;
+  name: string;
+  role?: string;
+  headers: Record<string, string>;
+  /** Ids de recursos que pertencem a esta persona. */
+  fixtures: Record<string, string>;
+}
+
 export interface TestContext {
   endpoint: Endpoint;
   analyzed: AnalyzedEndpoint;
@@ -18,6 +28,7 @@ export interface TestContext {
   authHeaders: Record<string, string>;
   productionSafetyMode?: boolean;
   rateLimit?: RateLimitConfig;
+  personas?: Record<string, PersonaContext>;
 }
 
 /** Minimal executor surface — avoids hard dep on @sw/http-client. */
