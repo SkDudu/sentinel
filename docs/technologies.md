@@ -15,6 +15,8 @@
 | ORM | **Drizzle** | Leve, SQL-friendly |
 | OpenAPI | parser próprio (`@sw/api-parser`) + YAML | Controle do modelo interno |
 | Login gravado | **Playwright** (`playwright-core`, Chrome instalado) | Grava o login; o scan repete a receita via fetch |
+| Editor de fluxos | **React Flow** (`@xyflow/react`, só no desktop) | Grafo de passos e de relações; runner (`@sw/flows`) não depende dele |
+| Testes | **`node:test`** (type stripping nativo, Node ≥ 23.6) | Sem framework extra; `pnpm test` builda e roda `packages/*/test` + `apps/*/test` |
 | Security engine | próprio | Independente de ZAP |
 | AI local | **Ollama / LM Studio** | Sem cloud obrigatória |
 | AI cloud | OpenAI-compatible (opcional) | Fallback |
@@ -23,7 +25,7 @@
 
 ## Versões / ambiente
 
-- Node **≥ 22.5** (usa `node:sqlite`)
+- Node **≥ 22.5** (usa `node:sqlite`); `pnpm test` precisa de **≥ 23.6** (roda `.ts` direto)
 - Package manager: **pnpm**
 - TypeScript **5.x**
 - React **19** no desktop scaffold
@@ -56,6 +58,7 @@
 pnpm install
 pnpm build
 pnpm typecheck
+pnpm test
 pnpm dev:desktop
 pnpm --filter @sw/cli dev scan --openapi examples/sample-openapi.json --base-url http://localhost:3000
 ```

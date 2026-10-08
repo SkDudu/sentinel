@@ -32,8 +32,9 @@ Shell com contexto do projeto ativo (nome visível; saída clara de volta a Proj
 | **Dashboard do projeto** | Home do projeto: indicadores e atalhos do próprio projeto |
 | **Ambientes** | CRUD de ambientes (base URL, auth, safety, secrets). Clique no card abre a página do ambiente |
 | **Findings** | Lista, filtros, evidência |
+| **Fluxos** | Cenários multi-step do projeto (cards); abrir → editor Visual (React Flow) / JSON |
 
-Página do ambiente (`/projects/:projectId/environments/:environmentId`): header com abas **Informações**, **Endpoints**, **Scan do ambiente**, **AI Test Lab**. Scan e AI Lab não têm item próprio na sidebar.
+Página do ambiente (`/projects/:projectId/environments/:environmentId`): header com abas **Informações**, **Endpoints**, **Relacionamentos**, **Acesso**, **Scan do ambiente**, **AI Test Lab**. Acesso tem as sub-seções Personas e Matriz. Scan e AI Lab não têm item próprio na sidebar.
 
 Rotas sugeridas (implementação futura):
 
@@ -45,9 +46,13 @@ Rotas sugeridas (implementação futura):
 /projects/:projectId/environments
 /projects/:projectId/environments/:environmentId
 /projects/:projectId/environments/:environmentId/endpoints
+/projects/:projectId/environments/:environmentId/relations
+/projects/:projectId/environments/:environmentId/access
 /projects/:projectId/environments/:environmentId/scan
 /projects/:projectId/environments/:environmentId/lab
 /projects/:projectId/findings
+/projects/:projectId/flows
+/projects/:projectId/flows/:flowId
 ```
 
 O `projectId` na URL é a fonte de verdade do contexto. Evitar depender só de `activeProjectId` no store sem rota.
@@ -56,8 +61,9 @@ O `projectId` na URL é a fonte de verdade do contexto. Evitar depender só de `
 App open
   ├─ Dashboard (global)
   ├─ Projetos ──click card──► Dialog (detalhe) ──Abrir──► Dashboard do projeto
-  │                                                      ├─ Ambientes ──card──► detalhe (Informações, Endpoints, Scan, AI Lab)
-  │                                                      └─ Findings
+  │                                                      ├─ Ambientes ──card──► detalhe (Informações, Endpoints, Relacionamentos, Acesso, Scan, AI Lab)
+  │                                                      ├─ Findings
+  │                                                      └─ Fluxos ──card──► editor (Visual | JSON)
   └─ Configurações
 ```
 

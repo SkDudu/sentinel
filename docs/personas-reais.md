@@ -1,6 +1,8 @@
-# Sentinel — Personas reais e fluxos de negócio (planejado)
+# Sentinel — Personas reais e fluxos de negócio (v1 entregue)
 
-Feature nova pedida explicitamente, fora da Fase 6. Branch: `feat/personas-reais`.
+Feature nova pedida explicitamente, fora da Fase 6 (roadmap: Fase 8). Branch: `feat/personas-reais`.
+
+Status: as 7 entregas abaixo estão no branch. O que ficou para depois está só em [Em aberto](#em-aberto).
 
 ## Problema
 
@@ -151,6 +153,8 @@ Step falha → finding `business-logic`, `testId: flow:<flowId>:<stepId>`, evide
 
 v1 é **sequencial**: runner executa `setup → steps → teardown` na ordem do array. Sem branch/condicional (v2).
 
+Decisões v1: só falha em `steps` vira finding (severity default MEDIUM, confiança 70); falha em `setup` encerra o fluxo como `error`, sem finding (é problema de preparação, não do alvo). Cada passo vira `test_result` (`testId flow:<id>`, `testCaseId <fase>:<stepId>`). Variáveis embutidas: `{{runId}}` e `{{prefix}}` (`sentinel-<runId>`).
+
 ### Editor visual de fluxos — [React Flow](https://reactflow.dev/) (`@xyflow/react`)
 
 Editor = só UI sobre `FlowSchema`. Fonte da verdade continua o JSON validado por Zod; runner em `@sw/flows` não conhece React Flow. CLI/CI rodam o mesmo `Flow`.
@@ -160,10 +164,12 @@ Editor = só UI sobre `FlowSchema`. Fonte da verdade continua o JSON validado po
 | Nó | `FlowStep` (actor, endpoint, extract, expect) |
 | Aresta | ordem de execução; rótulo = variáveis repassadas (`{{orderId}}`) |
 | Cor do nó | persona/ator |
-| Grupo (sub flow) | `setup` / `steps` / `teardown` |
-| Status no nó pós-run | passou / falhou / finding; clique → request/response |
+| Fase do nó (coluna) | `setup` / `steps` / `teardown` |
+| Status no nó pós-run | passou / falhou / erro / pulado |
 
-Conversão `nodes/edges ↔ Flow` em função pura testada (`apps/desktop`, sem lógica de execução). Ordem = topological sort das arestas; editor rejeita ciclo e mais de uma saída por nó (v1 sequencial).
+Conversão `nodes/edges ↔ Flow` em função pura testada (`apps/desktop/src/pages/flows/flow-graph.ts`, sem lógica de execução). Ordem = cadeias a partir dos nós sem entrada, de cima para baixo; editor rejeita ciclo e mais de uma saída/entrada por nó (v1 sequencial).
+
+Decisões v1: fase é campo do nó desenhado em colunas, não grupo/sub flow do React Flow; "Organizar" alinha por fase e ordem, sem dagre; import/export = aba JSON (mesma fonte de verdade); request/response do passo aparecem na lista "Último run" abaixo do canvas.
 
 Interações:
 
@@ -201,13 +207,16 @@ Lógica nos packages; rotas e UI só orquestram.
 | `PUT/DELETE /api/environments/:id/personas/:personaId/secret` | credencial no vault |
 | `POST /api/environments/:id/personas/:personaId/login/test` | testa auth da persona (passos sem valores) |
 | `GET /api/environments/:id/relations` | recursos + relações (inferidas no import OpenAPI) |
-| `PUT /api/environments/:id/relations/:relationId` | confirmar / rejeitar / editar |
+| `PATCH /api/environments/:id/relations` | confirmar / rejeitar em lote |
+| `PUT/DELETE /api/environments/:id/relations/:relationId` | editar (vira `manual`) / remover |
 | `POST /api/environments/:id/relations` | relação manual |
 | `GET/PUT /api/environments/:id/access-rules` | matriz |
+| `POST /api/environments/:id/access-rules/suggest` | pré-preenche pelo grafo (sem IA) |
 | `GET/POST/PUT/DELETE /api/projects/:id/flows` | CRUD de fluxos |
-| `POST /api/ai/suggest-access` / `suggest-flows` | sugestão IA (review gate) |
+| `POST /api/environments/:id/flows/skeletons` | esqueletos CRUD/BOLA do grafo |
+| `POST /api/ai/suggest-access` / `suggest-flows` / `suggest-relations` | sugestão IA (review gate) |
 
-Scan: `runScan` ganha `flowIds?` e `matrix?: boolean`.
+Scan: `runScan` ganha `flowIds?` e `matrix?: boolean`, mais `matrixOnly` / `flowsOnly` (sem eles, categorias vazias = todas as suites).
 
 ## UI
 
@@ -232,22 +241,27 @@ Abas do `EnvironmentDetailPage` (`PageHeader2` tabs) ficam: **Informações · E
 
 ## Ordem de entrega (PRs pequenos)
 
-1. **Persona autenticada** — `role`, `PersonaBinding`, vault, `resolvePersonaAuthHeaders`, aba Personas, "Testar login". `authorization.idor` usa token + fixture da persona B. Testes com executor mockado.
-2. **Relacionamentos** — parser guarda component/`links`; `inferRelations` com testes em specs reais (Laravel do ambiente Development + petstore); tabelas; aba Relacionamentos com review.
-3. **Matriz** — `AccessRule`, plugin `authorization.matrix`, `TestContext.personas`, UI da matriz (pré-preenchida pelo grafo), opção no scan scope.
-4. **Fluxos (motor)** — `@sw/flows`, schema, CRUD, editor JSON, esqueletos gerados do grafo, execução no scan, findings `business-logic`.
-5. **Fluxos (editor visual)** — `@xyflow/react` no desktop; conversão `nodes/edges ↔ Flow`; paleta de endpoints; sugestão por relações; validação; status ao vivo nos nós. Grafo somente leitura na aba Relacionamentos.
-6. **IA** — sugestão de matriz/fluxos/relações + seleção de endpoints no AI Lab.
-7. **Docs** — `architecture.md`, `roadmap.md`, `hardening.md`, `ai-rules.md`, `technologies.md` (`@xyflow/react`).
+1. ✅ **Persona autenticada** — `role`, `PersonaBinding`, vault, `resolvePersonaAuthHeaders`, aba Personas, "Testar login". `authorization.idor` usa token + fixture da persona B. Testes com executor mockado.
+2. ✅ **Relacionamentos** — parser guarda component/`links`; `inferRelations` com testes em specs reais (Laravel do ambiente Development + petstore); tabelas; aba Relacionamentos com review.
+3. ✅ **Matriz** — `AccessRule`, plugin `authorization.matrix`, `TestContext.personas`, UI da matriz (pré-preenchida pelo grafo), opção no scan scope.
+4. ✅ **Fluxos (motor)** — `@sw/flows`, schema, CRUD, editor JSON, esqueletos gerados do grafo, execução no scan, findings `business-logic`.
+5. ✅ **Fluxos (editor visual)** — `@xyflow/react` no desktop; conversão `nodes/edges ↔ Flow`; paleta de endpoints; sugestão por relações; validação; status ao vivo nos nós. Grafo somente leitura na aba Relacionamentos.
+6. ✅ **IA** — sugestão de matriz/fluxos/relações + filtro de endpoints no AI Lab; seed de personas rotaciona entre endpoints.
+7. ✅ **Docs** — `architecture.md`, `roadmap.md`, `hardening.md`, `ai-rules.md`, `technologies.md` (`@xyflow/react`), `ui.md`.
+
+Reimport do OpenAPI (resolvido na v1): relações têm id estável (`from|kind|to|via`) e o merge preserva status, `manual`, `ai` e `confirmed`; regras da matriz guardam `method + path` e são remapeadas para os novos endpointIds (órfãs são descartadas).
 
 ## Em aberto
 
-- Personas para SQLite junto com bindings, ou manter JSON em `data/personas/` na v1?
-- Receita gravada com e-mail literal: recorder deve marcar identificador de login como secret automaticamente?
-- Re-login em `401` no meio de fluxo longo (mesmo ponto do login recorder v2).
-- Fixtures criadas no setup vs. fixtures fixas no binding — v1 aceita as duas?
-- CLI/CI rodar matriz e fluxos (`apps/cli`).
-- Reimport do OpenAPI: preservar relações `confirmed`/`manual` casando por `method + path` (endpointId muda a cada import).
-- Relação `observed` (aprendida do tráfego do scan) entra na v1 ou fica pra v2?
-- Fluxo com branch/condicional ("se 403 → passo X") — modelo de aresta com condição na v2?
-- Editor visual dentro do Tauri: checar performance com fluxos grandes (>50 nós) e bundle do `@xyflow/react`.
+Única lista de pendências desta feature. Cada item diz o que a v1 faz hoje.
+
+- **Personas em SQLite** — v1 mantém `data/personas/<projectId>.json` (só role + fields, sem credencial); bindings já estão no SQLite.
+- **Recorder marcar login como secret** — v1 não marca sozinho; persona exige `{ kind: "secret", key: "username" }` na receita e o "Testar login" acusa receita com identificador literal.
+- **Re-login em `401` no meio do fluxo** — v1 resolve auth uma vez por scan; sem retry de login (mesmo ponto do login recorder v2).
+- **Fixtures** — v1 aceita as duas: fixas no binding (`{{fixtures.x}}`) e criadas no setup via `extract` (`{{var}}`). Criar fixture automaticamente pelo `create` do recurso ainda não existe.
+- **CLI/CI** — `apps/cli` não roda matriz nem fluxos; só a desktop.
+- **Relação `observed`** (aprendida do tráfego do scan) — v2.
+- **Branch/condicional em fluxo** ("se 403 → passo X") — v2; editor rejeita mais de uma saída por nó.
+- **Editor visual no Tauri** — performance com >50 nós e bundle (`@xyflow/react` soma ao chunk único do desktop) não medidos.
+- **Matriz × `idor` legado** — `authorization.idor` só reconhece params de path com cara de id; params estilo Laravel (`{company_unit}`) ficam só com a matriz `own-only`.
+- **Mass assignment pelo grafo** (trocar `owner`/FK para outra persona) — não implementado.

@@ -44,15 +44,19 @@ sentinel/
     ├── core/             # tipos, enums, Zod
     ├── database/         # Drizzle schema
     ├── api-parser/       # OpenAPI + semantics
-    ├── auth/             # auth headers + secret store + login recipe replay
+    ├── auth/             # auth headers + secret store + login recipe replay + auth por persona
     ├── login-recorder/   # grava login no Chrome (Playwright) → receita
     ├── http-client/      # RequestExecutor
-    ├── test-registry/    # plugins SecurityTest
+    ├── test-registry/    # plugins SecurityTest (inclui authorization.matrix)
     ├── security-engine/  # TestOrchestrator
+    ├── scan-runner/      # scan de projeto: personas, matriz, fluxos
+    ├── flows/            # runner de Flow multi-step + esqueletos do grafo
     ├── findings/         # summary + CI gate
     ├── ai/               # client LLM + interpret findings
-    └── ai-data-generator/# casos det. + AI + personas
+    └── ai-data-generator/# casos det. + AI + personas + sugestões de matriz/fluxos/relações
 ```
+
+`api-parser` também infere o grafo de recursos (`inferRelations`) e pré-preenche a matriz (`suggestAccessFromGraph`). Plano e decisões v1: [personas-reais.md](./personas-reais.md).
 
 Regra: **UI e CLI dependem dos packages; packages não dependem de apps.**
 
@@ -93,7 +97,12 @@ Deterministic  AI Generator (opcional)
 ```
 Project
 ├── environments (baseUrl, auth, safety mode)
-│   └── endpoints (contrato OpenAPI daquele ambiente)
+│   ├── endpoints (contrato OpenAPI daquele ambiente)
+│   ├── resources + resource_relations (grafo inferido, revisado pelo usuário)
+│   ├── persona_bindings (auth + fixtures por persona; secret só no vault)
+│   └── access_rules (matriz persona × endpoint, por method+path)
+├── personas (data/personas/<projectId>.json: role + fields, sem credencial)
+├── flows (cenários multi-step: setup → steps → teardown)
 ├── authentication (refs de secret)
 ├── test suites
 ├── variables ({{token}}, {{userId}})
@@ -130,6 +139,7 @@ Categorias: authentication, authorization, injection, validation, rate-limit, ht
 | Gerar dados/casos de teste | ✅ | Executar scanner sozinha |
 | Interpretar/correlacionar findings | ✅ | Decidir severity sem evidência do engine |
 | Personas semânticas | ✅ | Inventar exploits destrutivos / DB drop |
+| Sugerir matriz, fluxos e relações | ✅ (review gate) | Ver credenciais ou valores de fixture |
 
 Providers: Ollama / LM Studio (local primeiro) → OpenAI-compatible opcional.
 

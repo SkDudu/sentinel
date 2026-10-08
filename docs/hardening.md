@@ -89,6 +89,9 @@ Schema em `packages/database` tem entidades sem repo/API/UI. Só implementar se 
 | Scans | detalhe do ambiente (`.../scan`, `.../lab`) via `ScanWorkspace` | `POST /api/scans`, `GET .../runs` | `@sw/scan-runner`, `@sw/security-engine`, `@sw/test-registry` |
 | Findings | `.../findings/FindingsPage.tsx` | `GET .../findings`, `PATCH /api/findings/:id/status` | `@sw/database`, `@sw/findings` (CLI/export) |
 | AI Lab | Scans + Settings | `/api/ai/*`, `/api/projects/:id/personas` | `@sw/ai-data-generator`, `@sw/ai` |
+| Personas / Matriz | ambiente → Acesso (`EnvironmentAccessPanel`, `AccessMatrixSection`) | `/api/environments/:id/personas/*`, `.../access-rules` | `@sw/auth`, `@sw/test-registry` (`authorization.matrix`), `@sw/database` |
+| Relacionamentos | ambiente → Relacionamentos (`EnvironmentRelationsPanel`) | `/api/environments/:id/relations` | `@sw/api-parser` (`inferRelations`), `@sw/database` |
+| Fluxos | projeto → Fluxos (`pages/flows/*`) | `/api/projects/:id/flows`, `.../flows/skeletons`, `POST /api/scans` (`flowIds`) | `@sw/flows`, `@sw/scan-runner` |
 | CLI | — | — | `apps/cli`, `@sw/scan-runner`, `@sw/findings` |
 
 Client HTTP da UI: `apps/desktop/src/services/api.ts`.  

@@ -87,6 +87,17 @@ Plano: **[login-recorder.md](./login-recorder.md)**.
 - [x] Buscar OpenAPI protegido por login
 - [x] Gravação de login via browser (Playwright) + wizard no ambiente
 
+## Fase 8 — Personas reais e fluxos (pedido explícito)
+
+Plano, decisões v1 e itens em aberto: **[personas-reais.md](./personas-reais.md)**.
+
+- [x] Persona autenticada (role, binding por ambiente, secret no vault, "Testar login")
+- [x] Relacionamentos (grafo inferido do OpenAPI + review)
+- [x] Matriz de acesso (`authorization.matrix`, BOLA/BFLA determinístico)
+- [x] Fluxos: motor (`@sw/flows`), editor JSON e visual (React Flow), execução no scan
+- [x] IA sugere matriz/fluxos/relações (review gate); AI Lab com filtro de endpoints
+- [ ] Matriz e fluxos na CLI/CI
+
 ## Não-objetivos (por enquanto)
 
 - SaaS multi-tenant na nuvem

@@ -70,8 +70,11 @@ Seguir esta ordem:
 | Módulo | Pode | Não pode |
 | --- | --- | --- |
 | `@sw/ai-data-generator` | Gerar casos/personas semânticos | Executar HTTP / marcar finding sozinha |
+| `@sw/ai-data-generator` (grafo) | Sugerir matriz, fluxos e relações a partir de contrato + grafo + nomes/roles/chaves de fixture | Ver credenciais, valores de fixture ou tráfego; salvar/rodar sem review |
 | `@sw/ai` interpret | Explicar/correlacionar findings | Alterar severity sem evidência do engine |
 | UI AI Test Lab | Sugerir casos | Rodar casos AI sem seleção/review |
+
+Sugestões do grafo passam por Zod + checagem contra o contrato (endpoint, persona, recurso existentes) + safety filter. Review gate: matriz só preenche células vazias e exige "Salvar"; fluxos chegam desmarcados; relações entram como `suggested` (origem `ai`). Execução e findings continuam determinísticos.
 
 ### Camadas de geração
 
