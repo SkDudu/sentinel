@@ -396,6 +396,11 @@ export const api = {
   listRuns: (projectId: string) =>
     request<ScanRun[]>(`/api/projects/${projectId}/runs`),
 
+  listFlowRuns: (projectId: string, flowId: string) =>
+    request<ScanRun[]>(
+      `/api/projects/${projectId}/flows/${encodeURIComponent(flowId)}/runs`,
+    ),
+
   getEnvironmentLatency: (environmentId: string) =>
     request<{
       points: Array<{

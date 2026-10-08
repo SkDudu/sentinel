@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { ScanStatus, type ScanRun, type TestCategory } from "@sw/core";
 import type { SentinelDb } from "../client.js";
@@ -34,20 +34,32 @@ function mapRun(row: typeof testRuns.$inferSelect): ScanRun {
     completedCases: row.completedCases,
     findingsCount: row.findingsCount,
     categories: parseCategories(row.categoriesJson),
+    ...(row.flowId ? { flowId: row.flowId } : {}),
   };
+}
+
+function newestFirst(runs: ScanRun[]): ScanRun[] {
+  return runs.sort((a, b) => (b.startedAt ?? "").localeCompare(a.startedAt ?? ""));
 }
 
 export class TestRunRepository {
   constructor(private readonly db: SentinelDb) {}
 
+  /** Scans do projeto, sem os runs feitos no editor de fluxo. */
   async listByProject(projectId: string): Promise<ScanRun[]> {
     const rows = await this.db
       .select()
       .from(testRuns)
-      .where(eq(testRuns.projectId, projectId));
-    return rows
-      .map(mapRun)
-      .sort((a, b) => (b.startedAt ?? "").localeCompare(a.startedAt ?? ""));
+      .where(and(eq(testRuns.projectId, projectId), isNull(testRuns.flowId)));
+    return newestFirst(rows.map(mapRun));
+  }
+
+  async listByFlow(projectId: string, flowId: string): Promise<ScanRun[]> {
+    const rows = await this.db
+      .select()
+      .from(testRuns)
+      .where(and(eq(testRuns.projectId, projectId), eq(testRuns.flowId, flowId)));
+    return newestFirst(rows.map(mapRun));
   }
 
   async getById(id: string): Promise<ScanRun | null> {
@@ -63,6 +75,7 @@ export class TestRunRepository {
     projectId: string;
     environmentId: string;
     categories?: TestCategory[];
+    flowId?: string;
   }): Promise<ScanRun> {
     const id = randomUUID();
     const startedAt = new Date().toISOString();
@@ -77,6 +90,7 @@ export class TestRunRepository {
       completedCases: 0,
       findingsCount: 0,
       categoriesJson: JSON.stringify(categories),
+      flowId: input.flowId ?? null,
     });
     return {
       id,
@@ -88,6 +102,7 @@ export class TestRunRepository {
       completedCases: 0,
       findingsCount: 0,
       categories,
+      ...(input.flowId ? { flowId: input.flowId } : {}),
     };
   }
 

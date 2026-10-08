@@ -248,6 +248,7 @@ export async function runProjectScan(
         : matrixOnly
           ? [TestCategory.AUTHORIZATION]
           : input.categories,
+    ...(flowsOnly && flows.length === 1 ? { flowId: flows[0]!.id } : {}),
   });
 
   const orchestrator = new TestOrchestrator(input.registry);

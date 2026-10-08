@@ -137,6 +137,23 @@ export function applyMigrations(sqlite: DatabaseSync) {
   if (!runColumns.some((column) => column.name === "categories_json")) {
     sqlite.exec("ALTER TABLE test_runs ADD COLUMN categories_json TEXT");
   }
+  if (!runColumns.some((column) => column.name === "flow_id")) {
+    sqlite.exec("ALTER TABLE test_runs ADD COLUMN flow_id TEXT");
+    // Runs antigos com resultados de um único fluxo e nada mais viram run do fluxo.
+    sqlite.exec(`
+      UPDATE test_runs
+      SET flow_id = (
+        SELECT substr(MIN(test_id), 6) FROM test_results WHERE run_id = test_runs.id
+      )
+      WHERE (
+        SELECT COUNT(DISTINCT test_id) FROM test_results WHERE run_id = test_runs.id
+      ) = 1
+      AND NOT EXISTS (
+        SELECT 1 FROM test_results
+        WHERE run_id = test_runs.id AND test_id NOT LIKE 'flow:%'
+      )
+    `);
+  }
 
   sqlite.exec(`
     CREATE TABLE IF NOT EXISTS persona_bindings (

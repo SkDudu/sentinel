@@ -1,8 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AlertCircle, Workflow } from "lucide-react";
-import { FlowSchema, type Endpoint, type Flow, type Resource } from "@sw/core";
-import { api, type FlowRunResultDto, type FlowStepStatus } from "@/services/api";
+import {
+  FlowSchema,
+  type Endpoint,
+  type Flow,
+  type Resource,
+  type ScanRun,
+} from "@sw/core";
+import {
+  api,
+  type FlowPhase,
+  type FlowRunResultDto,
+  type FlowRunStatus,
+  type FlowStepStatus,
+} from "@/services/api";
 import { cn } from "@/lib/utils";
 import { useProjectStore } from "@/stores/project";
 import { BackLink } from "@/components/dashboardblocks/page-header";
@@ -43,6 +55,50 @@ function parseFlow(text: string, id: string): { flow?: Flow; error?: string } {
   return { error: issue ? `${issue.path.join(".") || "flow"}: ${issue.message}` : "Fluxo inválido" };
 }
 
+type RunDetail = Awaited<ReturnType<typeof api.getRunDetail>>;
+
+function resultFromRun(detail: RunDetail, flow: Flow): FlowRunResultDto {
+  const labels = new Map(
+    [...flow.setup, ...flow.steps, ...flow.teardown].map((step) => [step.id, step.label]),
+  );
+  const steps = detail.results.items
+    .filter((item) => item.testId === `flow:${flow.id}`)
+    .map((item) => {
+      const [phase = "steps", stepId = item.testCaseId] = item.testCaseId.split(":");
+      const [rawStatus = "", ...rest] = (item.notes ?? "").split(": ");
+      const status: FlowStepStatus = ["passed", "failed", "error", "skipped"].includes(rawStatus)
+        ? (rawStatus as FlowStepStatus)
+        : item.passed
+          ? "passed"
+          : "failed";
+      return {
+        stepId,
+        phase: phase as FlowPhase,
+        label: labels.get(stepId) ?? stepId,
+        status,
+        ...(rest.length ? { message: rest.join(": ") } : {}),
+        ...(item.request ? { request: item.request } : {}),
+        ...(item.response ? { response: item.response } : {}),
+      };
+    });
+  const status: FlowRunStatus =
+    detail.run.status === "FAILED" || steps.some((s) => s.status === "error")
+      ? "error"
+      : steps.some((s) => s.status === "failed")
+        ? "failed"
+        : steps.length === 0
+          ? "blocked"
+          : "passed";
+  return { flowId: flow.id, name: flow.name, status, steps };
+}
+
+const RUN_STATUS_LABEL: Record<FlowRunStatus, string> = {
+  passed: "passou",
+  failed: "falhou",
+  error: "erro",
+  blocked: "bloqueado",
+};
+
 export function writeSteps(flow: Flow) {
   return [...flow.setup, ...flow.steps, ...flow.teardown].filter(
     (step) => !SAFE.has(step.request.method),
@@ -61,6 +117,8 @@ export function FlowEditorPage() {
   const [stepState, setStepState] = useState<StepRunState>({});
   const [result, setResult] = useState<FlowRunResultDto | null>(null);
   const [openStep, setOpenStep] = useState<string | null>(null);
+  const [history, setHistory] = useState<ScanRun[]>([]);
+  const [shownRunId, setShownRunId] = useState<string | null>(null);
   const [view, setView] = useState<"visual" | "json">("visual");
   const [canvasKey, setCanvasKey] = useState(0);
   const [context, setContext] = useState<{
@@ -96,7 +154,32 @@ export function FlowEditorPage() {
         setText(JSON.stringify(rest, null, 2));
       })
       .catch(() => setMissing(true));
+    void api
+      .listFlowRuns(projectId, flowId)
+      .then(setHistory)
+      .catch(() => setHistory([]));
   }, [projectId, flowId]);
+
+  async function showRun(run: ScanRun) {
+    if (!draft) return;
+    try {
+      const next = resultFromRun(await api.getRunDetail(run.id), draft);
+      setResult(next);
+      setStepState(
+        Object.fromEntries(
+          next.steps.map((step) => [step.stepId, { status: step.status, message: step.message }]),
+        ),
+      );
+      setShownRunId(run.id);
+      setOpenStep(null);
+    } catch {
+      toast.add({
+        title: "Não abri esse run",
+        description: "Tente de novo. Se continuar, rode o fluxo outra vez.",
+        type: "error",
+      });
+    }
+  }
 
   useEffect(() => {
     if (!environmentId) return;
@@ -175,6 +258,8 @@ export function FlowEditorPage() {
       );
       const run = scan.flows?.[0] ?? null;
       setResult(run);
+      setShownRunId(scan.run.id);
+      setHistory(await api.listFlowRuns(projectId, draft.id).catch(() => []));
       toast.add({
         title: run ? `Fluxo ${run.status}` : "Fluxo executado",
         description: run?.message ?? `${scan.findings.length} findings`,
@@ -297,6 +382,16 @@ export function FlowEditorPage() {
               onToggle={(id) => setOpenStep((prev) => (prev === id ? null : id))}
             />
           ) : null}
+
+          {history.length > 0 ? (
+            <FlowRunHistory
+              runs={history}
+              environments={project?.environments ?? []}
+              shownRunId={shownRunId}
+              disabled={busy || !draft}
+              onShow={(run) => void showRun(run)}
+            />
+          ) : null}
         </div>
       </PageShell>
     </div>
@@ -324,7 +419,7 @@ function FlowRunSteps({
   return (
     <div className="space-y-2">
       <p className="text-sm font-medium">
-        Último run{result ? ` · ${result.status}` : "…"}
+        Run{result ? ` · ${RUN_STATUS_LABEL[result.status]}` : "…"}
       </p>
       <ul className="space-y-1.5">
         {steps.map((step) => {
@@ -348,6 +443,62 @@ function FlowRunSteps({
             </li>
           );
         })}
+      </ul>
+    </div>
+  );
+}
+
+const SCAN_STATUS_LABEL: Record<ScanRun["status"], string> = {
+  PENDING: "na fila",
+  RUNNING: "rodando",
+  COMPLETED: "concluído",
+  FAILED: "falhou",
+  CANCELLED: "cancelado",
+};
+
+function FlowRunHistory({
+  runs,
+  environments,
+  shownRunId,
+  disabled,
+  onShow,
+}: {
+  runs: ScanRun[];
+  environments: Array<{ id: string; name: string }>;
+  shownRunId: string | null;
+  disabled: boolean;
+  onShow: (run: ScanRun) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium">Histórico de runs</p>
+      <ul className="max-h-72 space-y-1.5 overflow-auto">
+        {runs.map((run) => (
+          <li key={run.id}>
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => onShow(run)}
+              className={cn(
+                "flex w-full items-center gap-3 rounded-md border px-3 py-2 text-left text-sm disabled:opacity-60",
+                run.id === shownRunId ? "border-primary bg-primary/5" : "hover:bg-muted/50",
+              )}
+            >
+              <span className="w-36 text-xs text-muted-foreground">
+                {run.startedAt ? new Date(run.startedAt).toLocaleString("pt-BR") : "—"}
+              </span>
+              <span className="flex-1 truncate">
+                {environments.find((env) => env.id === run.environmentId)?.name ?? "Ambiente removido"}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {run.findingsCount} findings
+              </span>
+              <Badge variant={run.status === "COMPLETED" ? "secondary" : "outline"}>
+                {SCAN_STATUS_LABEL[run.status]}
+              </Badge>
+            </button>
+          </li>
+        ))}
       </ul>
     </div>
   );

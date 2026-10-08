@@ -232,6 +232,8 @@ export const ScanRunSchema = z.object({
   findingsCount: z.number().int().default(0),
   /** Suites selecionadas; [] = todas; ausente = run anterior ao registro. */
   categories: z.array(z.nativeEnum(TestCategory)).optional(),
+  /** Run disparado no editor de um fluxo; fica fora do histórico de scans. */
+  flowId: z.string().optional(),
 });
 export type ScanRun = z.infer<typeof ScanRunSchema>;
 

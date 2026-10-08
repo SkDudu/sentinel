@@ -1623,6 +1623,17 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
             }
           }
 
+          const flowRunsMatch = path.match(
+            /^\/api\/projects\/([^/]+)\/flows\/([^/]+)\/runs$/,
+          );
+          if (flowRunsMatch && method === "GET") {
+            const projectId = decodeURIComponent(flowRunsMatch[1]!);
+            const flowId = decodeURIComponent(flowRunsMatch[2]!);
+            if (!(await projects.getById(projectId))) return notFound(res);
+            sendJson(res, 200, await runs.listByFlow(projectId, flowId));
+            return;
+          }
+
           const flowsMatch = path.match(
             /^\/api\/projects\/([^/]+)\/flows(?:\/([^/]+))?$/,
           );
