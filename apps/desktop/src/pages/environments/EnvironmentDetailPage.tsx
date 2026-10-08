@@ -203,6 +203,7 @@ export function EnvironmentDetailPage() {
       await updateEnvironment(environment.id, {
         name: values.name,
         baseUrl: values.baseUrl,
+        docsUrl: values.docsUrl,
         authType: values.authType,
         headers: values.headers,
         productionSafetyMode: values.productionSafetyMode,

@@ -16,6 +16,7 @@ export interface CreateEnvironmentInput {
   projectId: string;
   name: string;
   baseUrl: string;
+  docsUrl?: string | null;
   authType?: Environment["authType"];
   secretRef?: string;
   headers?: Record<string, string>;
@@ -26,6 +27,7 @@ export interface CreateEnvironmentInput {
 export interface UpdateEnvironmentInput {
   name?: string;
   baseUrl?: string;
+  docsUrl?: string | null;
   authType?: Environment["authType"];
   secretRef?: string | null;
   headers?: Record<string, string>;
@@ -69,6 +71,7 @@ export class EnvironmentRepository {
       projectId: input.projectId,
       name: input.name.trim(),
       baseUrl: input.baseUrl.trim(),
+      docsUrl: input.docsUrl?.trim() || null,
       authType: input.authType ?? AuthType.NONE,
       secretRef: input.secretRef ?? `env:${id}:auth`,
       headersJson: JSON.stringify(input.headers ?? {}),
@@ -94,6 +97,10 @@ export class EnvironmentRepository {
       .set({
         name: input.name?.trim() ?? existing.name,
         baseUrl: input.baseUrl?.trim() ?? existing.baseUrl,
+        docsUrl:
+          input.docsUrl === undefined
+            ? (existing.docsUrl ?? null)
+            : input.docsUrl?.trim() || null,
         authType: input.authType ?? existing.authType,
         secretRef:
           input.secretRef === undefined

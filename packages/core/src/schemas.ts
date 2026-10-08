@@ -87,6 +87,14 @@ export const EnvironmentSchema = z.object({
   projectId: z.string().uuid(),
   name: z.string().min(1),
   baseUrl: z.string().url(),
+  /** Path (`/docs`) ou URL da documentação. Não entra nas requisições de teste. */
+  docsUrl: z
+    .string()
+    .min(1)
+    .refine((value) => value.startsWith("/") || /^https?:\/\//i.test(value), {
+      message: "Use um path como /docs ou uma URL completa",
+    })
+    .optional(),
   authType: z.nativeEnum(AuthType),
   /** Reference to OS keychain secret — never store raw tokens here */
   secretRef: z.string().optional(),
