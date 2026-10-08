@@ -33,6 +33,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "@/components/ui/toast";
+import { RelationsGraph } from "./RelationsGraph";
 
 const KIND_LABEL: Record<ResourceRelation["kind"], string> = {
   parent: "pai",
@@ -85,6 +86,7 @@ export function EnvironmentRelationsPanel({
   const [expanded, setExpanded] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
+  const [asGraph, setAsGraph] = useState(false);
 
   const apply = useCallback(
     (next: ResourceRelation[]) => {
@@ -187,6 +189,10 @@ export function EnvironmentRelationsPanel({
           <Switch checked={onlySuggested} onCheckedChange={setOnlySuggested} />
           Só sugeridas
         </label>
+        <label className="flex items-center gap-2 text-sm">
+          <Switch checked={asGraph} onCheckedChange={setAsGraph} />
+          Grafo
+        </label>
         <span className="text-xs text-muted-foreground">
           {selected.size} selecionada{selected.size === 1 ? "" : "s"}
         </span>
@@ -225,6 +231,8 @@ export function EnvironmentRelationsPanel({
               : "O contrato não expôs relações; adicione manualmente."
           }
         />
+      ) : asGraph ? (
+        <RelationsGraph resources={resources} relations={visible} />
       ) : (
         <Table>
           <TableHeader>

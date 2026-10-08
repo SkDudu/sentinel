@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AlertCircle, Workflow } from "lucide-react";
-import { FlowSchema, type Flow } from "@sw/core";
+import { FlowSchema, type Endpoint, type Flow, type Resource } from "@sw/core";
 import { api, type FlowRunResultDto, type FlowStepStatus } from "@/services/api";
+import { cn } from "@/lib/utils";
 import { useProjectStore } from "@/stores/project";
 import { BackLink } from "@/components/dashboardblocks/page-header";
 import { PageEmptyState } from "@/components/layout/page-empty-state";
@@ -13,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toast";
 import { EnvironmentSelect } from "./EnvironmentSelect";
+import { FlowCanvas, type ActorOption } from "./FlowCanvas";
 
 const SAFE = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -59,6 +61,13 @@ export function FlowEditorPage() {
   const [stepState, setStepState] = useState<StepRunState>({});
   const [result, setResult] = useState<FlowRunResultDto | null>(null);
   const [openStep, setOpenStep] = useState<string | null>(null);
+  const [view, setView] = useState<"visual" | "json">("visual");
+  const [canvasKey, setCanvasKey] = useState(0);
+  const [context, setContext] = useState<{
+    endpoints: Endpoint[];
+    resources: Resource[];
+    actors: ActorOption[];
+  }>({ endpoints: [], resources: [], actors: [] });
 
   useEffect(() => {
     void loadProjects();
@@ -88,6 +97,38 @@ export function FlowEditorPage() {
       })
       .catch(() => setMissing(true));
   }, [projectId, flowId]);
+
+  useEffect(() => {
+    if (!environmentId) return;
+    let cancelled = false;
+    void Promise.all([
+      api.listEnvironmentEndpoints(environmentId),
+      api.listRelations(environmentId).catch(() => ({ resources: [] as Resource[] })),
+      api.listEnvironmentPersonas(environmentId),
+    ]).then(([endpoints, graph, personas]) => {
+      if (cancelled) return;
+      setContext({
+        endpoints,
+        resources: graph.resources,
+        actors: personas
+          .filter((item) => item.binding)
+          .map((item) => ({ id: item.persona.id, name: item.persona.name })),
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [environmentId]);
+
+  function showView(next: "visual" | "json") {
+    if (next === "visual") setCanvasKey((key) => key + 1);
+    setView(next);
+  }
+
+  function onCanvasChange(next: Flow) {
+    const { id: _id, ...rest } = next;
+    setText(JSON.stringify(rest, null, 2));
+  }
 
   const parsed = useMemo(() => (flowId ? parseFlow(text, flowId) : {}), [text, flowId]);
   const draft = parsed.flow ?? null;
@@ -210,12 +251,42 @@ export function FlowEditorPage() {
             </Alert>
           ) : null}
 
-          <textarea
-            value={text}
-            spellCheck={false}
-            onChange={(event) => setText(event.target.value)}
-            className={textareaClass}
-          />
+          <div className="inline-flex rounded-lg border p-0.5">
+            {(["visual", "json"] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                disabled={option === "visual" && !draft}
+                onClick={() => showView(option)}
+                className={cn(
+                  "rounded-md px-3 py-1 text-xs disabled:opacity-50",
+                  view === option ? "bg-muted font-medium" : "text-muted-foreground",
+                )}
+              >
+                {option === "visual" ? "Visual" : "JSON"}
+              </button>
+            ))}
+          </div>
+
+          {view === "visual" && draft ? (
+            <FlowCanvas
+              key={canvasKey}
+              flow={draft}
+              onChange={onCanvasChange}
+              endpoints={context.endpoints}
+              resources={context.resources}
+              actors={context.actors}
+              runState={stepState}
+              safety={Boolean(environment?.productionSafetyMode)}
+            />
+          ) : (
+            <textarea
+              value={text}
+              spellCheck={false}
+              onChange={(event) => setText(event.target.value)}
+              className={textareaClass}
+            />
+          )}
 
           {draft && (Object.keys(stepState).length > 0 || result) ? (
             <FlowRunSteps
