@@ -102,6 +102,43 @@ export async function loginWithRecipe(
   });
 }
 
+/** Logs in with the recipe and downloads the OpenAPI document it points to. */
+export async function fetchSpecWithRecipe(
+  environment: Environment,
+  store: SecretStore,
+  executor: LoginExecutor,
+): Promise<{ text: string; url: string; login: LoginRecipeResult }> {
+  const specUrl = environment.loginRecipe?.spec?.url;
+  if (!specUrl) {
+    throw new Error("Receita de login não tem URL do OpenAPI");
+  }
+  const login = await loginWithRecipe(environment, store, executor);
+  const url = new URL(specUrl, environment.baseUrl).toString();
+  const response = await executor.execute({
+    method: "GET",
+    url,
+    headers: {
+      ...environment.headers,
+      ...login.headersFor("spec", url),
+      Accept: "application/json, application/yaml, text/yaml, */*",
+    },
+    redirect: "manual",
+  });
+  if (response.status >= 300 && response.status < 400) {
+    throw new Error(
+      `OpenAPI redirecionou para ${response.headers.location ?? "?"} — sessão não aceita`,
+    );
+  }
+  if (response.status >= 400) {
+    throw new Error(`OpenAPI respondeu ${response.status}`);
+  }
+  const text =
+    typeof response.body === "string"
+      ? response.body
+      : JSON.stringify(response.body);
+  return { text, url, login };
+}
+
 export async function resolveAuthHeaders(
   environment: Environment,
   store: SecretStore,

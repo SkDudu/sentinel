@@ -13,7 +13,14 @@ import {
   type Variable,
 } from "@sw/core";
 import { parseOpenApi, parseSpecText } from "@sw/api-parser";
-import { createSecretStore, environmentSecretRef } from "@sw/auth";
+import {
+  createSecretStore,
+  environmentSecretRef,
+  fetchSpecWithRecipe,
+  loginWithRecipe,
+  LoginRecipeError,
+} from "@sw/auth";
+import { HttpExecutor } from "@sw/http-client";
 import {
   createSqliteDb,
   EndpointRepository,
@@ -462,6 +469,82 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                   error instanceof Error
                     ? error.message
                     : "Invalid OpenAPI document",
+              });
+            }
+            return;
+          }
+
+          const envLoginTestMatch = path.match(
+            /^\/api\/environments\/([^/]+)\/login\/test$/,
+          );
+          if (envLoginTestMatch && method === "POST") {
+            const id = decodeURIComponent(envLoginTestMatch[1]!);
+            const environment = await environments.getById(id);
+            if (!environment) return notFound(res);
+            const executor = new HttpExecutor({ timeoutMs: 15_000 });
+            try {
+              if (environment.loginRecipe?.spec) {
+                const fetched = await fetchSpecWithRecipe(
+                  environment,
+                  secrets,
+                  executor,
+                );
+                sendJson(res, 200, {
+                  ok: true,
+                  steps: fetched.login.steps,
+                  spec: { url: fetched.url, bytes: fetched.text.length },
+                });
+              } else {
+                const login = await loginWithRecipe(
+                  environment,
+                  secrets,
+                  executor,
+                );
+                sendJson(res, 200, { ok: true, steps: login.steps });
+              }
+            } catch (error) {
+              sendJson(res, 200, {
+                ok: false,
+                error: error instanceof Error ? error.message : "Falha no login",
+                steps: error instanceof LoginRecipeError ? error.steps : [],
+              });
+            }
+            return;
+          }
+
+          const envFetchSpecMatch = path.match(
+            /^\/api\/environments\/([^/]+)\/openapi\/fetch$/,
+          );
+          if (envFetchSpecMatch && method === "POST") {
+            const id = decodeURIComponent(envFetchSpecMatch[1]!);
+            const environment = await environments.getById(id);
+            if (!environment) return notFound(res);
+            try {
+              const fetched = await fetchSpecWithRecipe(
+                environment,
+                secrets,
+                new HttpExecutor({ timeoutMs: 30_000 }),
+              );
+              const parsed = parseOpenApi(
+                parseSpecText(fetched.text),
+                environment.projectId,
+                environment.id,
+              );
+              const saved = await endpoints.replaceOpenApiEndpoints(
+                environment.projectId,
+                environment.id,
+                parsed,
+              );
+              sendJson(res, 201, {
+                imported: saved.filter((e) => e.source === "openapi").length,
+                endpoints: saved,
+              });
+            } catch (error) {
+              sendJson(res, 400, {
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : "Falha ao buscar OpenAPI",
               });
             }
             return;

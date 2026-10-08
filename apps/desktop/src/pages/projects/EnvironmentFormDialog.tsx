@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { AuthType } from "@sw/core";
+import { AuthType, LoginRecipeSchema, type LoginRecipe } from "@sw/core";
 import type { EnvironmentDto } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,6 +41,51 @@ const SECRET_HINT: Partial<Record<string, string>> = {
 /** Display-only mask. Never submitted as a real credential. */
 const SAVED_MASK = "••••••••";
 
+const RECIPE_PLACEHOLDER = `{
+  "version": 1,
+  "spec": { "url": "/openapi.yaml" },
+  "steps": [
+    {
+      "label": "Abrir login",
+      "role": "spec-access",
+      "request": { "method": "GET", "url": "/docs/login" },
+      "extract": [{ "kind": "hiddenInput", "name": "_token", "as": "csrf" }]
+    },
+    {
+      "label": "Enviar senha",
+      "role": "spec-access",
+      "request": {
+        "method": "POST",
+        "url": "/docs/login",
+        "bodyType": "form",
+        "fields": {
+          "_token": { "kind": "var", "name": "csrf" },
+          "password": { "kind": "secret", "key": "password" }
+        }
+      },
+      "failIfLocationIncludes": "/login"
+    }
+  ]
+}`;
+
+export function parseLoginRecipeJson(raw: string): LoginRecipe {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error("Receita de login não é JSON válido");
+  }
+  const result = LoginRecipeSchema.safeParse(parsed);
+  if (!result.success) {
+    const detail = result.error.issues
+      .slice(0, 3)
+      .map((issue) => `${issue.path.join(".") || "receita"}: ${issue.message}`)
+      .join("; ");
+    throw new Error(`Receita de login inválida. ${detail}`);
+  }
+  return result.data;
+}
+
 export function parseHeadersJson(raw: string): Record<string, string> {
   const trimmed = raw.trim();
   if (!trimmed) return {};
@@ -77,6 +122,7 @@ export type EnvironmentFormValues = {
   authType: string;
   headers: Record<string, string>;
   productionSafetyMode: boolean;
+  loginRecipe?: LoginRecipe | null;
   secret?: string;
 };
 
@@ -108,6 +154,11 @@ function buildSecret(
     return `${user}:${pass}`;
   }
 
+  if (authType === AuthType.LOGIN_RECIPE) {
+    const pass = liveValue(password, locked);
+    return pass || undefined;
+  }
+
   const trimmed = liveValue(secret, locked).trim();
   return trimmed || undefined;
 }
@@ -134,6 +185,7 @@ export function EnvironmentFormDialog({
   const [secret, setSecret] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [recipeJson, setRecipeJson] = useState("");
   const [secretLocked, setSecretLocked] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -148,6 +200,9 @@ export function EnvironmentFormDialog({
       setAuthType(env.authType);
       setSafety(env.productionSafetyMode);
       setHeaders(headersToJson(env.headers));
+      setRecipeJson(
+        env.loginRecipe ? JSON.stringify(env.loginRecipe, null, 2) : "",
+      );
       setSecretLocked(locked);
       setSecret(locked ? SAVED_MASK : "");
       setUsername(locked ? SAVED_MASK : "");
@@ -158,6 +213,7 @@ export function EnvironmentFormDialog({
       setAuthType(AuthType.NONE);
       setSafety(false);
       setHeaders("");
+      setRecipeJson("");
       setSecretLocked(false);
       setSecret("");
       setUsername("");
@@ -185,15 +241,23 @@ export function EnvironmentFormDialog({
         password,
         secretLocked,
       );
+      const isRecipe = authType === AuthType.LOGIN_RECIPE;
       if (!isEdit && authType === AuthType.BASIC && !nextSecret) {
         throw new Error("Basic auth precisa de usuário e senha");
       }
+      if (!isEdit && isRecipe && !nextSecret) {
+        throw new Error("Login com senha precisa da senha");
+      }
+      const loginRecipe = isRecipe
+        ? parseLoginRecipeJson(recipeJson)
+        : null;
       await onSubmit({
         name,
         baseUrl,
         authType,
         headers: parsedHeaders,
         productionSafetyMode: safety,
+        loginRecipe,
         secret: nextSecret,
       });
     } catch (err) {
@@ -203,6 +267,7 @@ export function EnvironmentFormDialog({
 
   const needsSecret = authType !== AuthType.NONE;
   const isBasic = authType === AuthType.BASIC;
+  const isRecipe = authType === AuthType.LOGIN_RECIPE;
   const secretConfigured =
     isEdit && mode.kind === "edit"
       ? Boolean(mode.environment.secretConfigured)
@@ -263,6 +328,7 @@ export function EnvironmentFormDialog({
                   setSecret("");
                   setUsername("");
                   setPassword("");
+                  setRecipeJson("");
                 }}
               >
                 <SelectTrigger className="w-full">
@@ -346,7 +412,7 @@ export function EnvironmentFormDialog({
               </>
             ) : null}
 
-            {needsSecret && !isBasic ? (
+            {needsSecret && !isBasic && !isRecipe ? (
               <label className="block text-sm sm:col-span-2">
                 Secret (vault criptografado)
                 <Input
@@ -370,6 +436,45 @@ export function EnvironmentFormDialog({
                   </p>
                 ) : null}
               </label>
+            ) : null}
+
+            {isRecipe ? (
+              <>
+                <label className="block text-sm sm:col-span-2">
+                  Senha
+                  <Input
+                    required={!isEdit || !secretConfigured}
+                    type="password"
+                    autoComplete="new-password"
+                    value={password}
+                    onFocus={unlockSecret}
+                    onChange={(e) => {
+                      unlockSecret();
+                      setPassword(e.target.value);
+                    }}
+                    className="mt-1 font-mono text-xs tracking-widest"
+                    placeholder="senha do login"
+                  />
+                  {secretConfigured ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {secretLocked
+                        ? "Senha salva no vault. Clique no campo para trocar."
+                        : "Digite a senha nova para substituir o vault."}
+                    </p>
+                  ) : null}
+                </label>
+                <label className="block text-sm sm:col-span-2">
+                  Receita de login (JSON)
+                  <textarea
+                    required
+                    value={recipeJson}
+                    onChange={(e) => setRecipeJson(e.target.value)}
+                    rows={8}
+                    placeholder={RECIPE_PLACEHOLDER}
+                    className="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 font-mono text-xs"
+                  />
+                </label>
+              </>
             ) : null}
 
             <label className="block text-sm sm:col-span-2">

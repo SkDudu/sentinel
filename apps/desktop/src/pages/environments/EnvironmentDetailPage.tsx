@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { AlertCircle, FileJson, FolderKanban } from "lucide-react";
 import { AuthType, type ScanRun } from "@sw/core";
-import { api } from "@/services/api";
+import { api, type LoginTestResult } from "@/services/api";
 import { useProjectStore } from "@/stores/project";
 import {
   ChartPanel6,
@@ -92,6 +92,7 @@ export function EnvironmentDetailPage() {
   const [endpointCount, setEndpointCount] = useState<number | null>(null);
   const [endpointsRevision, setEndpointsRevision] = useState(0);
   const [docsOpen, setDocsOpen] = useState(false);
+  const [loginReport, setLoginReport] = useState<LoginTestResult | null>(null);
   const [runs, setRuns] = useState<ScanRun[]>([]);
   const [latencyChart, setLatencyChart] = useState<ChartPanel6Props | null>(
     null,
@@ -205,6 +206,7 @@ export function EnvironmentDetailPage() {
         authType: values.authType,
         headers: values.headers,
         productionSafetyMode: values.productionSafetyMode,
+        loginRecipe: values.loginRecipe,
       });
       if (values.secret?.trim()) {
         await setEnvironmentSecret(environment.id, values.secret.trim());
@@ -255,6 +257,47 @@ export function EnvironmentDetailPage() {
         title: "Algo deu errado",
         description:
           err instanceof Error ? err.message : "Falha ao salvar secret",
+        type: "error",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onTestLogin() {
+    if (!environment) return;
+    setBusy(true);
+    try {
+      const result = await api.testEnvironmentLogin(environment.id);
+      setLoginReport(result);
+    } catch (err) {
+      toast.add({
+        title: "Algo deu errado",
+        description: err instanceof Error ? err.message : "Falha ao testar login",
+        type: "error",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onFetchSpec() {
+    if (!environment) return;
+    setBusy(true);
+    try {
+      const result = await api.fetchEnvironmentOpenApi(environment.id);
+      setEndpointCount(result.endpoints.length);
+      setEndpointsRevision((current) => current + 1);
+      toast.add({
+        title: "OpenAPI importado.",
+        description: `${result.imported} endpoint${result.imported === 1 ? "" : "s"}.`,
+        type: "success",
+      });
+    } catch (err) {
+      toast.add({
+        title: "Algo deu errado",
+        description:
+          err instanceof Error ? err.message : "Falha ao buscar OpenAPI",
         type: "error",
       });
     } finally {
@@ -367,6 +410,26 @@ export function EnvironmentDetailPage() {
               <FileJson data-icon="inline-start" />
               Adicionar documentação
             </Button>
+            {environment.authType === AuthType.LOGIN_RECIPE ? (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy || !environment.loginRecipe}
+                  onClick={() => void onTestLogin()}
+                >
+                  Testar login
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy || !environment.loginRecipe?.spec}
+                  onClick={() => void onFetchSpec()}
+                >
+                  Buscar OpenAPI
+                </Button>
+              </>
+            ) : null}
             <Button type="button" variant="outline" onClick={() => setEditing(true)}>
               Editar
             </Button>
@@ -415,6 +478,15 @@ export function EnvironmentDetailPage() {
                     <span className="font-mono text-xs">{environment.baseUrl}</span>
                   </Property>
                   <Property label="Auth">{environment.authType}</Property>
+                  {environment.loginRecipe ? (
+                    <Property label="Receita">
+                      {environment.loginRecipe.steps.length} passo
+                      {environment.loginRecipe.steps.length === 1 ? "" : "s"}
+                      {environment.loginRecipe.spec
+                        ? ` · spec ${environment.loginRecipe.spec.url}`
+                        : ""}
+                    </Property>
+                  ) : null}
                   <Property label="Vault">
                     {environment.secretConfigured ? "configurado" : "ausente"}
                   </Property>
@@ -502,6 +574,47 @@ export function EnvironmentDetailPage() {
         onSubmit={onUpdate}
       />
 
+      <Dialog open={loginReport !== null} onOpenChange={(open) => !open && setLoginReport(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {loginReport?.ok ? "Login ok" : "Login falhou"}
+            </DialogTitle>
+            <DialogDescription>
+              {loginReport?.error
+                ? loginReport.error
+                : loginReport?.spec
+                  ? `Spec em ${loginReport.spec.url} (${loginReport.spec.bytes} bytes).`
+                  : "Passos da receita, sem valores de secret."}
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="max-h-72 space-y-2 overflow-auto text-sm">
+            {loginReport?.steps.map((step, index) => (
+              <li key={`${step.label}-${index}`} className="rounded-md border px-3 py-2">
+                <p className="font-medium">
+                  {step.status} {step.method} {step.label}
+                </p>
+                <p className="font-mono text-xs text-muted-foreground">{step.url}</p>
+                {step.location ? (
+                  <p className="font-mono text-xs">→ {step.location}</p>
+                ) : null}
+                {step.cookies.length > 0 ? (
+                  <p className="text-xs">cookies: {step.cookies.join(", ")}</p>
+                ) : null}
+                {step.extracted.length > 0 ? (
+                  <p className="text-xs">extraído: {step.extracted.join(", ")}</p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+          <DialogFooter>
+            <Button type="button" onClick={() => setLoginReport(null)}>
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={docsOpen} onOpenChange={setDocsOpen}>
         <DialogContent className="bg-transparent p-0 shadow-none ring-0 sm:max-w-lg">
           <DialogHeader className="sr-only">
@@ -561,7 +674,9 @@ export function EnvironmentDetailPage() {
               </div>
             ) : (
               <label className="block text-sm">
-                Token / API key
+                {environment.authType === AuthType.LOGIN_RECIPE
+                  ? "Senha"
+                  : "Token / API key"}
                 <Input
                   type="password"
                   required

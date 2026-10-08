@@ -2,6 +2,7 @@ import type {
   Endpoint,
   Environment,
   Finding,
+  LoginRecipe,
   RateLimitConfig,
   ScanRun,
   TestCase,
@@ -12,6 +13,23 @@ import type {
 
 export type EnvironmentDto = Environment & {
   secretConfigured?: boolean;
+};
+
+export type LoginStepReport = {
+  label: string;
+  method: string;
+  url: string;
+  status: number;
+  location?: string;
+  cookies: string[];
+  extracted: string[];
+};
+
+export type LoginTestResult = {
+  ok: boolean;
+  error?: string;
+  steps: LoginStepReport[];
+  spec?: { url: string; bytes: number };
 };
 
 export interface ProjectDto {
@@ -196,6 +214,7 @@ export const api = {
       authType?: string;
       headers?: Record<string, string>;
       productionSafetyMode?: boolean;
+      loginRecipe?: LoginRecipe | null;
     },
   ) =>
     request<Environment>(`/api/projects/${projectId}/environments`, {
@@ -211,6 +230,7 @@ export const api = {
       authType?: string;
       headers?: Record<string, string>;
       productionSafetyMode?: boolean;
+      loginRecipe?: LoginRecipe | null;
     },
   ) =>
     request<Environment>(`/api/environments/${id}`, {
@@ -243,6 +263,18 @@ export const api = {
 
   deleteEndpoint: (id: string) =>
     request<void>(`/api/endpoints/${id}`, { method: "DELETE" }),
+
+  testEnvironmentLogin: (environmentId: string) =>
+    request<LoginTestResult>(
+      `/api/environments/${environmentId}/login/test`,
+      { method: "POST" },
+    ),
+
+  fetchEnvironmentOpenApi: (environmentId: string) =>
+    request<{ imported: number; endpoints: Endpoint[] }>(
+      `/api/environments/${environmentId}/openapi/fetch`,
+      { method: "POST" },
+    ),
 
   importEnvironmentOpenApi: (environmentId: string, text: string) =>
     request<{ imported: number; endpoints: Endpoint[] }>(

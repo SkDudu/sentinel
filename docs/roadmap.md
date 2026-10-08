@@ -81,10 +81,10 @@ Detalhe operacional (checklist humano + gaps P0–P3 para agentes): **[hardening
 
 Plano: **[login-recorder.md](./login-recorder.md)**.
 
-- [ ] Import OpenAPI YAML
-- [ ] Executor: redirect manual + `Set-Cookie` múltiplo
-- [ ] `AuthType.LOGIN_RECIPE` reproduzido no scan (sem browser)
-- [ ] Buscar OpenAPI protegido por login
+- [x] Import OpenAPI YAML
+- [x] Executor: redirect manual + `Set-Cookie` múltiplo
+- [x] `AuthType.LOGIN_RECIPE` reproduzido no scan (sem browser)
+- [x] Buscar OpenAPI protegido por login
 - [ ] Gravação de login via browser (Playwright) + wizard no ambiente
 
 ## Não-objetivos (por enquanto)
