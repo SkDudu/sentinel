@@ -167,5 +167,16 @@ export function applyMigrations(sqlite: DatabaseSync) {
       status TEXT NOT NULL DEFAULT 'suggested',
       PRIMARY KEY (environment_id, id)
     );
+
+    CREATE TABLE IF NOT EXISTS access_rules (
+      environment_id TEXT NOT NULL REFERENCES environments(id) ON DELETE CASCADE,
+      endpoint_id TEXT NOT NULL,
+      method TEXT NOT NULL,
+      path TEXT NOT NULL,
+      persona_id TEXT NOT NULL,
+      expect TEXT NOT NULL,
+      path_fixtures_json TEXT,
+      PRIMARY KEY (environment_id, endpoint_id, persona_id)
+    );
   `);
 }

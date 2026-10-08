@@ -314,3 +314,19 @@ export const ResourceRelationSchema = z.object({
   status: z.enum(["suggested", "confirmed", "rejected"]).default("suggested"),
 });
 export type ResourceRelation = z.infer<typeof ResourceRelationSchema>;
+
+/** Ator sem credencial na matriz de acesso. */
+export const ANONYMOUS_PERSONA = "anonymous";
+
+export const AccessExpectSchema = z.enum(["allow", "deny", "own-only"]);
+export type AccessExpect = z.infer<typeof AccessExpectSchema>;
+
+export const AccessRuleSchema = z.object({
+  endpointId: z.string().min(1),
+  /** personaId ou "anonymous". */
+  personaId: z.string().min(1),
+  expect: AccessExpectSchema,
+  /** own-only: path param → chave de fixture da persona. */
+  pathFixtures: z.record(z.string()).optional(),
+});
+export type AccessRule = z.infer<typeof AccessRuleSchema>;

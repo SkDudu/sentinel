@@ -178,3 +178,24 @@ export const resourceRelations = sqliteTable(
   },
   (table) => [primaryKey({ columns: [table.environmentId, table.id] })],
 );
+
+export const accessRules = sqliteTable(
+  "access_rules",
+  {
+    environmentId: text("environment_id")
+      .notNull()
+      .references(() => environments.id, { onDelete: "cascade" }),
+    endpointId: text("endpoint_id").notNull(),
+    /** method + path: endpointId muda a cada import do OpenAPI. */
+    method: text("method").notNull(),
+    path: text("path").notNull(),
+    personaId: text("persona_id").notNull(),
+    expect: text("expect").notNull(),
+    pathFixturesJson: text("path_fixtures_json"),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.environmentId, table.endpointId, table.personaId],
+    }),
+  ],
+);
