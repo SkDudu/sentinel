@@ -147,9 +147,16 @@ export function hasAuthHeaders(ctx: TestContext): boolean {
   return carriesAuth(ctx.authHeaders);
 }
 
+const AUTH_HEADER = /authorization|x-api-key|api-key|^cookie$/i;
+
 export function carriesAuth(headers: Record<string, string>): boolean {
-  return Object.keys(headers).some((k) =>
-    /authorization|x-api-key|api-key|^cookie$/i.test(k),
+  return Object.keys(headers).some((k) => AUTH_HEADER.test(k));
+}
+
+/** Mantém headers do ambiente (tenant, accept…) sem credencial. */
+export function withoutAuth(headers: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(headers).filter(([k]) => !AUTH_HEADER.test(k)),
   );
 }
 

@@ -1,4 +1,5 @@
 import type {
+  AccessRule,
   Endpoint,
   Finding,
   HttpRequest,
@@ -29,6 +30,8 @@ export interface TestContext {
   productionSafetyMode?: boolean;
   rateLimit?: RateLimitConfig;
   personas?: Record<string, PersonaContext>;
+  /** Regras da matriz de acesso deste endpoint (só quando o scan pede matriz). */
+  accessRules?: AccessRule[];
 }
 
 /** Minimal executor surface — avoids hard dep on @sw/http-client. */
