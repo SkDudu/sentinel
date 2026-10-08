@@ -18,6 +18,70 @@ export const ProjectSchema = z.object({
 });
 export type Project = z.infer<typeof ProjectSchema>;
 
+export const LoginFieldValueSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("literal"), value: z.string() }),
+  /** Key inside the environment vault entry — never stored in SQLite. */
+  z.object({ kind: z.literal("secret"), key: z.string().min(1) }),
+  /** Value extracted by an earlier step. */
+  z.object({ kind: z.literal("var"), name: z.string().min(1) }),
+]);
+export type LoginFieldValue = z.infer<typeof LoginFieldValueSchema>;
+
+export const LoginExtractSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("hiddenInput"),
+    name: z.string().min(1),
+    as: z.string().min(1),
+  }),
+  z.object({
+    kind: z.literal("cookie"),
+    name: z.string().min(1),
+    as: z.string().min(1).optional(),
+  }),
+  z.object({
+    kind: z.literal("jsonPath"),
+    path: z.string().min(1),
+    as: z.string().min(1),
+    emit: z.literal("bearer").optional(),
+  }),
+  z.object({
+    kind: z.literal("header"),
+    name: z.string().min(1),
+    as: z.string().min(1),
+  }),
+]);
+export type LoginExtract = z.infer<typeof LoginExtractSchema>;
+
+export const LoginStepRoleSchema = z.enum(["spec-access", "api-auth", "both"]);
+export type LoginStepRole = z.infer<typeof LoginStepRoleSchema>;
+
+export const LoginStepSchema = z.object({
+  label: z.string().min(1),
+  role: LoginStepRoleSchema.default("both"),
+  request: z.object({
+    method: z.enum(["GET", "POST"]),
+    /** Absolute, or relative to the environment baseUrl. */
+    url: z.string().min(1),
+    bodyType: z.enum(["none", "form", "json"]).default("none"),
+    fields: z.record(LoginFieldValueSchema).default({}),
+    headers: z.record(LoginFieldValueSchema).default({}),
+  }),
+  extract: z.array(LoginExtractSchema).default([]),
+  /** Accepted statuses. Default: anything below 400. */
+  expectStatus: z.array(z.number().int()).optional(),
+  /** Login forms often 302 back to themselves on bad credentials. */
+  failIfLocationIncludes: z.string().min(1).optional(),
+});
+export type LoginStep = z.infer<typeof LoginStepSchema>;
+
+export const LoginRecipeSchema = z.object({
+  version: z.literal(1),
+  steps: z.array(LoginStepSchema).min(1),
+  /** OpenAPI document reachable after login. */
+  spec: z.object({ url: z.string().min(1) }).optional(),
+});
+export type LoginRecipe = z.infer<typeof LoginRecipeSchema>;
+
 export const EnvironmentSchema = z.object({
   id: z.string().uuid(),
   projectId: z.string().uuid(),
@@ -28,6 +92,8 @@ export const EnvironmentSchema = z.object({
   secretRef: z.string().optional(),
   headers: z.record(z.string()).default({}),
   productionSafetyMode: z.boolean().default(false),
+  /** Used when authType is LOGIN_RECIPE. Holds no secrets. */
+  loginRecipe: LoginRecipeSchema.optional(),
 });
 export type Environment = z.infer<typeof EnvironmentSchema>;
 

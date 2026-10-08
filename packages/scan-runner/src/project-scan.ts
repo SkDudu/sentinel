@@ -130,19 +130,12 @@ export async function runProjectScan(
     await overlay.set(authEnv.secretRef, input.bearerToken);
   }
   const store = new OverlaySecretStore(secretStore, overlay);
-  const authHeaders = await resolveAuthHeaders(authEnv, store);
 
   const rateLimit: RateLimitConfig = {
     ...DEFAULT_RATE_LIMIT,
     ...input.rateLimit,
   };
 
-  const run = await repos.runs.create({
-    projectId: input.projectId,
-    environmentId: input.environmentId,
-  });
-
-  const orchestrator = new TestOrchestrator(input.registry);
   const executor =
     input.executor ??
     new HttpExecutor({
@@ -152,6 +145,14 @@ export async function runProjectScan(
         : rateLimit.requests * 6,
       signal: input.signal,
     });
+  const authHeaders = await resolveAuthHeaders(authEnv, store, { executor });
+
+  const run = await repos.runs.create({
+    projectId: input.projectId,
+    environmentId: input.environmentId,
+  });
+
+  const orchestrator = new TestOrchestrator(input.registry);
 
   let totalCases = 0;
   let completedCases = 0;

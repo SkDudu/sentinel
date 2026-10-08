@@ -1,4 +1,9 @@
-import { AuthType, type Environment, type Project } from "@sw/core";
+import {
+  AuthType,
+  LoginRecipeSchema,
+  type Environment,
+  type Project,
+} from "@sw/core";
 import type { environments, projects } from "./schema.js";
 
 type ProjectRow = typeof projects.$inferSelect;
@@ -32,6 +37,16 @@ export function mapEnvironment(row: EnvironmentRow): Environment {
       ? (row.authType as Environment["authType"])
       : AuthType.NONE;
 
+  let loginRecipe: Environment["loginRecipe"];
+  if (row.loginRecipeJson) {
+    try {
+      const parsed = LoginRecipeSchema.safeParse(JSON.parse(row.loginRecipeJson));
+      if (parsed.success) loginRecipe = parsed.data;
+    } catch {
+      loginRecipe = undefined;
+    }
+  }
+
   return {
     id: row.id,
     projectId: row.projectId,
@@ -41,5 +56,6 @@ export function mapEnvironment(row: EnvironmentRow): Environment {
     secretRef: row.secretRef ?? undefined,
     headers,
     productionSafetyMode: Boolean(row.productionSafetyMode),
+    ...(loginRecipe ? { loginRecipe } : {}),
   };
 }

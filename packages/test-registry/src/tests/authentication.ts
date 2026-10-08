@@ -100,6 +100,7 @@ export const invalidAuthTest: SecurityTest = {
   execute(ctx) {
     return buildJsonRequest(ctx, {
       body: {},
+      stripAuth: true,
       headers: { Authorization: "Bearer sentinel-invalid-token" },
     });
   },
@@ -142,6 +143,7 @@ export const expiredAuthTest: SecurityTest = {
   execute(ctx) {
     return buildJsonRequest(ctx, {
       body: {},
+      stripAuth: true,
       headers: { Authorization: `Bearer ${EXPIRED_JWT}` },
     });
   },

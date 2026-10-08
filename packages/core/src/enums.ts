@@ -23,6 +23,7 @@ export const AuthType = {
   API_KEY: "API_KEY",
   COOKIE: "COOKIE",
   OAUTH2: "OAUTH2",
+  LOGIN_RECIPE: "LOGIN_RECIPE",
 } as const;
 export type AuthType = (typeof AuthType)[keyof typeof AuthType];
 

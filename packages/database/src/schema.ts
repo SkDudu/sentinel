@@ -33,6 +33,7 @@ export const environments = sqliteTable("environments", {
   })
     .notNull()
     .default(false),
+  loginRecipeJson: text("login_recipe_json"),
 });
 
 export const endpoints = sqliteTable("endpoints", {

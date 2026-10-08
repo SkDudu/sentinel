@@ -44,16 +44,19 @@ export function buildJsonRequest(
   ctx: TestContext,
   overrides: Partial<HttpRequest> & { stripAuth?: boolean } = {},
 ): HttpRequest {
+  const auth: Record<string, string> = { ...ctx.authHeaders };
+  if (overrides.stripAuth) {
+    delete auth.Authorization;
+    delete auth.authorization;
+    delete auth.Cookie;
+    delete auth.cookie;
+  }
+
   const headers: Record<string, string> = {
-    ...ctx.authHeaders,
+    ...auth,
     "Content-Type": "application/json",
     ...(overrides.headers ?? {}),
   };
-
-  if (overrides.stripAuth) {
-    delete headers.Authorization;
-    delete headers.authorization;
-  }
 
   const body =
     overrides.body !== undefined
@@ -142,7 +145,7 @@ export function makeFinding(
 
 export function hasAuthHeaders(ctx: TestContext): boolean {
   return Object.keys(ctx.authHeaders).some((k) =>
-    /authorization|x-api-key|api-key/i.test(k),
+    /authorization|x-api-key|api-key|^cookie$/i.test(k),
   );
 }
 

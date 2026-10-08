@@ -6,7 +6,9 @@ import {
   AiProviderKind,
   AuthType,
   FindingStatus,
+  LoginRecipeSchema,
   TestCategory,
+  type LoginRecipe,
   type TestCase,
   type Variable,
 } from "@sw/core";
@@ -78,6 +80,24 @@ function parseAuthType(value: unknown) {
   return (Object.values(AuthType) as string[]).includes(value)
     ? (value as (typeof AuthType)[keyof typeof AuthType])
     : AuthType.NONE;
+}
+
+/** `undefined` = untouched, `null` = clear. */
+function parseLoginRecipe(value: unknown): {
+  value?: LoginRecipe | null;
+  error?: string;
+} {
+  if (value === undefined) return {};
+  if (value === null) return { value: null };
+  const parsed = LoginRecipeSchema.safeParse(value);
+  if (!parsed.success) {
+    return {
+      error: `loginRecipe inválida: ${parsed.error.issues
+        .map((issue) => `${issue.path.join(".")} ${issue.message}`)
+        .join("; ")}`,
+    };
+  }
+  return { value: parsed.data };
 }
 
 function parseFindingStatus(value: unknown) {
@@ -225,10 +245,17 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                 secretRef?: string;
                 headers?: Record<string, string>;
                 productionSafetyMode?: boolean;
+                loginRecipe?: unknown;
               }>(req);
 
               if (!body.name?.trim() || !body.baseUrl?.trim()) {
                 sendJson(res, 400, { error: "name and baseUrl are required" });
+                return;
+              }
+
+              const recipe = parseLoginRecipe(body.loginRecipe);
+              if (recipe.error) {
+                sendJson(res, 400, { error: recipe.error });
                 return;
               }
 
@@ -244,6 +271,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                     secretRef: body.secretRef,
                     headers: body.headers,
                     productionSafetyMode: body.productionSafetyMode,
+                    loginRecipe: recipe.value ?? undefined,
                   }),
                 );
               } catch (error) {
@@ -291,12 +319,19 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                 secretRef?: string | null;
                 headers?: Record<string, string>;
                 productionSafetyMode?: boolean;
+                loginRecipe?: unknown;
               }>(req);
+              const recipe = parseLoginRecipe(body.loginRecipe);
+              if (recipe.error) {
+                sendJson(res, 400, { error: recipe.error });
+                return;
+              }
               const updated = await environments.update(id, {
                 ...body,
                 authType: body.authType
                   ? parseAuthType(body.authType)
                   : undefined,
+                loginRecipe: recipe.value,
               });
               if (!updated) return notFound(res);
               sendJson(res, 200, updated);

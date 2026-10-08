@@ -1,7 +1,22 @@
 import { AuthType, type Environment } from "@sw/core";
+import {
+  parseRecipeSecrets,
+  runLoginRecipe,
+  type LoginExecutor,
+  type LoginRecipeResult,
+} from "./login-recipe.js";
 import type { SecretStore } from "./types.js";
 
 export type { SecretStore } from "./types.js";
+export {
+  LoginRecipeError,
+  parseRecipeSecrets,
+  runLoginRecipe,
+  type LoginAudience,
+  type LoginExecutor,
+  type LoginRecipeResult,
+  type LoginStepReport,
+} from "./login-recipe.js";
 export {
   EncryptedFileSecretStore,
   environmentSecretRef,
@@ -65,11 +80,43 @@ export class OverlaySecretStore implements SecretStore {
   }
 }
 
+/** Runs the environment login recipe with secrets from the vault. */
+export async function loginWithRecipe(
+  environment: Environment,
+  store: SecretStore,
+  executor: LoginExecutor | undefined,
+): Promise<LoginRecipeResult> {
+  if (!environment.loginRecipe) {
+    throw new Error(`Ambiente "${environment.name}" sem receita de login`);
+  }
+  if (!executor) {
+    throw new Error("Receita de login precisa de um executor HTTP");
+  }
+  const raw = environment.secretRef
+    ? await store.get(environment.secretRef)
+    : undefined;
+  return runLoginRecipe(environment.loginRecipe, {
+    baseUrl: environment.baseUrl,
+    secrets: parseRecipeSecrets(raw),
+    executor,
+  });
+}
+
 export async function resolveAuthHeaders(
   environment: Environment,
   store: SecretStore,
+  options: { executor?: LoginExecutor } = {},
 ): Promise<Record<string, string>> {
   const headers: Record<string, string> = { ...environment.headers };
+
+  if (environment.authType === AuthType.LOGIN_RECIPE) {
+    return {
+      ...headers,
+      ...(await loginWithRecipe(environment, store, options.executor)).headersFor(
+        "api",
+      ),
+    };
+  }
 
   if (environment.authType === AuthType.NONE || !environment.secretRef) {
     return headers;
