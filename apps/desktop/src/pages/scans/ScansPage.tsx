@@ -300,6 +300,8 @@ export function ScanWorkspace({
         categories: scope.categories,
         matrix: scope.matrix,
         matrixOnly: scope.matrixOnly,
+        flowIds: scope.flowIds,
+        flowsOnly: scope.flowsOnly,
         bearerToken:
           environment?.authType === AuthType.BASIC
             ? undefined

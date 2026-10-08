@@ -3,6 +3,7 @@ import type {
   Endpoint,
   Environment,
   Finding,
+  Flow,
   HttpRequest,
   HttpResponse,
   LoginRecipe,
@@ -90,7 +91,50 @@ export type ScanLogEvent =
       name: string;
       ok: boolean;
       error?: string;
+    }
+  | {
+      type: "flow-step";
+      flowId: string;
+      stepId: string;
+      phase: FlowPhase;
+      label: string;
+      status: FlowStepStatus;
+      message?: string;
+    }
+  | {
+      type: "flow";
+      flowId: string;
+      name: string;
+      status: FlowRunStatus;
+      message?: string;
     };
+
+export type FlowPhase = "setup" | "steps" | "teardown";
+export type FlowStepStatus = "passed" | "failed" | "error" | "skipped";
+export type FlowRunStatus = "passed" | "failed" | "error" | "blocked";
+
+export type FlowRunResultDto = {
+  flowId: string;
+  name: string;
+  status: FlowRunStatus;
+  message?: string;
+  steps: Array<{
+    stepId: string;
+    phase: FlowPhase;
+    label: string;
+    status: FlowStepStatus;
+    message?: string;
+    request?: HttpRequest;
+    response?: HttpResponse;
+  }>;
+};
+
+export type FlowDto = {
+  projectId: string;
+  flow: Flow;
+  createdAt: string;
+  updatedAt: string;
+};
 
 export type ScanResult = {
   run: ScanRun;
@@ -98,6 +142,7 @@ export type ScanResult = {
   endpointsScanned: number;
   totalCases: number;
   variables?: Variable[];
+  flows?: FlowRunResultDto[];
   cancelled?: boolean;
 };
 
@@ -120,6 +165,8 @@ async function runScanStream(
     aiOnly?: boolean;
     matrix?: boolean;
     matrixOnly?: boolean;
+    flowIds?: string[];
+    flowsOnly?: boolean;
     categories?: TestCategory[];
     variables?: Variable[];
     rateLimit?: Partial<RateLimitConfig>;
@@ -394,6 +441,8 @@ export const api = {
       aiOnly?: boolean;
       matrix?: boolean;
       matrixOnly?: boolean;
+      flowIds?: string[];
+      flowsOnly?: boolean;
       categories?: TestCategory[];
       variables?: Variable[];
       rateLimit?: Partial<RateLimitConfig>;
@@ -604,6 +653,34 @@ export const api = {
       `/api/environments/${environmentId}/access-rules/suggest`,
       { method: "POST" },
     ),
+
+  listFlows: (projectId: string) =>
+    request<FlowDto[]>(`/api/projects/${projectId}/flows`),
+
+  getFlow: (projectId: string, flowId: string) =>
+    request<FlowDto>(`/api/projects/${projectId}/flows/${encodeURIComponent(flowId)}`),
+
+  createFlow: (projectId: string, flow: Omit<Flow, "id"> & { id?: string }) =>
+    request<FlowDto>(`/api/projects/${projectId}/flows`, {
+      method: "POST",
+      body: JSON.stringify(flow),
+    }),
+
+  updateFlow: (projectId: string, flow: Flow) =>
+    request<FlowDto>(`/api/projects/${projectId}/flows/${encodeURIComponent(flow.id)}`, {
+      method: "PUT",
+      body: JSON.stringify(flow),
+    }),
+
+  deleteFlow: (projectId: string, flowId: string) =>
+    request<void>(`/api/projects/${projectId}/flows/${encodeURIComponent(flowId)}`, {
+      method: "DELETE",
+    }),
+
+  flowSkeletons: (environmentId: string) =>
+    request<Flow[]>(`/api/environments/${environmentId}/flows/skeletons`, {
+      method: "POST",
+    }),
 };
 
 export type RelationStatus = "suggested" | "confirmed" | "rejected";

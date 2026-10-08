@@ -19,6 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { api } from "@/services/api";
 import {
   buildEndpointTree,
   type EndpointTreeNode,
@@ -185,12 +186,14 @@ export function ScanScopeDialog({
   open,
   onOpenChange,
   endpoints = [],
+  projectId,
   busy,
   onConfirm,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   endpoints?: Endpoint[];
+  projectId?: string;
   busy?: boolean;
   onConfirm: (scope: ScanScopePayload) => void;
 }) {
@@ -198,6 +201,17 @@ export function ScanScopeDialog({
   const [selectedSuites, setSelectedSuites] =
     useState<TestCategory[]>(ALL_SCAN_SUITE_IDS);
   const [matrix, setMatrix] = useState(false);
+  const [flows, setFlows] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedFlows, setSelectedFlows] = useState<Set<string>>(() => new Set());
+
+  useEffect(() => {
+    if (!open || !projectId) return;
+    setSelectedFlows(new Set());
+    void api
+      .listFlows(projectId)
+      .then((list) => setFlows(list.map((item) => ({ id: item.flow.id, name: item.flow.name }))))
+      .catch(() => setFlows([]));
+  }, [open, projectId]);
   const [groupFilter, setGroupFilter] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -243,8 +257,10 @@ export function ScanScopeDialog({
   }, [selectedIds, scopedIds]);
 
   const visibleSelection = checkboxStateForIds(visibleIds, selectedIds);
+  const endpointWork = selectedSuites.length > 0 || matrix;
   const canConfirm =
-    selectedCount > 0 && (selectedSuites.length > 0 || matrix) && !busy;
+    !busy &&
+    ((selectedCount > 0 && endpointWork) || (!endpointWork && selectedFlows.size > 0));
 
   useEffect(() => {
     if (!open) return;
@@ -343,13 +359,14 @@ export function ScanScopeDialog({
   function handleConfirm() {
     if (!canConfirm) return;
     const endpointIds = [...selectedIds].filter((id) => scopedIds.has(id));
-    if (endpointIds.length === 0) return;
+    const flowIds = [...selectedFlows];
     onConfirm({
       endpointIds,
       categories: categoriesForRequest(selectedSuites),
       ...(matrix
         ? { matrix: true, matrixOnly: selectedSuites.length === 0 }
         : {}),
+      ...(flowIds.length > 0 ? { flowIds, flowsOnly: !endpointWork } : {}),
     });
     onOpenChange(false);
   }
@@ -527,12 +544,39 @@ export function ScanScopeDialog({
                   Só a matriz roda, nos endpoints com regra.
                 </p>
               ) : null}
-              {selectedSuites.length === 0 && !matrix ? (
+              {flows.length > 0 ? (
+                <div className="space-y-2 border-t pt-3">
+                  <p className="text-sm font-medium">Fluxos</p>
+                  <ul className="grid gap-2">
+                    {flows.map((flow) => (
+                      <li key={flow.id} className="flex items-center gap-2">
+                        <Checkbox
+                          id={`scope-flow-${flow.id}`}
+                          checked={selectedFlows.has(flow.id)}
+                          disabled={busy}
+                          onCheckedChange={(value) =>
+                            setSelectedFlows((prev) => {
+                              const next = new Set(prev);
+                              if (value) next.add(flow.id);
+                              else next.delete(flow.id);
+                              return next;
+                            })
+                          }
+                        />
+                        <label htmlFor={`scope-flow-${flow.id}`} className="truncate text-sm">
+                          {flow.name}
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {!endpointWork && selectedFlows.size === 0 ? (
                 <p className="text-xs text-destructive">
-                  Selecione ao menos uma suite ou a matriz.
+                  Selecione uma suite, a matriz ou um fluxo.
                 </p>
               ) : null}
-              {selectedCount === 0 ? (
+              {endpointWork && selectedCount === 0 ? (
                 <p className="text-xs text-destructive">
                   Selecione ao menos um endpoint.
                 </p>

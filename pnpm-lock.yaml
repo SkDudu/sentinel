@@ -80,6 +80,9 @@ importers:
       '@sw/findings':
         specifier: workspace:*
         version: link:../../packages/findings
+      '@sw/flows':
+        specifier: workspace:*
+        version: link:../../packages/flows
       '@sw/http-client':
         specifier: workspace:*
         version: link:../../packages/http-client

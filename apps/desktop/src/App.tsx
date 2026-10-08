@@ -6,6 +6,8 @@ import { ProjectDashboardPage } from "@/pages/projects/ProjectDashboardPage";
 import { EnvironmentsPage } from "@/pages/environments/EnvironmentsPage";
 import { EnvironmentDetailPage } from "@/pages/environments/EnvironmentDetailPage";
 import { FindingsPage } from "@/pages/findings/FindingsPage";
+import { FlowEditorPage } from "@/pages/flows/FlowEditorPage";
+import { FlowsPage } from "@/pages/flows/FlowsPage";
 import { SettingsPage } from "@/pages/settings/SettingsPage";
 
 function LegacyEndpointsRedirect() {
@@ -45,6 +47,11 @@ export default function App() {
         <Route
           path="projects/:projectId/findings"
           element={<FindingsPage />}
+        />
+        <Route path="projects/:projectId/flows" element={<FlowsPage />} />
+        <Route
+          path="projects/:projectId/flows/:flowId"
+          element={<FlowEditorPage />}
         />
         {/* Compatibilidade com rotas antigas (pré-IA) */}
         <Route path="endpoints" element={<Navigate to="/projects" replace />} />

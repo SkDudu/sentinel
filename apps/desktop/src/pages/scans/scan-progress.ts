@@ -393,6 +393,35 @@ export function reduceScanProgress(
     };
   }
 
+  if (event.type === "flow-step") {
+    const failed = event.status === "failed" || event.status === "error";
+    return {
+      ...prev,
+      liveLabel: `Fluxo · ${event.label}`,
+      findingsCount: prev.findingsCount + (event.status === "failed" && event.phase === "steps" ? 1 : 0),
+      activity: [
+        ...prev.activity,
+        activity(
+          `${event.label}: ${event.status}${event.message ? ` · ${event.message}` : ""}`,
+          failed ? "finding" : "info",
+        ),
+      ].slice(-80),
+    };
+  }
+
+  if (event.type === "flow") {
+    return {
+      ...prev,
+      activity: [
+        ...prev.activity,
+        activity(
+          `Fluxo ${event.name}: ${event.status}${event.message ? ` · ${event.message}` : ""}`,
+          event.status === "passed" ? "done" : "finding",
+        ),
+      ].slice(-80),
+    };
+  }
+
   // endpoint-done
   const endpointsDone = prev.endpointsDone + 1;
   const next: ScanProgress = {

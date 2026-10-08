@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,6 +8,7 @@ import {
   AuthType,
   FindingStatus,
   AccessRuleSchema,
+  FlowSchema,
   LoginRecipeSchema,
   RelationKindSchema,
   TestCategory,
@@ -45,6 +47,7 @@ import {
   EnvironmentRepository,
   FindingRepository,
   AccessRuleRepository,
+  FlowRepository,
   PersonaBindingRepository,
   ProjectRepository,
   RelationRepository,
@@ -52,6 +55,7 @@ import {
   TestRunRepository,
   type SqliteHandle,
 } from "@sw/database";
+import { generateFlowSkeletons } from "@sw/flows";
 import { HttpExecutor } from "@sw/http-client";
 import { runProjectScan, type ScanProgressEvent } from "@sw/scan-runner";
 import { createAiClientFromSettings } from "./ai-client.js";
@@ -161,6 +165,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
       const personaBindings = new PersonaBindingRepository(handle.db);
       const relationsRepo = new RelationRepository(handle.db);
       const accessRulesRepo = new AccessRuleRepository(handle.db);
+      const flowsRepo = new FlowRepository(handle.db);
       const recorders = new Map<string, RecorderHandle>();
 
       /** Contrato mudou: re-infere grafo (preserva revisão) e reaponta a matriz. */
@@ -967,6 +972,8 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
               aiOnly?: boolean;
               matrix?: boolean;
               matrixOnly?: boolean;
+              flowIds?: string[];
+              flowsOnly?: boolean;
               categories?: TestCategory[];
               variables?: Variable[];
               rateLimit?: {
@@ -1005,6 +1012,8 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
               aiOnly: body.aiOnly,
               matrix: body.matrix,
               matrixOnly: body.matrixOnly,
+              flowIds: body.flowIds,
+              flowsOnly: body.flowsOnly,
               categories:
                 categories && categories.length > 0 ? categories : undefined,
               variables: body.variables,
@@ -1021,6 +1030,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
               testResults,
               personaBindings,
               accessRules: accessRulesRepo,
+              flows: flowsRepo,
             };
             if (stream) {
               res.statusCode = 200;
@@ -1244,6 +1254,91 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
               sendJson(res, 200, clearAiCases(dataDir, projectId));
               return;
             }
+          }
+
+          const flowsMatch = path.match(
+            /^\/api\/projects\/([^/]+)\/flows(?:\/([^/]+))?$/,
+          );
+          if (flowsMatch) {
+            const projectId = decodeURIComponent(flowsMatch[1]!);
+            const flowId = flowsMatch[2]
+              ? decodeURIComponent(flowsMatch[2])
+              : undefined;
+            if (!(await projects.getById(projectId))) return notFound(res);
+
+            if (!flowId && method === "GET") {
+              sendJson(res, 200, await flowsRepo.listByProject(projectId));
+              return;
+            }
+
+            if (flowId && method === "GET") {
+              const stored = await flowsRepo.get(projectId, flowId);
+              if (!stored) return notFound(res);
+              sendJson(res, 200, stored);
+              return;
+            }
+
+            if ((!flowId && method === "POST") || (flowId && method === "PUT")) {
+              if (flowId && !(await flowsRepo.get(projectId, flowId))) {
+                return notFound(res);
+              }
+              const body = await readJson<Record<string, unknown>>(req);
+              const parsed = FlowSchema.safeParse({
+                ...body,
+                id: flowId ?? randomUUID(),
+              });
+              if (!parsed.success) {
+                const issue = parsed.error.issues[0];
+                sendJson(res, 400, {
+                  error: issue
+                    ? `${issue.path.join(".") || "flow"}: ${issue.message}`
+                    : "invalid flow",
+                });
+                return;
+              }
+              sendJson(
+                res,
+                flowId ? 200 : 201,
+                await flowsRepo.save(projectId, parsed.data),
+              );
+              return;
+            }
+
+            if (flowId && method === "DELETE") {
+              if (!(await flowsRepo.delete(projectId, flowId))) {
+                return notFound(res);
+              }
+              sendJson(res, 204);
+              return;
+            }
+          }
+
+          const skeletonsMatch = path.match(
+            /^\/api\/environments\/([^/]+)\/flows\/skeletons$/,
+          );
+          if (skeletonsMatch && method === "POST") {
+            const environment = await environments.getById(
+              decodeURIComponent(skeletonsMatch[1]!),
+            );
+            if (!environment) return notFound(res);
+            const bound = new Set(
+              (await personaBindings.listByEnvironment(environment.id)).map(
+                (binding) => binding.personaId,
+              ),
+            );
+            sendJson(
+              res,
+              200,
+              generateFlowSkeletons({
+                endpoints: await endpoints.listByEnvironment(environment.id),
+                resources: await relationsRepo.listResources(environment.id),
+                relations: await relationsRepo.listRelations(environment.id),
+                personaIds: listPersonas(dataDir, environment.projectId)
+                  .map((persona) => persona.id)
+                  .filter((id) => bound.has(id)),
+              }),
+            );
+            return;
           }
 
           const personasMatch = path.match(

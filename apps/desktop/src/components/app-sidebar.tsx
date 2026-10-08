@@ -7,6 +7,7 @@ import {
   Server,
   Settings,
   Shield,
+  Workflow,
 } from "lucide-react";
 import {
   Sidebar,
@@ -40,6 +41,11 @@ function projectLinks(projectId: string) {
       to: `/projects/${projectId}/environments`,
       label: "Ambientes",
       icon: Server,
+    },
+    {
+      to: `/projects/${projectId}/flows`,
+      label: "Fluxos",
+      icon: Workflow,
     },
     {
       to: `/projects/${projectId}/findings`,

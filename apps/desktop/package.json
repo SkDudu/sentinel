@@ -23,6 +23,7 @@
     "@sw/core": "workspace:*",
     "@sw/database": "workspace:*",
     "@sw/findings": "workspace:*",
+    "@sw/flows": "workspace:*",
     "@sw/http-client": "workspace:*",
     "@sw/login-recorder": "workspace:*",
     "@sw/scan-runner": "workspace:*",

@@ -40,6 +40,9 @@ export type ScanScopePayload = {
   matrix?: boolean;
   /** Matriz marcada sem nenhuma suite. */
   matrixOnly?: boolean;
+  flowIds?: string[];
+  /** Só fluxos: nenhuma suite nem matriz. */
+  flowsOnly?: boolean;
 };
 
 /** Todos os IDs de endpoint sob um nó (grupo ou folha). */
