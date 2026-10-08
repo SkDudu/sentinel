@@ -23,6 +23,7 @@ import {
   environmentSecretRef,
 } from "@sw/auth";
 import type {
+  AccessRuleRepository,
   EndpointRepository,
   EnvironmentRepository,
   FindingRepository,
@@ -52,6 +53,10 @@ export interface ScanRequest {
   variables?: Variable[];
   /** Personas do projeto; só as com binding no ambiente entram no scan. */
   personas?: TestPersona[];
+  /** Roda a matriz de acesso do ambiente (plugin authorization.matrix). */
+  matrix?: boolean;
+  /** Só a matriz: sem suites nem casos determinísticos. Implica `matrix`. */
+  matrixOnly?: boolean;
   rateLimit?: Partial<RateLimitConfig>;
   /** Optional custom executor (e.g. ZapExecutor). */
   executor?: RequestExecutor;
@@ -112,9 +117,19 @@ export async function runProjectScan(
     runs: TestRunRepository;
     testResults?: TestResultRepository;
     personaBindings?: PersonaBindingRepository;
+    accessRules?: AccessRuleRepository;
   },
   secretStore: SecretStore,
 ) {
+  const matrixOnly = Boolean(input.matrixOnly) && !input.aiOnly;
+  const accessRules =
+    input.matrix || matrixOnly
+      ? ((await repos.accessRules?.listByEnvironment(input.environmentId)) ?? [])
+      : [];
+  if (matrixOnly && accessRules.length === 0) {
+    throw new Error("Matriz de acesso vazia — preencha em Acesso → Matriz");
+  }
+
   const project = await repos.projects.getById(input.projectId);
   if (!project) throw new Error("Project not found");
 
@@ -129,6 +144,10 @@ export async function runProjectScan(
   if (input.endpointIds?.length) {
     const allow = new Set(input.endpointIds);
     targetEndpoints = targetEndpoints.filter((e) => allow.has(e.id));
+  }
+  if (matrixOnly) {
+    const ruled = new Set(accessRules.map((rule) => rule.endpointId));
+    targetEndpoints = targetEndpoints.filter((e) => ruled.has(e.id));
   }
   // Imports antigos podiam gravar `$ref` de parâmetro sem name/in.
   targetEndpoints = targetEndpoints.map((e) => ({
@@ -180,7 +199,11 @@ export async function runProjectScan(
   const run = await repos.runs.create({
     projectId: input.projectId,
     environmentId: input.environmentId,
-    categories: input.aiOnly ? [TestCategory.AI_GENERATED] : input.categories,
+    categories: input.aiOnly
+      ? [TestCategory.AI_GENERATED]
+      : matrixOnly
+        ? [TestCategory.AUTHORIZATION]
+        : input.categories,
   });
 
   const orchestrator = new TestOrchestrator(input.registry);
@@ -227,8 +250,10 @@ export async function runProjectScan(
         variables: sharedVariables,
         executor,
         extraCases,
-        skipPlugins: Boolean(input.aiOnly),
+        skipPlugins: Boolean(input.aiOnly) || matrixOnly,
         categories: input.aiOnly ? undefined : input.categories,
+        includePlugins: accessRules.length > 0 ? ["authorization.matrix"] : undefined,
+        accessRules: accessRules.filter((rule) => rule.endpointId === endpoint.id),
         productionSafetyMode: environment.productionSafetyMode,
         rateLimit,
         personas,
@@ -244,7 +269,10 @@ export async function runProjectScan(
             findings,
           });
         },
-        options: optionsForCategories(input.categories, Boolean(input.aiOnly)),
+        options: optionsForCategories(
+          input.categories,
+          Boolean(input.aiOnly) || matrixOnly,
+        ),
       });
 
       for (const [key, value] of Object.entries(result.context.variables)) {

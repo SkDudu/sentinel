@@ -3,6 +3,7 @@ import { analyzeEndpoint } from "@sw/api-parser";
 import {
   FindingStatus,
   Severity,
+  type AccessRule,
   type Endpoint,
   type Finding,
   type HttpRequest,
@@ -54,6 +55,10 @@ export interface OrchestratorInput {
   skipPlugins?: boolean;
   /** When set, only registry plugins in these categories run. */
   categories?: TestCategory[];
+  /** Plugins que rodam mesmo fora de `categories` / com `skipPlugins`. */
+  includePlugins?: string[];
+  /** Matriz de acesso do endpoint (plugin authorization.matrix). */
+  accessRules?: AccessRule[];
   productionSafetyMode?: boolean;
   rateLimit?: RateLimitConfig;
   /** Personas autenticadas no ambiente (headers + fixtures). */
@@ -129,23 +134,27 @@ export class TestOrchestrator {
       productionSafetyMode: input.productionSafetyMode,
       rateLimit: input.rateLimit,
       personas: input.personas,
+      accessRules: input.accessRules,
     };
 
-    if (!input.skipPlugins) {
-      const plugins =
-        input.categories && input.categories.length > 0
-          ? this.registry.list(...input.categories)
-          : this.registry.list();
-      for (const test of plugins) {
-        const cases = await test.generateCases(ctxPreview);
-        pluginCases.push(
-          ...cases.map((c) => ({
-            ...c,
-            id: `${test.id}:${c.id}`,
-            tags: [...c.tags, `plugin:${test.id}`],
-          })),
-        );
-      }
+    const plugins = input.skipPlugins
+      ? []
+      : input.categories && input.categories.length > 0
+        ? this.registry.list(...input.categories)
+        : this.registry.list();
+    for (const id of input.includePlugins ?? []) {
+      const extra = this.registry.get(id);
+      if (extra && !plugins.includes(extra)) plugins.push(extra);
+    }
+    for (const test of plugins) {
+      const cases = await test.generateCases(ctxPreview);
+      pluginCases.push(
+        ...cases.map((c) => ({
+          ...c,
+          id: `${test.id}:${c.id}`,
+          tags: [...c.tags, `plugin:${test.id}`],
+        })),
+      );
     }
 
     const approved = new Set(input.approvedAiCaseIds ?? []);
