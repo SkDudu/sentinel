@@ -10,6 +10,7 @@ import {
   EndpointRepository,
   EnvironmentRepository,
   FindingRepository,
+  FlowRepository,
   PersonaBindingRepository,
   ProjectRepository,
   TestResultRepository,
@@ -112,5 +113,59 @@ test("scan só-matriz: login por persona, BOLA e evidence redigida", async () =>
   const bola = result.findings.find((f) => f.title.startsWith("BOLA"));
   assert.ok(bola, "BOLA no objeto de Bob");
   assert.equal(bola.request?.headers.Authorization, "[redacted]");
+
+  // Só fluxos: Bob lê pedido de Alice e a API deixa → finding do fluxo.
+  const flowsRepo = new FlowRepository(db);
+  await flowsRepo.save(project.id, {
+    id: "f-bola",
+    name: "Bob lê pedido de Alice",
+    steps: [
+      {
+        id: "read",
+        label: "Bob lê",
+        actor: "bob",
+        request: { method: "GET", path: "/orders/{{personas.alice.fixtures.orderId}}" },
+        expect: { status: "4xx" },
+      },
+    ],
+  } as never);
+  seen.length = 0;
+  const events: string[] = [];
+  const flowRun = await runProjectScan(
+    {
+      projectId: project.id,
+      environmentId: env.id,
+      flowIds: ["f-bola"],
+      flowsOnly: true,
+      personas: [
+        { id: "alice", name: "Alice", fields: {}, tags: [] },
+        { id: "bob", name: "Bob", fields: {}, tags: [] },
+      ] as never,
+      executor: {
+        async execute(request) {
+          seen.push({ url: request.url, auth: request.headers.Authorization });
+          return { status: 200, headers: {}, body: {}, durationMs: 1 };
+        },
+      },
+      onEvent: (event) => events.push(event.type),
+    },
+    {
+      projects: new ProjectRepository(db),
+      environments: new EnvironmentRepository(db),
+      endpoints,
+      findings: new FindingRepository(db),
+      runs: new TestRunRepository(db),
+      testResults: new TestResultRepository(db),
+      personaBindings: bindings,
+      flows: flowsRepo,
+    },
+    store,
+  );
+  assert.equal(flowRun.endpointsScanned, 0);
+  assert.deepEqual(seen, [{ url: "https://api.test/orders/ord_a", auth: "Bearer token-bob" }]);
+  assert.equal(flowRun.flows[0]?.status, "failed");
+  assert.equal(flowRun.findings[0]?.testId, "flow:f-bola:read");
+  assert.equal(flowRun.findings[0]?.endpointId, order.id);
+  assert.ok(events.includes("flow-step") && events.includes("flow"));
   handle.close();
 });

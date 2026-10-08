@@ -19,6 +19,7 @@
     "@sw/auth": "workspace:*",
     "@sw/core": "workspace:*",
     "@sw/database": "workspace:*",
+    "@sw/flows": "workspace:*",
     "@sw/http-client": "workspace:*",
     "@sw/security-engine": "workspace:*",
     "@sw/test-registry": "workspace:*"

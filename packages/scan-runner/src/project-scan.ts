@@ -7,6 +7,7 @@ import {
   type Endpoint,
   type Environment,
   type Finding,
+  type Flow,
   type PersonaBinding,
   type RateLimitConfig,
   type TestCase,
@@ -27,15 +28,26 @@ import type {
   EndpointRepository,
   EnvironmentRepository,
   FindingRepository,
+  FlowRepository,
   PersonaBindingRepository,
   ProjectRepository,
   TestResultInput,
   TestResultRepository,
   TestRunRepository,
 } from "@sw/database";
+import {
+  runFlow,
+  type FlowActor,
+  type FlowRunResult,
+  type FlowStepResult,
+} from "@sw/flows";
 import { HttpExecutor, type RequestExecutor } from "@sw/http-client";
 import { TestOrchestrator } from "@sw/security-engine";
-import type { PersonaContext, TestRegistry } from "@sw/test-registry";
+import {
+  withoutAuth,
+  type PersonaContext,
+  type TestRegistry,
+} from "@sw/test-registry";
 
 export interface ScanRequest {
   projectId: string;
@@ -57,6 +69,10 @@ export interface ScanRequest {
   matrix?: boolean;
   /** Só a matriz: sem suites nem casos determinísticos. Implica `matrix`. */
   matrixOnly?: boolean;
+  /** Fluxos do projeto a rodar depois dos endpoints. */
+  flowIds?: string[];
+  /** Só os fluxos: pula a varredura de endpoints. */
+  flowsOnly?: boolean;
   rateLimit?: Partial<RateLimitConfig>;
   /** Optional custom executor (e.g. ZapExecutor). */
   executor?: RequestExecutor;
@@ -98,6 +114,22 @@ export type ScanProgressEvent =
       name: string;
       ok: boolean;
       error?: string;
+    }
+  | {
+      type: "flow-step";
+      flowId: string;
+      stepId: string;
+      phase: FlowStepResult["phase"];
+      label: string;
+      status: FlowStepResult["status"];
+      message?: string;
+    }
+  | {
+      type: "flow";
+      flowId: string;
+      name: string;
+      status: FlowRunResult["status"];
+      message?: string;
     };
 
 const DEFAULT_RATE_LIMIT: RateLimitConfig = {
@@ -118,10 +150,21 @@ export async function runProjectScan(
     testResults?: TestResultRepository;
     personaBindings?: PersonaBindingRepository;
     accessRules?: AccessRuleRepository;
+    flows?: FlowRepository;
   },
   secretStore: SecretStore,
 ) {
-  const matrixOnly = Boolean(input.matrixOnly) && !input.aiOnly;
+  const flowsOnly = Boolean(input.flowsOnly) && !input.aiOnly;
+  const flows: Flow[] = [];
+  for (const id of input.flowIds ?? []) {
+    const stored = await repos.flows?.get(input.projectId, id);
+    if (!stored) throw new Error(`Fluxo não encontrado: ${id}`);
+    flows.push(stored.flow);
+  }
+  if (flowsOnly && flows.length === 0) {
+    throw new Error("Nenhum fluxo selecionado");
+  }
+  const matrixOnly = Boolean(input.matrixOnly) && !input.aiOnly && !flowsOnly;
   const accessRules =
     input.matrix || matrixOnly
       ? ((await repos.accessRules?.listByEnvironment(input.environmentId)) ?? [])
@@ -138,9 +181,8 @@ export async function runProjectScan(
     throw new Error("Environment not found for project");
   }
 
-  let targetEndpoints = await repos.endpoints.listByEnvironment(
-    input.environmentId,
-  );
+  const contract = await repos.endpoints.listByEnvironment(input.environmentId);
+  let targetEndpoints = flowsOnly ? [] : contract;
   if (input.endpointIds?.length) {
     const allow = new Set(input.endpointIds);
     targetEndpoints = targetEndpoints.filter((e) => allow.has(e.id));
@@ -154,7 +196,7 @@ export async function runProjectScan(
     ...e,
     parameters: e.parameters.filter((p) => Boolean(p?.name && p?.in)),
   }));
-  if (targetEndpoints.length === 0) {
+  if (targetEndpoints.length === 0 && !flowsOnly) {
     throw new Error(
       "No endpoints to scan — import OpenAPI on this environment first",
     );
@@ -201,9 +243,11 @@ export async function runProjectScan(
     environmentId: input.environmentId,
     categories: input.aiOnly
       ? [TestCategory.AI_GENERATED]
-      : matrixOnly
-        ? [TestCategory.AUTHORIZATION]
-        : input.categories,
+      : flowsOnly
+        ? [TestCategory.BUSINESS_LOGIC]
+        : matrixOnly
+          ? [TestCategory.AUTHORIZATION]
+          : input.categories,
   });
 
   const orchestrator = new TestOrchestrator(input.registry);
@@ -212,6 +256,7 @@ export async function runProjectScan(
   let completedCases = 0;
   const allFindings = [];
   const allResults: TestResultInput[] = [];
+  const flowResults: FlowRunResult[] = [];
   let cancelled = Boolean(input.signal?.aborted);
 
   const casesByEndpoint = groupCasesByEndpoint(approved, targetEndpoints);
@@ -306,6 +351,67 @@ export async function runProjectScan(
       );
     }
 
+    const actors: Record<string, FlowActor> = Object.fromEntries(
+      Object.values(personas).map((persona) => [
+        persona.id,
+        {
+          ...persona,
+          fields: input.personas?.find((p) => p.id === persona.id)?.fields,
+        },
+      ]),
+    );
+    for (const flow of flows) {
+      if (cancelled || input.signal?.aborted) {
+        cancelled = true;
+        break;
+      }
+      const flowResult = await runFlow({
+        flow,
+        projectId: input.projectId,
+        runId: run.id,
+        baseUrl: environment.baseUrl,
+        executor,
+        actors,
+        anonymousHeaders: withoutAuth(authHeaders),
+        productionSafetyMode: environment.productionSafetyMode,
+        variables: Object.fromEntries(sharedVariables.map((v) => [v.key, v.value])),
+        endpoints: contract,
+        signal: input.signal,
+        onStep: (step) =>
+          input.onEvent?.({
+            type: "flow-step",
+            flowId: flow.id,
+            stepId: step.stepId,
+            phase: step.phase,
+            label: step.label,
+            status: step.status,
+            ...(step.message ? { message: step.message } : {}),
+          }),
+      });
+      flowResults.push(flowResult);
+      totalCases += flowResult.steps.length;
+      completedCases += flowResult.steps.filter((s) => s.status !== "skipped").length;
+      allFindings.push(...flowResult.findings);
+      allResults.push(
+        ...flowResult.steps.map((step) => ({
+          endpointId: step.endpointId,
+          testId: `flow:${flow.id}`,
+          testCaseId: `${step.phase}:${step.stepId}`,
+          passed: step.status === "passed",
+          request: step.request,
+          response: step.response,
+          notes: step.message ? `${step.status}: ${step.message}` : step.status,
+        })),
+      );
+      input.onEvent?.({
+        type: "flow",
+        flowId: flow.id,
+        name: flow.name,
+        status: flowResult.status,
+        ...(flowResult.message ? { message: flowResult.message } : {}),
+      });
+    }
+
     await repos.findings.createMany(allFindings, run.id);
     if (repos.testResults && allResults.length > 0) {
       await repos.testResults.createMany(run.id, allResults);
@@ -324,6 +430,7 @@ export async function runProjectScan(
       endpointsScanned: targetEndpoints.length,
       totalCases,
       variables: sharedVariables,
+      flows: flowResults,
       cancelled,
     };
   } catch (error) {

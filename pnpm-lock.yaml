@@ -337,6 +337,9 @@ importers:
       '@sw/database':
         specifier: workspace:*
         version: link:../database
+      '@sw/flows':
+        specifier: workspace:*
+        version: link:../flows
       '@sw/http-client':
         specifier: workspace:*
         version: link:../http-client
