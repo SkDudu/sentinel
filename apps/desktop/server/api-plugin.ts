@@ -163,6 +163,18 @@ function notFound(res: ServerResponse) {
   sendJson(res, 404, { error: "Not found" });
 }
 
+function parseDocsUrl(value: unknown): { value?: string | null; error?: string } {
+  if (value === undefined) return {};
+  if (value === null || value === "") return { value: null };
+  if (typeof value !== "string") {
+    return { error: "A documentação precisa ser um path como /docs ou uma URL." };
+  }
+  const trimmed = value.trim();
+  if (!trimmed) return { value: null };
+  if (trimmed.startsWith("/") || URL.canParse(trimmed)) return { value: trimmed };
+  return { error: "A documentação precisa ser um path como /docs ou uma URL." };
+}
+
 function parseAuthType(value: unknown) {
   if (typeof value !== "string") return AuthType.NONE;
   return (Object.values(AuthType) as string[]).includes(value)
@@ -295,14 +307,15 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
           }
 
           if (path === "/api/recorder/start" && method === "POST") {
-            const body = await readJson<{ baseUrl?: string }>(req);
+            const body = await readJson<{ baseUrl?: string; docsUrl?: string | null }>(req);
             if (!body.baseUrl?.trim()) {
-              sendJson(res, 400, { error: "baseUrl is required" });
+              sendJson(res, 400, { error: "Informe a base URL antes de abrir o navegador." });
               return;
             }
             try {
               const handle = await startLoginRecording({
                 baseUrl: body.baseUrl.trim(),
+                docsUrl: body.docsUrl,
               });
               recorders.set(handle.id, handle);
               sendJson(res, 201, handle.snapshot());
@@ -437,6 +450,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
               const body = await readJson<{
                 name?: string;
                 baseUrl?: string;
+                docsUrl?: string | null;
                 authType?: string;
                 secretRef?: string;
                 headers?: Record<string, string>;
@@ -445,7 +459,12 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
               }>(req);
 
               if (!body.name?.trim() || !body.baseUrl?.trim()) {
-                sendJson(res, 400, { error: "name and baseUrl are required" });
+                sendJson(res, 400, { error: "Informe o nome e a base URL." });
+                return;
+              }
+              const docsUrl = parseDocsUrl(body.docsUrl);
+              if (docsUrl.error) {
+                sendJson(res, 400, { error: docsUrl.error });
                 return;
               }
 
@@ -463,6 +482,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                     projectId,
                     name: body.name,
                     baseUrl: body.baseUrl,
+                    docsUrl: docsUrl.value,
                     authType: parseAuthType(body.authType),
                     secretRef: body.secretRef,
                     headers: body.headers,
@@ -511,6 +531,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
               const body = await readJson<{
                 name?: string;
                 baseUrl?: string;
+                docsUrl?: string | null;
                 authType?: string;
                 secretRef?: string | null;
                 headers?: Record<string, string>;
@@ -522,12 +543,18 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                 sendJson(res, 400, { error: recipe.error });
                 return;
               }
+              const docsUrl = parseDocsUrl(body.docsUrl);
+              if (docsUrl.error) {
+                sendJson(res, 400, { error: docsUrl.error });
+                return;
+              }
               const updated = await environments.update(id, {
                 ...body,
                 authType: body.authType
                   ? parseAuthType(body.authType)
                   : undefined,
                 loginRecipe: recipe.value,
+                ...(docsUrl.value !== undefined ? { docsUrl: docsUrl.value } : {}),
               });
               if (!updated) return notFound(res);
               sendJson(res, 200, updated);

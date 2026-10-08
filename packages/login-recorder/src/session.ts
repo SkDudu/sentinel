@@ -54,7 +54,16 @@ function friendlyNavigationError(error: unknown): string {
   if (/Timeout/i.test(message)) {
     return "A aplicação demorou demais para responder.";
   }
-  return "Não foi possível abrir a base URL no navegador.";
+  return "Não foi possível abrir o endereço no navegador.";
+}
+
+/** Página inicial da gravação: docs absoluto, ou path colado na base URL. */
+export function recorderStartUrl(baseUrl: string, docsUrl?: string | null): string {
+  const docs = docsUrl?.trim() ?? "";
+  if (!docs) return baseUrl;
+  if (/^https?:\/\//i.test(docs)) return docs;
+  const path = docs.startsWith("/") ? docs : `/${docs}`;
+  return new URL(path, baseUrl).toString();
 }
 
 /** Runs inside every recorded page (top frame only). */
@@ -102,11 +111,13 @@ function keep(type: string) {
   return type === "document" || type === "xhr" || type === "fetch";
 }
 
-/** Opens a visible browser at `baseUrl` and records same-origin traffic. */
+/** Opens a visible browser at the docs URL and records same-origin traffic. */
 export async function startLoginRecording(options: {
   baseUrl: string;
+  docsUrl?: string | null;
 }): Promise<RecorderHandle> {
   const origin = new URL(options.baseUrl);
+  const startUrl = recorderStartUrl(options.baseUrl, options.docsUrl);
   const browser = await launchBrowser();
   const context = await browser.newContext();
   const exchanges: CapturedExchange[] = [];
@@ -178,7 +189,7 @@ export async function startLoginRecording(options: {
   browser.on("disconnected", markClosed);
 
   try {
-    await page.goto(origin.toString(), { waitUntil: "domcontentloaded" });
+    await page.goto(startUrl, { waitUntil: "domcontentloaded" });
   } catch (error) {
     await browser.close().catch(() => undefined);
     throw new Error(friendlyNavigationError(error));

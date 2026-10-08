@@ -42,6 +42,7 @@ interface ProjectState {
     input: {
       name: string;
       baseUrl: string;
+      docsUrl?: string | null;
       authType?: string;
       headers?: Record<string, string>;
       productionSafetyMode?: boolean;
@@ -54,6 +55,7 @@ interface ProjectState {
     input: {
       name?: string;
       baseUrl?: string;
+      docsUrl?: string | null;
       authType?: string;
       headers?: Record<string, string>;
       productionSafetyMode?: boolean;

@@ -127,6 +127,9 @@ export function applyMigrations(sqlite: DatabaseSync) {
   if (!environmentColumns.some((column) => column.name === "login_recipe_json")) {
     sqlite.exec("ALTER TABLE environments ADD COLUMN login_recipe_json TEXT");
   }
+  if (!environmentColumns.some((column) => column.name === "docs_url")) {
+    sqlite.exec("ALTER TABLE environments ADD COLUMN docs_url TEXT");
+  }
 
   const runColumns = sqlite
     .prepare("PRAGMA table_info(test_runs)")

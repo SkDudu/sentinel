@@ -286,6 +286,7 @@ export const api = {
     input: {
       name: string;
       baseUrl: string;
+      docsUrl?: string | null;
       authType?: string;
       headers?: Record<string, string>;
       productionSafetyMode?: boolean;
@@ -302,6 +303,7 @@ export const api = {
     input: {
       name?: string;
       baseUrl?: string;
+      docsUrl?: string | null;
       authType?: string;
       headers?: Record<string, string>;
       productionSafetyMode?: boolean;
@@ -351,10 +353,10 @@ export const api = {
       { method: "POST" },
     ),
 
-  startRecorder: (baseUrl: string) =>
+  startRecorder: (baseUrl: string, docsUrl?: string | null) =>
     request<RecorderSnapshot>("/api/recorder/start", {
       method: "POST",
-      body: JSON.stringify({ baseUrl }),
+      body: JSON.stringify({ baseUrl, docsUrl: docsUrl?.trim() || null }),
     }),
 
   recorderStatus: (id: string) =>

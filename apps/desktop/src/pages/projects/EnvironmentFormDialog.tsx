@@ -24,6 +24,20 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toast";
 
+function recorderOpenUrl(baseUrl: string, docsUrl: string): string {
+  const base = baseUrl.trim();
+  const docs = docsUrl.trim();
+  if (!docs) return base;
+  if (/^https?:\/\//i.test(docs)) return docs;
+  if (!base) return docs;
+  try {
+    const path = docs.startsWith("/") ? docs : `/${docs}`;
+    return new URL(path, base).toString();
+  } catch {
+    return docs;
+  }
+}
+
 const AUTH_TYPE_ITEMS = Object.values(AuthType).map((type) => ({
   label: type,
   value: type,
@@ -122,6 +136,7 @@ export function headersToJson(
 export type EnvironmentFormValues = {
   name: string;
   baseUrl: string;
+  docsUrl?: string | null;
   authType: string;
   headers: Record<string, string>;
   productionSafetyMode: boolean;
@@ -182,6 +197,7 @@ export function EnvironmentFormDialog({
   const isEdit = mode?.kind === "edit";
   const [name, setName] = useState("Development");
   const [baseUrl, setBaseUrl] = useState("http://localhost:3000");
+  const [docsUrl, setDocsUrl] = useState("/docs");
   const [authType, setAuthType] = useState<string>(AuthType.NONE);
   const [safety, setSafety] = useState(false);
   const [headers, setHeaders] = useState("");
@@ -205,6 +221,7 @@ export function EnvironmentFormDialog({
       const locked = Boolean(env.secretConfigured);
       setName(env.name);
       setBaseUrl(env.baseUrl);
+      setDocsUrl(env.docsUrl ?? "");
       setAuthType(env.authType);
       setSafety(env.productionSafetyMode);
       setHeaders(headersToJson(env.headers));
@@ -218,6 +235,7 @@ export function EnvironmentFormDialog({
     } else {
       setName("Development");
       setBaseUrl("http://localhost:3000");
+      setDocsUrl("/docs");
       setAuthType(AuthType.NONE);
       setSafety(false);
       setHeaders("");
@@ -273,7 +291,7 @@ export function EnvironmentFormDialog({
     setFormError(null);
     setRecording(true);
     try {
-      const snap = await api.startRecorder(baseUrl.trim());
+      const snap = await api.startRecorder(baseUrl.trim(), docsUrl.trim() || null);
       setRecorderId(snap.id);
       setCaptured(snap.steps);
     } catch (err) {
@@ -338,6 +356,7 @@ export function EnvironmentFormDialog({
       await onSubmit({
         name,
         baseUrl,
+        docsUrl: docsUrl.trim() || null,
         authType,
         headers: parsedHeaders,
         productionSafetyMode: safety,
@@ -429,7 +448,7 @@ export function EnvironmentFormDialog({
                 autoFocus
               />
             </label>
-            <label className="block text-sm sm:col-span-1">
+            <label className="block text-sm sm:col-span-2">
               Base URL
               <Input
                 required
@@ -438,6 +457,22 @@ export function EnvironmentFormDialog({
                 onChange={(e) => setBaseUrl(e.target.value)}
                 className="mt-1 font-mono text-xs"
               />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Usada nas requisições de teste.
+              </p>
+            </label>
+            <label className="block text-sm sm:col-span-2">
+              Documentação
+              <Input
+                value={docsUrl}
+                placeholder="/docs"
+                onChange={(e) => setDocsUrl(e.target.value)}
+                className="mt-1 font-mono text-xs"
+                spellCheck={false}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Path ou URL da documentação. O usual é /docs.
+              </p>
             </label>
             <div className="block text-sm">
               <span className="mb-1 block">Auth</span>
@@ -584,8 +619,9 @@ export function EnvironmentFormDialog({
                             : "Grave o login no navegador"}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Abre o Chrome na base URL. Faça o login nessa janela.
-                        Concluir monta a receita e preenche a senha para o vault.
+                        Abre o Chrome em {recorderOpenUrl(baseUrl, docsUrl) || "a documentação"}.
+                        Faça o login nessa janela. Concluir monta a receita e
+                        preenche a senha para o vault.
                       </p>
                     </div>
                   </div>
