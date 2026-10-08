@@ -121,31 +121,28 @@ export class EnvironmentRepository {
     const existing = await this.getById(id);
     if (!existing) return false;
 
+    // Findings e scans do ambiente saem junto (test_runs não tem ON DELETE CASCADE).
+    const runs = await this.db
+      .select({ id: testRuns.id })
+      .from(testRuns)
+      .where(eq(testRuns.environmentId, id));
+    for (const run of runs) {
+      await this.db.delete(findings).where(eq(findings.runId, run.id));
+    }
+    await this.db.delete(testRuns).where(eq(testRuns.environmentId, id));
+
     const owned = await this.db
       .select({ id: endpoints.id })
       .from(endpoints)
       .where(eq(endpoints.environmentId, id));
     for (const row of owned) {
-      await this.db
-        .update(findings)
-        .set({ endpointId: null })
-        .where(eq(findings.endpointId, row.id));
+      await this.db.delete(findings).where(eq(findings.endpointId, row.id));
       await this.db
         .update(testResults)
         .set({ endpointId: null })
         .where(eq(testResults.endpointId, row.id));
     }
     await this.db.delete(endpoints).where(eq(endpoints.environmentId, id));
-
-    // test_runs.environment_id não tem ON DELETE CASCADE; findings sobrevivem sem run.
-    const runs = await this.db
-      .select({ id: testRuns.id })
-      .from(testRuns)
-      .where(eq(testRuns.environmentId, id));
-    for (const run of runs) {
-      await this.db.update(findings).set({ runId: null }).where(eq(findings.runId, run.id));
-    }
-    await this.db.delete(testRuns).where(eq(testRuns.environmentId, id));
 
     await this.db.delete(environments).where(eq(environments.id, id));
     await this.touchProject(existing.projectId);

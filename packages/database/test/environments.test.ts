@@ -11,7 +11,7 @@ import {
   TestRunRepository,
 } from "../dist/index.js";
 
-test("remover ambiente com scans: apaga runs e mantém findings sem run", async () => {
+test("remover ambiente com scans: apaga runs e findings do ambiente", async () => {
   const handle = createSqliteDb(join(mkdtempSync(join(tmpdir(), "sw-")), "t.db"));
   const project = await new ProjectRepository(handle.db).create({ name: "p" });
   const environments = new EnvironmentRepository(handle.db);
@@ -43,8 +43,6 @@ test("remover ambiente com scans: apaga runs e mantém findings sem run", async 
 
   assert.equal(await environments.delete(env.id), true);
   assert.equal(await runs.getById(run.id), null);
-  const [kept] = await findings.listByProject(project.id);
-  assert.equal(kept?.id, "f1");
-  assert.equal(kept?.runId, undefined);
+  assert.deepEqual(await findings.listByProject(project.id), []);
   handle.close();
 });
