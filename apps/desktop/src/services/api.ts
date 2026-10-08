@@ -5,6 +5,7 @@ import type {
   HttpRequest,
   HttpResponse,
   LoginRecipe,
+  PersonaBinding,
   RateLimitConfig,
   ScanRun,
   TestCase,
@@ -12,6 +13,12 @@ import type {
   TestPersona,
   Variable,
 } from "@sw/core";
+
+export type EnvironmentPersonaDto = {
+  persona: TestPersona;
+  binding: PersonaBinding | null;
+  secretConfigured: boolean;
+};
 
 export type EnvironmentDto = Environment & {
   secretConfigured?: boolean;
@@ -73,6 +80,13 @@ export type ScanLogEvent =
       path: string;
       executed: number;
       findings: number;
+    }
+  | {
+      type: "persona";
+      personaId: string;
+      name: string;
+      ok: boolean;
+      error?: string;
     };
 
 export type ScanResult = {
@@ -466,6 +480,7 @@ export const api = {
       description?: string;
       fields: Record<string, unknown>;
       tags?: string[];
+      role?: string;
     },
   ) =>
     request<TestPersona>(`/api/projects/${projectId}/personas`, {
@@ -481,6 +496,7 @@ export const api = {
       description?: string;
       fields: Record<string, unknown>;
       tags?: string[];
+      role?: string;
     },
   ) =>
     request<TestPersona>(
@@ -495,4 +511,43 @@ export const api = {
     request<void>(`/api/projects/${projectId}/personas/${personaId}`, {
       method: "DELETE",
     }),
+
+  listEnvironmentPersonas: (environmentId: string) =>
+    request<EnvironmentPersonaDto[]>(
+      `/api/environments/${environmentId}/personas`,
+    ),
+
+  savePersonaBinding: (
+    environmentId: string,
+    personaId: string,
+    input: { authType: string; fixtures: Record<string, string> },
+  ) =>
+    request<PersonaBinding>(
+      `/api/environments/${environmentId}/personas/${encodeURIComponent(personaId)}`,
+      { method: "PUT", body: JSON.stringify(input) },
+    ),
+
+  deletePersonaBinding: (environmentId: string, personaId: string) =>
+    request<void>(
+      `/api/environments/${environmentId}/personas/${encodeURIComponent(personaId)}`,
+      { method: "DELETE" },
+    ),
+
+  setPersonaSecret: (environmentId: string, personaId: string, secret: string) =>
+    request<{ configured: boolean }>(
+      `/api/environments/${environmentId}/personas/${encodeURIComponent(personaId)}/secret`,
+      { method: "PUT", body: JSON.stringify({ secret }) },
+    ),
+
+  clearPersonaSecret: (environmentId: string, personaId: string) =>
+    request<void>(
+      `/api/environments/${environmentId}/personas/${encodeURIComponent(personaId)}/secret`,
+      { method: "DELETE" },
+    ),
+
+  testPersonaLogin: (environmentId: string, personaId: string) =>
+    request<LoginTestResult & { headers?: string[] }>(
+      `/api/environments/${environmentId}/personas/${encodeURIComponent(personaId)}/login/test`,
+      { method: "POST" },
+    ),
 };

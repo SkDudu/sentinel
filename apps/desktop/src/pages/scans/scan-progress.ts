@@ -378,6 +378,21 @@ export function reduceScanProgress(
     return { ...next, progress: overallProgress(next) };
   }
 
+  if (event.type === "persona") {
+    return {
+      ...prev,
+      activity: [
+        ...prev.activity,
+        activity(
+          event.ok
+            ? `Persona ${event.name} autenticada`
+            : `Persona ${event.name} fora do scan: ${event.error ?? "falha no login"}`,
+          event.ok ? "info" : "finding",
+        ),
+      ].slice(-80),
+    };
+  }
+
   // endpoint-done
   const endpointsDone = prev.endpointsDone + 1;
   const next: ScanProgress = {

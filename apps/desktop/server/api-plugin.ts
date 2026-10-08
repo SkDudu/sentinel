@@ -14,11 +14,15 @@ import {
 } from "@sw/core";
 import { parseOpenApi, parseSpecText } from "@sw/api-parser";
 import {
+  assertPersonaRecipe,
   createSecretStore,
   environmentSecretRef,
   fetchSpecWithRecipe,
   loginWithRecipe,
   LoginRecipeError,
+  personaEnvironment,
+  personaSecretRef,
+  resolvePersonaAuthHeaders,
 } from "@sw/auth";
 import {
   startLoginRecording,
@@ -29,6 +33,7 @@ import {
   EndpointRepository,
   EnvironmentRepository,
   FindingRepository,
+  PersonaBindingRepository,
   ProjectRepository,
   TestResultRepository,
   TestRunRepository,
@@ -140,7 +145,24 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
       const findings = new FindingRepository(handle.db);
       const runs = new TestRunRepository(handle.db);
       const testResults = new TestResultRepository(handle.db);
+      const personaBindings = new PersonaBindingRepository(handle.db);
       const recorders = new Map<string, RecorderHandle>();
+
+      const bindingSecretRef = (binding: {
+        environmentId: string;
+        personaId: string;
+        secretRef?: string;
+      }) =>
+        binding.secretRef ??
+        personaSecretRef(binding.environmentId, binding.personaId);
+
+      const deleteBindingSecrets = async (environmentId: string) => {
+        for (const binding of await personaBindings.listByEnvironment(
+          environmentId,
+        )) {
+          await secrets.delete(bindingSecretRef(binding));
+        }
+      };
 
       server.httpServer?.once("close", () => {
         handle?.close();
@@ -282,6 +304,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                 if (environment.secretRef) {
                   await secrets.delete(environment.secretRef);
                 }
+                await deleteBindingSecrets(environment.id);
               }
               if (!(await projects.delete(id))) return notFound(res);
               sendJson(res, 204);
@@ -408,6 +431,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
               if (existing.secretRef) {
                 await secrets.delete(existing.secretRef);
               }
+              await deleteBindingSecrets(id);
               if (!(await environments.delete(id))) return notFound(res);
               sendJson(res, 204);
               return;
@@ -755,6 +779,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                 categories && categories.length > 0 ? categories : undefined,
               variables: body.variables,
               rateLimit: body.rateLimit,
+              personas: listPersonas(dataDir, body.projectId),
               signal: abort.signal,
             };
             const repos = {
@@ -764,6 +789,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
               findings,
               runs,
               testResults,
+              personaBindings,
             };
             if (stream) {
               res.statusCode = 200;
@@ -1008,6 +1034,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                 description?: string;
                 fields?: Record<string, unknown>;
                 tags?: string[];
+                role?: string;
               }>(req);
               if (!body.name?.trim() || !body.fields) {
                 sendJson(res, 400, { error: "name and fields are required" });
@@ -1022,6 +1049,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                   description: body.description,
                   fields: body.fields,
                   tags: body.tags,
+                  role: body.role,
                 }),
               );
               return;
@@ -1034,9 +1062,16 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
           if (personaMatch && method === "DELETE") {
             const projectId = decodeURIComponent(personaMatch[1]!);
             const personaId = decodeURIComponent(personaMatch[2]!);
-            if (!(await projects.getById(projectId))) return notFound(res);
+            const project = await projects.getById(projectId);
+            if (!project) return notFound(res);
             if (!deletePersona(dataDir, projectId, personaId)) {
               return notFound(res);
+            }
+            for (const environment of project.environments) {
+              const binding = await personaBindings.get(environment.id, personaId);
+              if (!binding) continue;
+              await secrets.delete(bindingSecretRef(binding));
+              await personaBindings.delete(environment.id, personaId);
             }
             sendJson(res, 204);
             return;
@@ -1051,6 +1086,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
               description?: string;
               fields?: Record<string, unknown>;
               tags?: string[];
+              role?: string;
             }>(req);
             if (!body.name?.trim() || !body.fields) {
               sendJson(res, 400, { error: "name and fields are required" });
@@ -1065,9 +1101,169 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                 description: body.description,
                 fields: body.fields,
                 tags: body.tags,
+                role: body.role,
               }),
             );
             return;
+          }
+
+          const envPersonasMatch = path.match(
+            /^\/api\/environments\/([^/]+)\/personas$/,
+          );
+          if (envPersonasMatch && method === "GET") {
+            const environment = await environments.getById(
+              decodeURIComponent(envPersonasMatch[1]!),
+            );
+            if (!environment) return notFound(res);
+            const bindings = await personaBindings.listByEnvironment(
+              environment.id,
+            );
+            sendJson(
+              res,
+              200,
+              await Promise.all(
+                listPersonas(dataDir, environment.projectId).map(
+                  async (persona) => {
+                    const binding = bindings.find(
+                      (item) => item.personaId === persona.id,
+                    );
+                    return {
+                      persona,
+                      binding: binding ?? null,
+                      secretConfigured: binding
+                        ? await secrets.has(bindingSecretRef(binding))
+                        : false,
+                    };
+                  },
+                ),
+              ),
+            );
+            return;
+          }
+
+          const envPersonaMatch = path.match(
+            /^\/api\/environments\/([^/]+)\/personas\/([^/]+)(\/secret|\/login\/test)?$/,
+          );
+          if (envPersonaMatch) {
+            const environment = await environments.getById(
+              decodeURIComponent(envPersonaMatch[1]!),
+            );
+            if (!environment) return notFound(res);
+            const personaId = decodeURIComponent(envPersonaMatch[2]!);
+            const persona = listPersonas(dataDir, environment.projectId).find(
+              (item) => item.id === personaId,
+            );
+            if (!persona) return notFound(res);
+            const suffix = envPersonaMatch[3];
+            const binding = await personaBindings.get(environment.id, personaId);
+
+            if (!suffix && method === "GET") {
+              sendJson(res, 200, {
+                binding,
+                secretConfigured: binding
+                  ? await secrets.has(bindingSecretRef(binding))
+                  : false,
+              });
+              return;
+            }
+
+            if (!suffix && method === "PUT") {
+              const body = await readJson<{
+                authType?: string;
+                fixtures?: Record<string, unknown>;
+              }>(req);
+              const fixtures: Record<string, string> = {};
+              for (const [key, value] of Object.entries(body.fixtures ?? {})) {
+                if (value === null || value === undefined || value === "") continue;
+                fixtures[key] = String(value);
+              }
+              sendJson(
+                res,
+                200,
+                await personaBindings.upsert({
+                  environmentId: environment.id,
+                  personaId,
+                  authType: parseAuthType(body.authType),
+                  secretRef: personaSecretRef(environment.id, personaId),
+                  fixtures,
+                }),
+              );
+              return;
+            }
+
+            if (!suffix && method === "DELETE") {
+              if (!binding) return notFound(res);
+              await secrets.delete(bindingSecretRef(binding));
+              await personaBindings.delete(environment.id, personaId);
+              sendJson(res, 204);
+              return;
+            }
+
+            if (suffix === "/secret" && (method === "PUT" || method === "DELETE")) {
+              if (!binding) {
+                sendJson(res, 400, { error: "Configure o vínculo antes do secret" });
+                return;
+              }
+              const ref = bindingSecretRef(binding);
+              if (method === "DELETE") {
+                await secrets.delete(ref);
+                sendJson(res, 204);
+                return;
+              }
+              const body = await readJson<{ secret?: string }>(req);
+              if (!body.secret?.trim()) {
+                sendJson(res, 400, { error: "secret is required" });
+                return;
+              }
+              await secrets.set(ref, body.secret.trim());
+              sendJson(res, 200, { configured: true });
+              return;
+            }
+
+            if (suffix === "/login/test" && method === "POST") {
+              if (!binding) {
+                sendJson(res, 200, { ok: false, error: "Persona sem vínculo neste ambiente", steps: [] });
+                return;
+              }
+              const executor = new HttpExecutor({ timeoutMs: 15_000 });
+              try {
+                if (binding.authType === AuthType.LOGIN_RECIPE) {
+                  assertPersonaRecipe(environment.loginRecipe);
+                  const login = await loginWithRecipe(
+                    personaEnvironment(environment, binding),
+                    secrets,
+                    executor,
+                  );
+                  sendJson(res, 200, { ok: true, steps: login.steps });
+                  return;
+                }
+                if (
+                  binding.authType !== AuthType.NONE &&
+                  !(await secrets.has(bindingSecretRef(binding)))
+                ) {
+                  sendJson(res, 200, { ok: false, error: "Secret não configurado", steps: [] });
+                  return;
+                }
+                const headers = await resolvePersonaAuthHeaders(
+                  environment,
+                  binding,
+                  secrets,
+                  { executor },
+                );
+                sendJson(res, 200, {
+                  ok: true,
+                  steps: [],
+                  headers: Object.keys(headers),
+                });
+              } catch (error) {
+                sendJson(res, 200, {
+                  ok: false,
+                  error: error instanceof Error ? error.message : "Falha no login",
+                  steps: error instanceof LoginRecipeError ? error.steps : [],
+                });
+              }
+              return;
+            }
           }
 
           notFound(res);

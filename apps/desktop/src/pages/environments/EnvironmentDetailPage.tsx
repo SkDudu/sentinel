@@ -53,12 +53,14 @@ import {
   type EnvironmentFormValues,
 } from "@/pages/projects/EnvironmentFormDialog";
 import { ScanWorkspace } from "@/pages/scans/ScansPage";
+import { EnvironmentAccessPanel } from "./EnvironmentAccessPanel";
 import { EnvironmentEndpointsPanel } from "./EnvironmentDetailDialog";
 
-type Section = "info" | "endpoints" | "scan" | "lab";
+type Section = "info" | "endpoints" | "access" | "scan" | "lab";
 
 function sectionOf(pathname: string, base: string): Section {
   if (pathname === `${base}/endpoints`) return "endpoints";
+  if (pathname === `${base}/access`) return "access";
   if (pathname === `${base}/scan`) return "scan";
   if (pathname === `${base}/lab`) return "lab";
   return "info";
@@ -386,6 +388,7 @@ export function EnvironmentDetailPage() {
       title: "Endpoints",
       badge: endpointCount ?? undefined,
     },
+    { href: `${base}/access`, title: "Acesso" },
     { href: `${base}/scan`, title: "Scan do ambiente" },
     { href: `${base}/lab`, title: "AI Test Lab" },
   ];
@@ -550,6 +553,10 @@ export function EnvironmentDetailPage() {
           onCount={onEndpointCount}
           reloadToken={endpointsRevision}
         />
+      ) : null}
+
+      {section === "access" ? (
+        <EnvironmentAccessPanel environment={environment} />
       ) : null}
 
       {/* Mantém montado: trocar aba não perde scan ao vivo nem runs. */}

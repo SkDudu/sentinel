@@ -42,14 +42,17 @@ export function upsertPersona(
 ): TestPersona {
   const personas = listPersonas(dataDir, projectId);
   const id = input.id ?? randomUUID();
+  const idx = personas.findIndex((p) => p.id === id);
+  // `role` ausente = mantém; "" = limpa.
+  const role = (input.role ?? personas[idx]?.role)?.trim();
   const next: TestPersona = {
     id,
     name: input.name,
     description: input.description,
     fields: input.fields,
     tags: input.tags ?? [],
+    ...(role ? { role } : {}),
   };
-  const idx = personas.findIndex((p) => p.id === id);
   if (idx >= 0) personas[idx] = next;
   else personas.push(next);
   writePersonas(dataDir, projectId, personas);
