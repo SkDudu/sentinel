@@ -330,3 +330,46 @@ export const AccessRuleSchema = z.object({
   pathFixtures: z.record(z.string()).optional(),
 });
 export type AccessRule = z.infer<typeof AccessRuleSchema>;
+
+export const FlowStepSchema = z.object({
+  /** Estável; = id do nó no editor visual. */
+  id: z.string().min(1),
+  label: z.string().min(1),
+  /** personaId ou "anonymous". */
+  actor: z.string().min(1),
+  request: z.object({
+    method: EndpointSchema.shape.method,
+    /** Template: /orders/{{orderId}}. */
+    path: z.string().min(1),
+    query: z.record(z.string()).optional(),
+    body: z.unknown().optional(),
+  }),
+  extract: z.array(LoginExtractSchema).default([]),
+  expect: z.object({
+    status: z.union([z.array(z.number().int()).min(1), z.enum(["2xx", "4xx"])]),
+    json: z
+      .array(
+        z.object({
+          path: z.string().min(1),
+          equals: z.unknown().optional(),
+          exists: z.boolean().optional(),
+        }),
+      )
+      .optional(),
+  }),
+  severityOnFail: z.nativeEnum(Severity).optional(),
+  /** Posição no editor; runner ignora. */
+  ui: z.object({ x: z.number(), y: z.number() }).optional(),
+});
+export type FlowStep = z.infer<typeof FlowStepSchema>;
+
+export const FlowSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  setup: z.array(FlowStepSchema).default([]),
+  steps: z.array(FlowStepSchema).default([]),
+  /** Sempre roda (finally), best-effort. */
+  teardown: z.array(FlowStepSchema).default([]),
+});
+export type Flow = z.infer<typeof FlowSchema>;
