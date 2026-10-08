@@ -2,15 +2,21 @@ import {
   AuthType,
   ScanStatus,
   TestCategory,
+  redactRequest,
+  redactResponse,
   type Endpoint,
   type Environment,
+  type Finding,
+  type PersonaBinding,
   type RateLimitConfig,
   type TestCase,
   type TestDataOptions,
+  type TestPersona,
   type Variable,
 } from "@sw/core";
 import {
   resolveAuthHeaders,
+  resolvePersonaAuthHeaders,
   MemorySecretStore,
   OverlaySecretStore,
   type SecretStore,
@@ -20,6 +26,7 @@ import type {
   EndpointRepository,
   EnvironmentRepository,
   FindingRepository,
+  PersonaBindingRepository,
   ProjectRepository,
   TestResultInput,
   TestResultRepository,
@@ -27,7 +34,7 @@ import type {
 } from "@sw/database";
 import { HttpExecutor, type RequestExecutor } from "@sw/http-client";
 import { TestOrchestrator } from "@sw/security-engine";
-import type { TestRegistry } from "@sw/test-registry";
+import type { PersonaContext, TestRegistry } from "@sw/test-registry";
 
 export interface ScanRequest {
   projectId: string;
@@ -43,6 +50,8 @@ export interface ScanRequest {
   categories?: TestCategory[];
   /** Scan variables for {{token}} / {{userId}} interpolation + authz fixtures. */
   variables?: Variable[];
+  /** Personas do projeto; só as com binding no ambiente entram no scan. */
+  personas?: TestPersona[];
   rateLimit?: Partial<RateLimitConfig>;
   /** Optional custom executor (e.g. ZapExecutor). */
   executor?: RequestExecutor;
@@ -77,6 +86,13 @@ export type ScanProgressEvent =
       path: string;
       executed: number;
       findings: number;
+    }
+  | {
+      type: "persona";
+      personaId: string;
+      name: string;
+      ok: boolean;
+      error?: string;
     };
 
 const DEFAULT_RATE_LIMIT: RateLimitConfig = {
@@ -95,6 +111,7 @@ export async function runProjectScan(
     findings: FindingRepository;
     runs: TestRunRepository;
     testResults?: TestResultRepository;
+    personaBindings?: PersonaBindingRepository;
   },
   secretStore: SecretStore,
 ) {
@@ -151,6 +168,14 @@ export async function runProjectScan(
       signal: input.signal,
     });
   const authHeaders = await resolveAuthHeaders(authEnv, store, { executor });
+  const personas = await resolveScanPersonas({
+    environment,
+    personas: input.personas ?? [],
+    bindings: (await repos.personaBindings?.listByEnvironment(environment.id)) ?? [],
+    store,
+    executor,
+    onEvent: input.onEvent,
+  });
 
   const run = await repos.runs.create({
     projectId: input.projectId,
@@ -206,6 +231,7 @@ export async function runProjectScan(
         categories: input.aiOnly ? undefined : input.categories,
         productionSafetyMode: environment.productionSafetyMode,
         rateLimit,
+        personas,
         signal: input.signal,
         onProgress: ({ completed, total, testCase, findings }) => {
           input.onEvent?.({
@@ -229,8 +255,8 @@ export async function runProjectScan(
 
       totalCases += result.cases.length;
       completedCases += result.executed;
-      allFindings.push(...result.findings);
-      allResults.push(...result.results);
+      allFindings.push(...result.findings.map(redactFinding));
+      allResults.push(...result.results.map(redactResult));
 
       input.onEvent?.({
         type: "endpoint-done",
@@ -289,6 +315,68 @@ export async function runProjectScan(
     });
     throw error;
   }
+}
+
+function redactFinding(finding: Finding): Finding {
+  return {
+    ...finding,
+    request: finding.request && redactRequest(finding.request),
+    response: finding.response && redactResponse(finding.response),
+  };
+}
+
+function redactResult(result: TestResultInput): TestResultInput {
+  return {
+    ...result,
+    request: result.request && redactRequest(result.request),
+    response: result.response && redactResponse(result.response),
+  };
+}
+
+/** Autentica cada persona com binding; falha de uma não derruba o scan. */
+export async function resolveScanPersonas(input: {
+  environment: Environment;
+  personas: TestPersona[];
+  bindings: PersonaBinding[];
+  store: SecretStore;
+  executor: RequestExecutor;
+  onEvent?: (event: ScanProgressEvent) => void;
+}): Promise<Record<string, PersonaContext>> {
+  const out: Record<string, PersonaContext> = {};
+  for (const binding of input.bindings) {
+    const persona = input.personas.find((p) => p.id === binding.personaId);
+    if (!persona) continue;
+    try {
+      const headers = await resolvePersonaAuthHeaders(
+        input.environment,
+        binding,
+        input.store,
+        { executor: input.executor },
+      );
+      out[persona.id] = {
+        id: persona.id,
+        name: persona.name,
+        role: persona.role,
+        headers,
+        fixtures: binding.fixtures,
+      };
+      input.onEvent?.({
+        type: "persona",
+        personaId: persona.id,
+        name: persona.name,
+        ok: true,
+      });
+    } catch (error) {
+      input.onEvent?.({
+        type: "persona",
+        personaId: persona.id,
+        name: persona.name,
+        ok: false,
+        error: error instanceof Error ? error.message : "Falha no login",
+      });
+    }
+  }
+  return out;
 }
 
 function optionsForCategories(

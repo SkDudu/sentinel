@@ -1,4 +1,5 @@
 export {
+  resolveScanPersonas,
   runProjectScan,
   type ScanProgressEvent,
   type ScanRequest,

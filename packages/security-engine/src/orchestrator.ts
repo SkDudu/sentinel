@@ -21,6 +21,7 @@ import {
   createDefaultRegistry,
   interpolate,
   interpolateUnknown,
+  type PersonaContext,
   type SecurityTest,
   type TestContext,
   type TestRegistry,
@@ -55,6 +56,8 @@ export interface OrchestratorInput {
   categories?: TestCategory[];
   productionSafetyMode?: boolean;
   rateLimit?: RateLimitConfig;
+  /** Personas autenticadas no ambiente (headers + fixtures). */
+  personas?: Record<string, PersonaContext>;
   /** Abort between cases / in-flight HTTP when supported. */
   signal?: AbortSignal;
   onProgress?: (event: {
@@ -125,6 +128,7 @@ export class TestOrchestrator {
       authHeaders: input.authHeaders ?? {},
       productionSafetyMode: input.productionSafetyMode,
       rateLimit: input.rateLimit,
+      personas: input.personas,
     };
 
     if (!input.skipPlugins) {
