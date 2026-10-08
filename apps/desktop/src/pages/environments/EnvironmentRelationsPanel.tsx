@@ -140,6 +140,23 @@ export function EnvironmentRelationsPanel({
     }
   }
 
+  async function onSuggestWithAi() {
+    setBusy(true);
+    try {
+      const result = await api.suggestRelationsWithAi(environment.id);
+      apply(result.relations);
+      toast.add({
+        title: `${result.added} relações sugeridas pela IA`,
+        description: `Entram como sugeridas, para revisão.${result.rejected.length > 0 ? ` ${result.rejected.length} descartadas na validação.` : ""}`,
+        type: "success",
+      });
+    } catch (err) {
+      showError(err, "Falha ao sugerir com IA");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function onDelete(relation: ResourceRelation) {
     setBusy(true);
     try {
@@ -214,6 +231,15 @@ export function EnvironmentRelationsPanel({
             onClick={() => void review([...selected], "rejected")}
           >
             Rejeitar
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={busy}
+            onClick={() => void onSuggestWithAi()}
+          >
+            Sugerir com IA
           </Button>
           <Button type="button" size="sm" onClick={() => setManualOpen(true)}>
             Nova relação

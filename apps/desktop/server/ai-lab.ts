@@ -28,8 +28,16 @@ export async function generateAiCasesForEndpoints(input: {
     Math.floor(input.maxAiCases / Math.max(1, input.endpoints.length)),
   );
 
-  for (const endpoint of input.endpoints) {
+  for (const [index, endpoint] of input.endpoints.entries()) {
     const analyzed = analyzeEndpoint(endpoint);
+    // Com 1 caso por endpoint, o seed usaria sempre a 1ª persona.
+    const offset = input.personas.length
+      ? (index * perEndpoint) % input.personas.length
+      : 0;
+    const personas = [
+      ...input.personas.slice(offset),
+      ...input.personas.slice(0, offset),
+    ];
     const bundle = await generateTestData(
       analyzed,
       {
@@ -45,7 +53,7 @@ export async function generateAiCasesForEndpoints(input: {
         client: input.client ?? undefined,
         maxAiCases: perEndpoint,
         requireReview: true,
-        personas: input.personas,
+        personas,
         allowPersonaSeed: !input.client && input.allowPersonaSeed,
       },
     );

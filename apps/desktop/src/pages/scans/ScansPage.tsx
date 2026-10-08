@@ -159,6 +159,20 @@ export function ScanWorkspace({
     [endpoints],
   );
 
+  const [aiFilter, setAiFilter] = useState("");
+  const aiEndpointIds = useMemo(() => {
+    const q = aiFilter.trim().toLowerCase();
+    if (!q) return endpointIds;
+    return endpoints
+      .filter(
+        (item) =>
+          item.path.toLowerCase().includes(q) ||
+          item.method.toLowerCase() === q ||
+          item.tags.some((tag) => tag.toLowerCase().includes(q)),
+      )
+      .map((item) => item.id);
+  }, [aiFilter, endpoints, endpointIds]);
+
   const approvedCases = useMemo(
     () => aiCases.filter((c) => approved[c.id]),
     [aiCases, approved],
@@ -327,7 +341,7 @@ export function ScanWorkspace({
     try {
       const result = await api.generateAiCases({
         projectId: project.id,
-        endpointIds,
+        endpointIds: aiEndpointIds,
         allowPersonaSeed: true,
       });
       const next: Record<string, boolean> = {};
@@ -540,7 +554,9 @@ export function ScanWorkspace({
       ) : (
         <AiLabPanel
           environment={environment}
-          selectedCount={endpointIds.length}
+          selectedCount={aiEndpointIds.length}
+          endpointFilter={aiFilter}
+          onEndpointFilter={setAiFilter}
           busy={busy || endpointsLoading}
           scanPhase={scanPhase}
           cases={aiCases}

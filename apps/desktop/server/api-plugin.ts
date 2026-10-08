@@ -55,6 +55,11 @@ import {
   TestRunRepository,
   type SqliteHandle,
 } from "@sw/database";
+import {
+  suggestAccessRules,
+  suggestFlows,
+  suggestRelations,
+} from "@sw/ai-data-generator";
 import { generateFlowSkeletons } from "@sw/flows";
 import { HttpExecutor } from "@sw/http-client";
 import { runProjectScan, type ScanProgressEvent } from "@sw/scan-runner";
@@ -1163,6 +1168,69 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                   error instanceof Error
                     ? error.message
                     : "AI generation failed",
+              });
+            }
+            return;
+          }
+
+          const aiSuggestMatch = path.match(
+            /^\/api\/ai\/suggest-(access|flows|relations)$/,
+          );
+          if (aiSuggestMatch && method === "POST") {
+            const body = await readJson<{ environmentId?: string }>(req);
+            const environment = body.environmentId
+              ? await environments.getById(body.environmentId)
+              : null;
+            if (!environment) return notFound(res);
+            const client = createAiClientFromSettings(loadAiSettings(dataDir));
+            if (!client) {
+              sendJson(res, 400, {
+                error: "AI desabilitada — configure Settings → AI",
+              });
+              return;
+            }
+            const bindings = await personaBindings.listByEnvironment(environment.id);
+            const input = {
+              endpoints: await endpoints.listByEnvironment(environment.id),
+              resources: await relationsRepo.listResources(environment.id),
+              relations: await relationsRepo.listRelations(environment.id),
+              // Só nomes, roles e chaves de fixture: nada de secret nem valor.
+              personas: listPersonas(dataDir, environment.projectId).flatMap(
+                (persona) => {
+                  const binding = bindings.find((b) => b.personaId === persona.id);
+                  return binding
+                    ? [
+                        {
+                          id: persona.id,
+                          name: persona.name,
+                          role: persona.role,
+                          fixtureKeys: Object.keys(binding.fixtures),
+                        },
+                      ]
+                    : [];
+                },
+              ),
+            };
+            try {
+              const kind = aiSuggestMatch[1];
+              if (kind === "access") {
+                sendJson(res, 200, await suggestAccessRules(client, input));
+              } else if (kind === "flows") {
+                sendJson(res, 200, await suggestFlows(client, input));
+              } else {
+                const result = await suggestRelations(client, input);
+                for (const relation of result.relations) {
+                  await relationsRepo.upsertRelation(environment.id, relation);
+                }
+                sendJson(res, 200, {
+                  added: result.relations.length,
+                  rejected: result.rejected,
+                  relations: await relationsRepo.listRelations(environment.id),
+                });
+              }
+            } catch (error) {
+              sendJson(res, 400, {
+                error: error instanceof Error ? error.message : "Sugestão IA falhou",
               });
             }
             return;

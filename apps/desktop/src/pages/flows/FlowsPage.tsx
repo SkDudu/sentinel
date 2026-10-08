@@ -326,15 +326,29 @@ function GenerateFlowsDialog({
     setSelected(new Set());
   }, [open, environments]);
 
-  async function onLoad() {
+  async function onLoad(source: "graph" | "ai") {
     if (!environmentId) return;
     setBusy(true);
     try {
+      if (source === "ai") {
+        const { flows, rejected } = await api.suggestFlowsWithAi(environmentId);
+        // Review gate: sugestões da IA entram desmarcadas.
+        setSkeletons(flows);
+        setSelected(new Set());
+        if (rejected.length > 0) {
+          toast.add({
+            title: `${rejected.length} sugestões descartadas`,
+            description: rejected.map((r) => `${r.item}: ${r.reason}`).join(" · "),
+            type: "info",
+          });
+        }
+        return;
+      }
       const list = await api.flowSkeletons(environmentId);
       setSkeletons(list);
       setSelected(new Set(list.map((flow) => flow.id)));
     } catch (err) {
-      showError(err, "Falha ao gerar esqueletos");
+      showError(err, source === "ai" ? "Falha ao sugerir com IA" : "Falha ao gerar esqueletos");
     } finally {
       setBusy(false);
     }
@@ -366,6 +380,7 @@ function GenerateFlowsDialog({
           <DialogDescription>
             Esqueletos CRUD e BOLA cruzado a partir dos recursos do ambiente e
             das personas com vínculo. Revise corpo e expectativas no editor.
+            A IA vê só contrato, grafo, nomes, roles e chaves de fixture.
           </DialogDescription>
         </DialogHeader>
         <div className="flex items-end gap-2">
@@ -375,8 +390,11 @@ function GenerateFlowsDialog({
             onChange={setEnvironmentId}
             portalled={false}
           />
-          <Button type="button" variant="outline" disabled={busy || !environmentId} onClick={() => void onLoad()}>
+          <Button type="button" variant="outline" disabled={busy || !environmentId} onClick={() => void onLoad("graph")}>
             Carregar
+          </Button>
+          <Button type="button" variant="outline" disabled={busy || !environmentId} onClick={() => void onLoad("ai")}>
+            Sugerir com IA
           </Button>
         </div>
         {skeletons ? (

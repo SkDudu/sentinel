@@ -681,6 +681,26 @@ export const api = {
     request<Flow[]>(`/api/environments/${environmentId}/flows/skeletons`, {
       method: "POST",
     }),
+
+  suggestAccessWithAi: (environmentId: string) =>
+    request<{ rules: AccessRule[]; rejected: AiRejected[] }>("/api/ai/suggest-access", {
+      method: "POST",
+      body: JSON.stringify({ environmentId }),
+    }),
+
+  suggestFlowsWithAi: (environmentId: string) =>
+    request<{ flows: Flow[]; rejected: AiRejected[] }>("/api/ai/suggest-flows", {
+      method: "POST",
+      body: JSON.stringify({ environmentId }),
+    }),
+
+  suggestRelationsWithAi: (environmentId: string) =>
+    request<{ added: number; rejected: AiRejected[]; relations: ResourceRelation[] }>(
+      "/api/ai/suggest-relations",
+      { method: "POST", body: JSON.stringify({ environmentId }) },
+    ),
 };
+
+export type AiRejected = { item: string; reason: string };
 
 export type RelationStatus = "suggested" | "confirmed" | "rejected";

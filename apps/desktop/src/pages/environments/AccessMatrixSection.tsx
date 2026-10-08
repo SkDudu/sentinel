@@ -111,10 +111,13 @@ export function AccessMatrixSection({ environment }: { environment: EnvironmentD
     setDirty(true);
   }
 
-  async function onPrefill() {
+  async function onPrefill(source: "graph" | "ai") {
     setBusy(true);
     try {
-      const { rules: suggested } = await api.suggestAccessRulesFromGraph(environment.id);
+      const { rules: suggested, rejected = [] } =
+        source === "ai"
+          ? await api.suggestAccessWithAi(environment.id)
+          : { ...(await api.suggestAccessRulesFromGraph(environment.id)), rejected: [] };
       const fresh = suggested.filter(
         (rule) => !rules.has(cellKey(rule.endpointId, rule.personaId)),
       );
@@ -125,12 +128,12 @@ export function AccessMatrixSection({ environment }: { environment: EnvironmentD
       });
       if (fresh.length > 0) setDirty(true);
       toast.add({
-        title: "Matriz pré-preenchida",
-        description: `${fresh.length} células novas vindas do grafo; as já marcadas não mudam. Revise e salve.`,
+        title: source === "ai" ? "Sugestão da IA aplicada" : "Matriz pré-preenchida",
+        description: `${fresh.length} células novas vindas ${source === "ai" ? "da IA" : "do grafo"}; as já marcadas não mudam.${rejected.length > 0 ? ` ${rejected.length} sugestões descartadas na validação.` : ""} Revise e salve.`,
         type: "success",
       });
     } catch (err) {
-      showError(err, "Falha ao sugerir pelo grafo");
+      showError(err, source === "ai" ? "Falha ao sugerir com IA" : "Falha ao sugerir pelo grafo");
     } finally {
       setBusy(false);
     }
@@ -197,9 +200,18 @@ export function AccessMatrixSection({ environment }: { environment: EnvironmentD
             variant="outline"
             size="sm"
             disabled={busy}
-            onClick={() => void onPrefill()}
+            onClick={() => void onPrefill("graph")}
           >
             Pré-preencher pelo grafo
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={busy}
+            onClick={() => void onPrefill("ai")}
+          >
+            Sugerir com IA
           </Button>
           <Button type="button" size="sm" disabled={busy || !dirty} onClick={() => void onSave()}>
             Salvar

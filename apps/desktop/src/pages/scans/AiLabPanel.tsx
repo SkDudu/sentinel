@@ -7,6 +7,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 export function AiLabPanel({
   environment,
   selectedCount,
+  endpointFilter,
+  onEndpointFilter,
   busy,
   scanPhase,
   cases,
@@ -31,6 +33,8 @@ export function AiLabPanel({
 }: {
   environment: EnvironmentDto | undefined;
   selectedCount: number;
+  endpointFilter: string;
+  onEndpointFilter: (value: string) => void;
   busy: boolean;
   scanPhase: "idle" | "running" | "cancelling";
   cases: TestCase[];
@@ -69,6 +73,12 @@ export function AiLabPanel({
       </div>
 
       <div className="flex flex-wrap gap-2">
+        <Input
+          value={endpointFilter}
+          placeholder="Filtrar endpoints (path, método ou tag)"
+          onChange={(event) => onEndpointFilter(event.target.value)}
+          className="w-72"
+        />
         <Button
           type="button"
           variant="outline"
