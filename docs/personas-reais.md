@@ -227,7 +227,7 @@ Abas do `EnvironmentDetailPage` (`PageHeader2` tabs) ficam: **Informações · E
   - **Personas**: personas do projeto; por linha: auth (tipo + "Secret"), fixtures (chave/valor), "Testar login".
   - **Matriz**: tabela endpoint × persona com `allow/deny/own-only` (pré-preenchida pelo grafo); filtro por tag/método; "Sugerir com IA".
 - **Projeto → "Fluxos"**: lista; abrir fluxo → editor visual (React Flow) com aba "JSON" ao lado; "Rodar" usa ambiente escolhido e pinta status nos nós.
-- **Scan scope**: checkbox "Matriz de acesso" + seleção de fluxos.
+- **Scan scope**: checkbox "Matriz de acesso". Fluxo roda separado, só pelo "Rodar" do editor (backend de scan ainda aceita `flowIds`).
 - **AI Lab**: seleção de endpoints para geração (resolve o "1 caso por endpoint").
 
 ## Segurança

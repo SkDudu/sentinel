@@ -417,7 +417,6 @@ export function ScanRunPanel({
         open={scopeOpen}
         onOpenChange={setScopeOpen}
         endpoints={endpoints}
-        projectId={environment?.projectId}
         busy={busy}
         onConfirm={handleConfirmScope}
       />
