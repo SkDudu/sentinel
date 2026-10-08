@@ -179,6 +179,16 @@ export function applyMigrations(sqlite: DatabaseSync) {
       PRIMARY KEY (environment_id, endpoint_id, persona_id)
     );
 
+    CREATE TABLE IF NOT EXISTS ai_settings (
+      id TEXT PRIMARY KEY NOT NULL DEFAULT 'default',
+      enabled INTEGER NOT NULL DEFAULT 0,
+      kind TEXT NOT NULL,
+      base_url TEXT NOT NULL DEFAULT '',
+      model TEXT NOT NULL DEFAULT '',
+      api_key_enc TEXT,
+      max_ai_cases INTEGER NOT NULL DEFAULT 20
+    );
+
     CREATE TABLE IF NOT EXISTS flows (
       id TEXT PRIMARY KEY NOT NULL,
       project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,

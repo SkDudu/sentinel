@@ -7,6 +7,17 @@ import {
   text,
 } from "drizzle-orm/sqlite-core";
 
+export const aiSettings = sqliteTable("ai_settings", {
+  id: text("id").primaryKey().default("default"),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(false),
+  kind: text("kind").notNull(),
+  baseUrl: text("base_url").notNull().default(""),
+  model: text("model").notNull().default(""),
+  /** AES-256-GCM. Nunca o token em claro. */
+  apiKeyEnc: text("api_key_enc"),
+  maxAiCases: integer("max_ai_cases").notNull().default(20),
+});
+
 export const projects = sqliteTable("projects", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),

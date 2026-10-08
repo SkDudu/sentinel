@@ -93,6 +93,54 @@ async function ask(client: AiClient, payload: unknown): Promise<unknown[]> {
   return parsed;
 }
 
+/** Body de um passo. JSON objeto. Placeholders `{{prefix}}` / `{{fixtures.*}}`. */
+export async function generateStepBody(
+  client: AiClient,
+  input: {
+    method: string;
+    path: string;
+    summary?: string;
+    requestBodySchema?: unknown;
+  },
+): Promise<unknown> {
+  const schema =
+    input.requestBodySchema === undefined
+      ? undefined
+      : JSON.stringify(input.requestBodySchema).slice(0, 8_000);
+  const raw = await client.complete([
+    { role: "system", content: SYSTEM },
+    {
+      role: "user",
+      content: JSON.stringify({
+        instruction:
+          "Gere o JSON body de UM request de teste autorizado. Responda SOMENTE um objeto JSON, sem markdown. Strings únicas usam {{prefix}}. IDs de path ou relações usam {{fixtures.<chave>}}. Sem credenciais, SQL, scripts ou payloads de ataque.",
+        method: input.method,
+        path: input.path,
+        summary: input.summary,
+        requestBodySchema: schema,
+      }),
+    },
+  ]);
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  if (start === -1 || end === -1) {
+    throw new Error("A IA não devolveu um body utilizável. Tente de novo.");
+  }
+  const parsed: unknown = JSON.parse(raw.slice(start, end + 1));
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("A IA não devolveu um body utilizável. Tente de novo.");
+  }
+  const serialized = JSON.stringify(parsed);
+  if (serialized.length > 8_000) {
+    throw new Error("O body ficou grande demais. Tente de novo.");
+  }
+  const hit = blockedPattern(serialized);
+  if (hit) {
+    throw new Error("O body sugerido não passou na revisão de segurança. Tente de novo.");
+  }
+  return parsed;
+}
+
 function describe(item: unknown): string {
   const text = JSON.stringify(item) ?? String(item);
   return text.length > 160 ? `${text.slice(0, 157)}...` : text;

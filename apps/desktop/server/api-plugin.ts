@@ -57,6 +57,7 @@ import {
 } from "@sw/database";
 import {
   suggestAccessRules,
+  generateStepBody,
   suggestFlows,
   suggestRelations,
 } from "@sw/ai-data-generator";
@@ -68,10 +69,12 @@ import {
   generateAiCasesForEndpoints,
   interpretProjectFindings,
 } from "./ai-lab.js";
+import { openApiKey, sealApiKey } from "./ai-key-cipher.js";
 import {
-  loadAiSettings,
-  saveAiSettings,
+  deleteAiSettingsRow,
+  readAiSettingsRow,
   toPublicAiSettings,
+  writeAiSettingsRow,
   type AiSettingsFile,
 } from "./ai-settings.js";
 import {
@@ -107,6 +110,35 @@ function sendJson(res: ServerResponse, status: number, body?: unknown) {
   }
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   res.end(JSON.stringify(body));
+}
+
+async function listProviderModels(baseUrl: string, apiKey?: string): Promise<string[]> {
+  const response = await fetch(`${baseUrl.replace(/\/$/, "")}/models`, {
+    headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
+  });
+  if (!response.ok) throw new Error(`AI provider error: HTTP ${response.status}`);
+  const data = (await response.json()) as { data?: Array<{ id?: string }> };
+  return [
+    ...new Set(
+      (data.data ?? [])
+        .map((item) => item.id?.trim())
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+}
+
+function aiProbeMessage(error: unknown): string {
+  const raw = error instanceof Error ? error.message : "";
+  if (/HTTP 401|HTTP 403/.test(raw)) {
+    return "A chave foi recusada. Confira e tente de novo.";
+  }
+  if (/HTTP 404/.test(raw)) {
+    return "Não encontrei o provedor nesse endereço. Confira a Base URL.";
+  }
+  if (/fetch failed|ECONNREFUSED|ENOTFOUND/i.test(raw)) {
+    return "Não alcancei o provedor. Confira se ele está ligado e a Base URL.";
+  }
+  return "Não consegui falar com a IA. Confira provedor, modelo e chave.";
 }
 
 function notFound(res: ServerResponse) {
@@ -172,6 +204,23 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
       const accessRulesRepo = new AccessRuleRepository(handle.db);
       const flowsRepo = new FlowRepository(handle.db);
       const recorders = new Map<string, RecorderHandle>();
+      const sqlite = handle.sqlite;
+
+      function resolveAiSettings() {
+        const { settings, apiKeyEnc } = readAiSettingsRow(sqlite);
+        let apiKey: string | undefined;
+        if (apiKeyEnc) {
+          try {
+            apiKey = openApiKey(dataDir, apiKeyEnc);
+          } catch {
+            apiKey = undefined;
+          }
+        }
+        return {
+          settings: { ...settings, apiKey },
+          hasApiKey: Boolean(apiKeyEnc && apiKey),
+        };
+      }
 
       /** Contrato mudou: re-infere grafo (preserva revisão) e reaponta a matriz. */
       const refreshRelations = async (
@@ -1103,7 +1152,15 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
           }
 
           if (path === "/api/ai/settings" && method === "GET") {
-            sendJson(res, 200, toPublicAiSettings(loadAiSettings(dataDir)));
+            const { settings, hasApiKey } = resolveAiSettings();
+            sendJson(res, 200, toPublicAiSettings(settings, hasApiKey));
+            return;
+          }
+
+          if (path === "/api/ai/settings" && method === "DELETE") {
+            deleteAiSettingsRow(sqlite);
+            const { settings, hasApiKey } = resolveAiSettings();
+            sendJson(res, 200, toPublicAiSettings(settings, hasApiKey));
             return;
           }
 
@@ -1111,18 +1168,78 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
             const body = await readJson<Partial<AiSettingsFile>>(req);
             const kindValues = Object.values(AiProviderKind) as string[];
             if (body.kind && !kindValues.includes(body.kind)) {
-              sendJson(res, 400, { error: "invalid AI kind" });
+              sendJson(res, 400, { error: "Escolha um provedor da lista." });
               return;
             }
-            const saved = saveAiSettings(dataDir, {
-              enabled: body.enabled,
-              kind: body.kind,
-              baseUrl: body.baseUrl,
-              model: body.model,
-              apiKey: body.apiKey === "" ? undefined : body.apiKey,
-              maxAiCases: body.maxAiCases,
-            });
-            sendJson(res, 200, toPublicAiSettings(saved));
+            if (!body.baseUrl?.trim() || !body.model?.trim()) {
+              sendJson(res, 400, {
+                error: "Informe a Base URL, busque os modelos e escolha um antes de salvar.",
+              });
+              return;
+            }
+            const current = readAiSettingsRow(sqlite);
+            let apiKeyEnc = current.apiKeyEnc;
+            if (typeof body.apiKey === "string") {
+              apiKeyEnc = body.apiKey.trim() ? sealApiKey(dataDir, body.apiKey.trim()) : null;
+            }
+            if (!apiKeyEnc && body.kind !== "ollama") {
+              sendJson(res, 400, { error: "Informe a chave de API antes de salvar." });
+              return;
+            }
+            writeAiSettingsRow(
+              sqlite,
+              {
+                enabled: body.enabled ?? true,
+                kind: body.kind ?? current.settings.kind,
+                baseUrl: body.baseUrl.trim(),
+                model: body.model.trim(),
+                maxAiCases: body.maxAiCases ?? current.settings.maxAiCases,
+                saved: true,
+              },
+              apiKeyEnc,
+            );
+            const { settings, hasApiKey } = resolveAiSettings();
+            sendJson(res, 200, toPublicAiSettings(settings, hasApiKey));
+            return;
+          }
+
+          if (path === "/api/ai/test" && method === "POST") {
+            const body = await readJson<{
+              baseUrl?: string;
+              model?: string;
+              kind?: AiSettingsFile["kind"];
+              apiKey?: string;
+            }>(req);
+            const { settings } = await resolveAiSettings();
+            const apiKey = body.apiKey?.trim() || settings.apiKey;
+            const kind = body.kind ?? settings.kind;
+            if (kind !== "ollama" && !apiKey) {
+              sendJson(res, 400, {
+                error: "Informe a chave de API para testar esse provedor.",
+              });
+              return;
+            }
+            const baseUrl = body.baseUrl?.trim() || settings.baseUrl;
+            if (!baseUrl) {
+              sendJson(res, 400, { error: "Informe a Base URL para buscar os modelos." });
+              return;
+            }
+            try {
+              const models = await listProviderModels(baseUrl, apiKey);
+              if (models.length === 0) {
+                sendJson(res, 400, {
+                  error: "O provedor não listou nenhum modelo. Confira a URL e a chave.",
+                });
+                return;
+              }
+              sendJson(res, 200, {
+                ok: true,
+                models,
+                message: `${models.length} modelo${models.length === 1 ? "" : "s"} encontrado${models.length === 1 ? "" : "s"}. Escolha um.`,
+              });
+            } catch (error) {
+              sendJson(res, 400, { error: aiProbeMessage(error) });
+            }
             return;
           }
 
@@ -1149,7 +1266,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
               return;
             }
 
-            const settings = loadAiSettings(dataDir);
+            const { settings } = await resolveAiSettings();
             const client = createAiClientFromSettings(settings);
             const personas = listPersonas(dataDir, body.projectId);
 
@@ -1173,6 +1290,50 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
             return;
           }
 
+          if (path === "/api/ai/generate-body" && method === "POST") {
+            const body = await readJson<{
+              method?: string;
+              path?: string;
+              summary?: string;
+              requestBodySchema?: unknown;
+            }>(req);
+            if (!body.method || !body.path) {
+              sendJson(res, 400, { error: "Escolha um passo com método e path antes de gerar." });
+              return;
+            }
+            const { settings: aiSettings } = await resolveAiSettings();
+            if (!aiSettings.saved) {
+              sendJson(res, 400, {
+                error: "Salve o provedor em Configurações → IA antes de gerar.",
+              });
+              return;
+            }
+            const client = createAiClientFromSettings(aiSettings);
+            if (!client) {
+              sendJson(res, 400, {
+                error: "A IA está desligada. Ative em Configurações → IA e tente de novo.",
+              });
+              return;
+            }
+            try {
+              const generated = await generateStepBody(client, {
+                method: body.method,
+                path: body.path,
+                summary: body.summary,
+                requestBodySchema: body.requestBodySchema,
+              });
+              sendJson(res, 200, { body: generated });
+            } catch (error) {
+              sendJson(res, 400, {
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : "Não consegui gerar o body. Tente de novo.",
+              });
+            }
+            return;
+          }
+
           const aiSuggestMatch = path.match(
             /^\/api\/ai\/suggest-(access|flows|relations)$/,
           );
@@ -1182,7 +1343,8 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
               ? await environments.getById(body.environmentId)
               : null;
             if (!environment) return notFound(res);
-            const client = createAiClientFromSettings(loadAiSettings(dataDir));
+            const { settings: suggestSettings } = await resolveAiSettings();
+            const client = createAiClientFromSettings(suggestSettings);
             if (!client) {
               sendJson(res, 400, {
                 error: "AI desabilitada — configure Settings → AI",
@@ -1248,7 +1410,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
             }
             if (!(await projects.getById(body.projectId))) return notFound(res);
 
-            const settings = loadAiSettings(dataDir);
+            const { settings } = await resolveAiSettings();
             const client = createAiClientFromSettings(settings);
             if (!client) {
               sendJson(res, 400, {

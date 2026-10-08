@@ -153,6 +153,7 @@ export interface AiSettingsDto {
   model: string;
   maxAiCases: number;
   hasApiKey: boolean;
+  saved: boolean;
 }
 
 async function runScanStream(
@@ -253,7 +254,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   } & T;
 
   if (!response.ok) {
-    throw new Error(data.error ?? `Request failed (${response.status})`);
+    throw new Error(data.error ?? "Não foi possível concluir. Tente de novo.");
   }
 
   return data as T;
@@ -456,6 +457,20 @@ export const api = {
 
   getAiSettings: () => request<AiSettingsDto>("/api/ai/settings"),
 
+  deleteAiSettings: () =>
+    request<AiSettingsDto>("/api/ai/settings", { method: "DELETE" }),
+
+  testAi: (input: {
+    kind?: string;
+    baseUrl?: string;
+    model?: string;
+    apiKey?: string;
+  }) =>
+    request<{ ok: boolean; message: string; models: string[] }>("/api/ai/test", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
   saveAiSettings: (input: {
     enabled?: boolean;
     kind?: string;
@@ -612,33 +627,6 @@ export const api = {
       `/api/environments/${environmentId}/relations`,
     ),
 
-  reviewRelations: (
-    environmentId: string,
-    ids: string[],
-    status: RelationStatus,
-  ) =>
-    request<{ relations: ResourceRelation[] }>(
-      `/api/environments/${environmentId}/relations`,
-      { method: "PATCH", body: JSON.stringify({ ids, status }) },
-    ),
-
-  createRelation: (
-    environmentId: string,
-    input: Pick<ResourceRelation, "from" | "to" | "kind" | "via"> & {
-      source?: string;
-    },
-  ) =>
-    request<ResourceRelation>(`/api/environments/${environmentId}/relations`, {
-      method: "POST",
-      body: JSON.stringify(input),
-    }),
-
-  deleteRelation: (environmentId: string, relationId: string) =>
-    request<void>(
-      `/api/environments/${environmentId}/relations/${encodeURIComponent(relationId)}`,
-      { method: "DELETE" },
-    ),
-
   listAccessRules: (environmentId: string) =>
     request<{ rules: AccessRule[] }>(`/api/environments/${environmentId}/access-rules`),
 
@@ -688,19 +676,22 @@ export const api = {
       body: JSON.stringify({ environmentId }),
     }),
 
+  generateStepBody: (input: {
+    method: string;
+    path: string;
+    summary?: string;
+    requestBodySchema?: unknown;
+  }) =>
+    request<{ body: unknown }>("/api/ai/generate-body", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
   suggestFlowsWithAi: (environmentId: string) =>
     request<{ flows: Flow[]; rejected: AiRejected[] }>("/api/ai/suggest-flows", {
       method: "POST",
       body: JSON.stringify({ environmentId }),
     }),
-
-  suggestRelationsWithAi: (environmentId: string) =>
-    request<{ added: number; rejected: AiRejected[]; relations: ResourceRelation[] }>(
-      "/api/ai/suggest-relations",
-      { method: "POST", body: JSON.stringify({ environmentId }) },
-    ),
 };
 
 export type AiRejected = { item: string; reason: string };
-
-export type RelationStatus = "suggested" | "confirmed" | "rejected";

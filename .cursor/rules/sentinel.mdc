@@ -35,6 +35,12 @@ Trabalho ativo sem pedido de feature nova: Fase 6 / `docs/hardening.md`.
 8. Comunicação com o usuário em português.
 9. UI de página: `PageShell` + `PageEmptyState` (`docs/ui.md`) — não inventar empty/header paralelo.
 
+## Erros na UI
+
+Ação do usuário que falha (salvar, gerar, rodar, importar) mostra **toast** `type: "error"`.
+
+Texto **sempre para quem usa o app**, em português: o que aconteceu e o que fazer. Sem rota, método HTTP, status, stack, nome de função ou inglês de servidor ("Not found", "Request failed"). Se a API só devolver erro técnico, traduzir para uma frase acionável. Título curto; detalhe na descrição.
+
 ## Escopo de mudança
 
 - Diff mínimo; sem refactors oportunistas.

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Lightbulb, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Lightbulb, Sparkles, Trash2 } from "lucide-react";
 import {
   ANONYMOUS_PERSONA,
   FlowStepSchema,
@@ -82,17 +82,46 @@ function JsonField({
   value,
   onValid,
   placeholder,
+  syncKey = 0,
+  onGenerate,
+  generating,
 }: {
   label: string;
   value: unknown;
   onValid: (value: unknown) => void;
   placeholder?: string;
+  /** Incrementa quando a IA (ou outro pai) substitui o valor. */
+  syncKey?: number;
+  onGenerate?: () => void;
+  generating?: boolean;
 }) {
   const [text, setText] = useState(value === undefined ? "" : JSON.stringify(value, null, 2));
   const [error, setError] = useState<string | null>(null);
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  useEffect(() => {
+    if (syncKey === 0) return;
+    const next = valueRef.current;
+    setText(next === undefined ? "" : JSON.stringify(next, null, 2));
+    setError(null);
+  }, [syncKey]);
   return (
     <label className="block text-[11px] text-muted-foreground">
-      {label}
+      <span className="flex items-center justify-between gap-2">
+        {label}
+        {onGenerate ? (
+          <Button
+            type="button"
+            size="xs"
+            variant="outline"
+            disabled={generating}
+            onClick={onGenerate}
+          >
+            <Sparkles data-icon="inline-start" />
+            {generating ? "Gerando…" : "Gerar com IA"}
+          </Button>
+        ) : null}
+      </span>
       <textarea
         value={text}
         placeholder={placeholder}
@@ -125,6 +154,10 @@ export function StepPanel({
   actors,
   suggestion,
   onSuggest,
+  bodyHint,
+  bodySyncKey,
+  onGenerateBody,
+  generatingBody,
   onChange,
   onRemove,
 }: {
@@ -133,6 +166,10 @@ export function StepPanel({
   actors: ActorOption[];
   suggestion: string | null;
   onSuggest: () => void;
+  bodyHint?: string | null;
+  bodySyncKey?: number;
+  onGenerateBody?: () => void;
+  generatingBody?: boolean;
   onChange: (step: FlowStep, phase?: FlowPhase) => void;
   onRemove: () => void;
 }) {
@@ -216,9 +253,13 @@ export function StepPanel({
         <JsonField
           label="Body (JSON, aceita {{var}})"
           value={step.request.body}
+          syncKey={bodySyncKey}
+          onGenerate={onGenerateBody}
+          generating={generatingBody}
           placeholder='{"name": "{{prefix}}-item"}'
           onValid={(body) => onChange({ ...step, request: { ...step.request, body } })}
         />
+        {bodyHint && step.request.body === undefined ? <p className="text-[11px] text-amber-500">{bodyHint}</p> : null}
 
         <JsonField
           label="Extract"

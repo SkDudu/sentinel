@@ -17,6 +17,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import {
   ANONYMOUS_PERSONA,
+  sampleRequestBody,
   type Endpoint,
   type Flow,
   type FlowStep,
@@ -27,6 +28,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { api } from "@/services/api";
+import { toast } from "@/components/ui/toast";
 import {
   canConnect,
   flowToGraph,
@@ -147,6 +150,8 @@ export function FlowCanvas({
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initial.edges);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [bodySyncKey, setBodySyncKey] = useState(0);
+  const [generatingBody, setGeneratingBody] = useState(false);
 
   const base = useMemo(
     () => ({ id: flow.id, name: flow.name, description: flow.description }),
@@ -226,11 +231,12 @@ export function FlowCanvas({
   );
 
   function addEndpoint(endpoint: Endpoint) {
+    const body = SAFE.has(endpoint.method) ? undefined : sampleRequestBody(endpoint.requestBodySchema);
     appendStep(
       {
         label: `${endpoint.method} ${endpoint.path}`,
         actor: actors[0]?.id ?? ANONYMOUS_PERSONA,
-        request: { method: endpoint.method, path: templated(endpoint.path) },
+        request: { method: endpoint.method, path: templated(endpoint.path), ...(body ? { body } : {}) },
         extract: [],
         expect: { status: "2xx" },
       },
@@ -254,6 +260,16 @@ export function FlowCanvas({
     }
     return null;
   }, [selected, endpoints, resources]);
+
+  const bodyHint = useMemo(() => {
+    if (!selected || SAFE.has(selected.data.step.request.method)) return null;
+    const { method, path } = selected.data.step.request;
+    const endpoint = endpoints.find((e) => e.method === method && shape(e.path) === shape(path));
+    if (!endpoint) return null;
+    return sampleRequestBody(endpoint.requestBodySchema)
+      ? null
+      : "OpenAPI não descreve o body deste endpoint — preencha à mão.";
+  }, [selected, endpoints]);
 
   function applySuggestion() {
     if (!selected || !suggestion) return;
@@ -281,6 +297,38 @@ export function FlowCanvas({
       selected.data.phase,
       selected.id,
     );
+  }
+
+  async function generateBody() {
+    if (!selected) return;
+    const { method, path } = selected.data.step.request;
+    const endpoint = endpoints.find((e) => e.method === method && shape(e.path) === shape(path));
+    setGeneratingBody(true);
+    try {
+      const { body } = await api.generateStepBody({
+        method,
+        path,
+        summary: endpoint?.summary,
+        requestBodySchema: endpoint?.requestBodySchema,
+      });
+      updateStep(selected.id, {
+        ...selected.data.step,
+        request: { ...selected.data.step.request, body },
+      });
+      setBodySyncKey((n) => n + 1);
+    } catch (error) {
+      const raw = error instanceof Error ? error.message : "";
+      const technical = !raw || /not found/i.test(raw) || /\/api\//.test(raw);
+      toast.add({
+        title: "Não deu para gerar o body",
+        description: technical
+          ? "Tente de novo. Se continuar, reinicie o Sentinel."
+          : raw,
+        type: "error",
+      });
+    } finally {
+      setGeneratingBody(false);
+    }
   }
 
   function updateStep(id: string, step: FlowStep, phase?: FlowPhase) {
@@ -391,6 +439,10 @@ export function FlowCanvas({
                 : null
             }
             onSuggest={applySuggestion}
+            bodyHint={bodyHint}
+            bodySyncKey={bodySyncKey}
+            generatingBody={generatingBody}
+            onGenerateBody={() => void generateBody()}
             onChange={(step, phase) => updateStep(selected.id, step, phase)}
             onRemove={() => removeStep(selected.id)}
           />

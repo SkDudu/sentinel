@@ -29,7 +29,6 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
-import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/toast";
 import { PageShell } from "@/components/layout/page-shell";
 
@@ -47,6 +46,18 @@ const KIND_HINTS: Record<string, string> = {
   [AiProviderKind.OPENAI]: "API da OpenAI. A chave fica no cofre, fora do SQLite.",
   [AiProviderKind.OPENAI_COMPATIBLE]:
     "Qualquer endpoint no formato da API da OpenAI.",
+};
+
+const SAVED_MASK = "••••••••";
+
+const BLANK_AI: AiSettingsDto = {
+  enabled: false,
+  kind: AiProviderKind.OPENAI_COMPATIBLE,
+  baseUrl: "",
+  model: "",
+  maxAiCases: 20,
+  hasApiKey: false,
+  saved: false,
 };
 
 const PROVIDER_ITEMS = Object.values(AiProviderKind).map((kind) => ({
@@ -81,36 +92,106 @@ const VAULT_FACTS = [
 export function SettingsPage() {
   const [settings, setSettings] = useState<AiSettingsDto | null>(null);
   const [apiKey, setApiKey] = useState("");
+  const [models, setModels] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     void api
       .getAiSettings()
-      .then(setSettings)
+      .then((next) => {
+        setSettings(next);
+        setApiKey(next.hasApiKey ? SAVED_MASK : "");
+      })
       .catch((err: unknown) =>
         setError(err instanceof Error ? err.message : "Falha ao carregar IA"),
       );
   }, []);
 
+  async function onTest() {
+    if (!settings) return;
+    const needsKey = settings.kind !== "ollama";
+    if (needsKey && !apiKey.trim() && !settings.hasApiKey) {
+      toast.add({
+        title: "Falta a chave",
+        description: "Informe a chave de API para testar esse provedor.",
+        type: "error",
+      });
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await api.testAi({
+        kind: settings.kind,
+        baseUrl: settings.baseUrl,
+        ...(apiKey.trim() && apiKey !== SAVED_MASK ? { apiKey: apiKey.trim() } : {}),
+      });
+      setModels(result.models);
+      setSettings({
+        ...settings,
+        model: result.models.includes(settings.model) ? settings.model : "",
+      });
+      toast.add({ title: result.message, type: "success" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Não consegui testar a IA.";
+      setError(message);
+      toast.add({ title: "Teste da IA falhou", description: message, type: "error" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function resetForm(next: AiSettingsDto = BLANK_AI) {
+    setSettings(next);
+    setApiKey(next.hasApiKey ? SAVED_MASK : "");
+    setModels([]);
+  }
+
+  async function onDeleteKey() {
+    setBusy(true);
+    setError(null);
+    try {
+      const next = await api.deleteAiSettings();
+      resetForm(next);
+      toast.add({ title: "Chave apagada. O formulário foi limpo.", type: "success" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Não consegui apagar a chave.";
+      setError(message);
+      toast.add({ title: "Não consegui apagar a chave", description: message, type: "error" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function onSave() {
     if (!settings) return;
+    if (!settings.model.trim()) {
+      toast.add({
+        title: "Escolha um modelo",
+        description: "Teste a conexão, veja a lista e escolha o modelo antes de salvar.",
+        type: "error",
+      });
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
       const next = await api.saveAiSettings({
-        enabled: settings.enabled,
+        enabled: true,
         kind: settings.kind,
         baseUrl: settings.baseUrl,
         model: settings.model,
         maxAiCases: settings.maxAiCases,
-        ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
+        ...(apiKey.trim() && apiKey !== SAVED_MASK ? { apiKey: apiKey.trim() } : {}),
       });
-      setSettings(next);
-      setApiKey("");
+      resetForm(next);
+      if (next.model) setModels([next.model]);
       toast.add({ title: "Configurações de IA salvas.", type: "success" });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao salvar");
+      const message = err instanceof Error ? err.message : "Não consegui salvar.";
+      setError(message);
+      toast.add({ title: "Não consegui salvar", description: message, type: "error" });
     } finally {
       setBusy(false);
     }
@@ -176,21 +257,12 @@ export function SettingsPage() {
             ) : (
               <>
                 <CardHeader className="border-b">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <CardTitle>IA habilitada</CardTitle>
-                      <CardDescription>
-                        Desligada, o AI Lab não chama o provedor.
-                      </CardDescription>
-                    </div>
-                    <Switch
-                      checked={settings.enabled}
-                      aria-label="IA habilitada"
-                      onCheckedChange={(enabled) =>
-                        setSettings({ ...settings, enabled })
-                      }
-                    />
-                  </div>
+                  <CardTitle>Provedor de IA</CardTitle>
+                  <CardDescription>
+                    {settings.saved
+                      ? "Configuração salva. A chave não volta para a tela."
+                      : "Nada salvo ainda."}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-4">
                   <Field id="ai-kind" label="Provedor" hint={KIND_HINTS[settings.kind]}>
@@ -198,7 +270,10 @@ export function SettingsPage() {
                       items={PROVIDER_ITEMS}
                       value={settings.kind}
                       onValueChange={(value) => {
-                        if (value != null) setSettings({ ...settings, kind: value });
+                        if (value != null) {
+                          setModels([]);
+                          setSettings({ ...settings, kind: value, model: "" });
+                        }
                       }}
                     >
                       <SelectTrigger id="ai-kind" className="w-full">
@@ -216,77 +291,110 @@ export function SettingsPage() {
                     </Select>
                   </Field>
 
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <Field id="ai-base-url" label="Base URL">
-                      <Input
-                        id="ai-base-url"
-                        value={settings.baseUrl}
-                        onChange={(e) =>
-                          setSettings({ ...settings, baseUrl: e.target.value })
-                        }
-                        className="font-mono text-xs"
-                        spellCheck={false}
-                        autoComplete="off"
-                      />
-                    </Field>
-                    <Field id="ai-model" label="Modelo">
-                      <Input
-                        id="ai-model"
-                        value={settings.model}
-                        onChange={(e) =>
-                          setSettings({ ...settings, model: e.target.value })
-                        }
-                        spellCheck={false}
-                        autoComplete="off"
-                      />
-                    </Field>
-                  </div>
-
-                  <Field
-                    id="ai-api-key"
-                    label="Chave de API"
-                    hint={
-                      settings.hasApiKey
-                        ? "Já está no cofre. Deixe em branco para manter."
-                        : "Opcional. Gravada no cofre, não no banco."
-                    }
-                  >
+                  <Field id="ai-base-url" label="Base URL">
                     <Input
-                      id="ai-api-key"
-                      type="password"
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
+                      id="ai-base-url"
+                      value={settings.baseUrl}
+                      placeholder="https://api.exemplo.com/v1"
+                      onChange={(e) => {
+                        setModels([]);
+                        setSettings({ ...settings, baseUrl: e.target.value, model: "" });
+                      }}
                       className="font-mono text-xs"
-                      autoComplete="new-password"
                       spellCheck={false}
+                      autoComplete="off"
                     />
                   </Field>
 
                   <Field
-                    id="ai-max-cases"
-                    label="Máximo de casos por geração"
-                    hint="De 1 a 100."
+                    id="ai-api-key"
+                    label="Token"
+                    hint={
+                      apiKey === SAVED_MASK
+                        ? "Chave salva. Clique no campo para trocar."
+                        : settings.hasApiKey
+                          ? "Digite a chave nova para substituir a salva."
+                          : "Obrigatória, exceto no Ollama. Gravada cifrada."
+                    }
                   >
-                    <Input
-                      id="ai-max-cases"
-                      type="number"
-                      min={1}
-                      max={100}
-                      value={settings.maxAiCases}
-                      onChange={(e) =>
-                        setSettings({
-                          ...settings,
-                          maxAiCases: Number(e.target.value) || 20,
-                        })
-                      }
-                      className="max-w-32"
-                    />
+                    <div className="flex gap-2">
+                      <Input
+                        id="ai-api-key"
+                        type="password"
+                        value={apiKey}
+                        placeholder="Cole a chave"
+                        onFocus={() => {
+                          if (apiKey === SAVED_MASK) setApiKey("");
+                        }}
+                        onChange={(e) => setApiKey(e.target.value)}
+                        className="font-mono text-xs tracking-widest"
+                        autoComplete="new-password"
+                        spellCheck={false}
+                      />
+                      {settings.hasApiKey ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={busy}
+                          onClick={() => void onDeleteKey()}
+                        >
+                          Apagar chave
+                        </Button>
+                      ) : null}
+                    </div>
+                  </Field>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => void onTest()}
+                  >
+                    {busy ? <Spinner data-icon="inline-start" /> : null}
+                    Buscar modelos
+                  </Button>
+
+                  <Field
+                    id="ai-model"
+                    label="Modelo"
+                    hint={
+                      models.length > 0
+                        ? "Lista vinda do provedor."
+                        : "Busque os modelos antes de escolher."
+                    }
+                  >
+                    <Select
+                      items={(settings.model && !models.includes(settings.model)
+                        ? [settings.model, ...models]
+                        : models
+                      ).map((id) => ({ value: id, label: id }))}
+                      value={settings.model || null}
+                      onValueChange={(value) => {
+                        if (value != null) setSettings({ ...settings, model: value });
+                      }}
+                    >
+                      <SelectTrigger id="ai-model" className="w-full">
+                        <SelectValue placeholder="Nenhum modelo ainda" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {(settings.model && !models.includes(settings.model)
+                            ? [settings.model, ...models]
+                            : models
+                          ).map((id) => (
+                            <SelectItem key={id} value={id}>
+                              {id}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
                   </Field>
                 </CardContent>
                 <CardFooter className="justify-end">
                   <Button
                     type="button"
-                    disabled={busy}
+                    disabled={busy || !settings.model.trim()}
                     onClick={() => void onSave()}
                   >
                     {busy ? <Spinner data-icon="inline-start" /> : null}

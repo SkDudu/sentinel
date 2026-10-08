@@ -5,7 +5,7 @@ import type { AiSettingsFile } from "./ai-settings.js";
 export function createAiClientFromSettings(
   settings: AiSettingsFile,
 ): AiClient | null {
-  if (!settings.enabled) return null;
+  if (!settings.saved || !settings.enabled) return null;
 
   const config: AiProviderConfig = {
     kind: settings.kind,
