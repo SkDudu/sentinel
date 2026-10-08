@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   integer,
+  primaryKey,
   real,
   sqliteTable,
   text,
@@ -130,3 +131,17 @@ export const findings = sqliteTable("findings", {
     .notNull()
     .default(sql`(datetime('now'))`),
 });
+
+export const personaBindings = sqliteTable(
+  "persona_bindings",
+  {
+    environmentId: text("environment_id")
+      .notNull()
+      .references(() => environments.id, { onDelete: "cascade" }),
+    personaId: text("persona_id").notNull(),
+    authType: text("auth_type").notNull().default("NONE"),
+    secretRef: text("secret_ref"),
+    fixturesJson: text("fixtures_json").notNull().default("{}"),
+  },
+  (table) => [primaryKey({ columns: [table.environmentId, table.personaId] })],
+);

@@ -134,4 +134,15 @@ export function applyMigrations(sqlite: DatabaseSync) {
   if (!runColumns.some((column) => column.name === "categories_json")) {
     sqlite.exec("ALTER TABLE test_runs ADD COLUMN categories_json TEXT");
   }
+
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS persona_bindings (
+      environment_id TEXT NOT NULL REFERENCES environments(id) ON DELETE CASCADE,
+      persona_id TEXT NOT NULL,
+      auth_type TEXT NOT NULL DEFAULT 'NONE',
+      secret_ref TEXT,
+      fixtures_json TEXT NOT NULL DEFAULT '{}',
+      PRIMARY KEY (environment_id, persona_id)
+    );
+  `);
 }
