@@ -5,6 +5,7 @@ import type {
   RateLimitConfig,
   ScanRun,
   TestCase,
+  TestCategory,
   TestPersona,
   Variable,
 } from "@sw/core";
@@ -22,6 +23,41 @@ export interface ProjectDto {
   environments: EnvironmentDto[];
 }
 
+export type ScanLogEvent =
+  | { type: "start"; endpoints: number; runId?: string }
+  | {
+      type: "endpoint";
+      index: number;
+      total: number;
+      method: string;
+      path: string;
+    }
+  | {
+      type: "case";
+      method: string;
+      path: string;
+      name: string;
+      completed: number;
+      total: number;
+      findings: number;
+    }
+  | {
+      type: "endpoint-done";
+      method: string;
+      path: string;
+      executed: number;
+      findings: number;
+    };
+
+export type ScanResult = {
+  run: ScanRun;
+  findings: Finding[];
+  endpointsScanned: number;
+  totalCases: number;
+  variables?: Variable[];
+  cancelled?: boolean;
+};
+
 export interface AiSettingsDto {
   enabled: boolean;
   kind: string;
@@ -29,6 +65,82 @@ export interface AiSettingsDto {
   model: string;
   maxAiCases: number;
   hasApiKey: boolean;
+}
+
+async function runScanStream(
+  input: {
+    projectId: string;
+    environmentId: string;
+    endpointIds?: string[];
+    bearerToken?: string;
+    approvedAiCases?: TestCase[];
+    aiOnly?: boolean;
+    categories?: TestCategory[];
+    variables?: Variable[];
+    rateLimit?: Partial<RateLimitConfig>;
+  },
+  init?: { signal?: AbortSignal; onEvent?: (event: ScanLogEvent) => void },
+): Promise<ScanResult> {
+  const response = await fetch("/api/scans", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/x-ndjson",
+    },
+    body: JSON.stringify(input),
+    signal: init?.signal,
+  });
+
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/x-ndjson")) {
+    const data = (await response.json().catch(() => ({}))) as {
+      error?: string;
+    } & ScanResult;
+    if (!response.ok) {
+      throw new Error(data.error ?? `Request failed (${response.status})`);
+    }
+    return data;
+  }
+
+  if (!response.body) {
+    throw new Error("Scan sem stream");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let result: ScanResult | null = null;
+
+  const consume = (line: string) => {
+    if (!line.trim()) return;
+    const event = JSON.parse(line) as
+      | ScanLogEvent
+      | { type: "result"; result: ScanResult }
+      | { type: "error"; error: string };
+    if (event.type === "result") {
+      result = event.result;
+      return;
+    }
+    if (event.type === "error") {
+      throw new Error(event.error);
+    }
+    init?.onEvent?.(event);
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) consume(line);
+  }
+  if (buffer.trim()) consume(buffer);
+
+  if (!result) {
+    throw new Error("Scan terminou sem resultado");
+  }
+  return result;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -141,6 +253,12 @@ export const api = {
       },
     ),
 
+  clearEnvironmentOpenApi: (environmentId: string) =>
+    request<{ removed: number }>(
+      `/api/environments/${environmentId}/openapi`,
+      { method: "DELETE" },
+    ),
+
   listFindings: (projectId: string) =>
     request<Finding[]>(`/api/projects/${projectId}/findings`),
 
@@ -153,6 +271,33 @@ export const api = {
   listRuns: (projectId: string) =>
     request<ScanRun[]>(`/api/projects/${projectId}/runs`),
 
+  getEnvironmentLatency: (environmentId: string) =>
+    request<{
+      points: Array<{
+        runId: string;
+        startedAt?: string;
+        finishedAt?: string;
+        sampleCount: number;
+        p50: number;
+        p95: number;
+        p99: number;
+      }>;
+      headlineMs: number;
+      trend: number;
+    }>(`/api/environments/${environmentId}/latency`),
+
+  getRunDetail: (runId: string) =>
+    request<{
+      run: ScanRun;
+      findings: Finding[];
+      results: {
+        passed: number;
+        failed: number;
+        total: number;
+        byTest: Array<{ testId: string; passed: number; failed: number }>;
+      };
+    }>(`/api/runs/${runId}`),
+
   runScan: (
     input: {
       projectId: string;
@@ -161,23 +306,16 @@ export const api = {
       bearerToken?: string;
       approvedAiCases?: TestCase[];
       aiOnly?: boolean;
+      categories?: TestCategory[];
       variables?: Variable[];
       rateLimit?: Partial<RateLimitConfig>;
     },
-    init?: { signal?: AbortSignal },
+    init?: {
+      signal?: AbortSignal;
+      onEvent?: (event: ScanLogEvent) => void;
+    },
   ) =>
-    request<{
-      run: ScanRun;
-      findings: Finding[];
-      endpointsScanned: number;
-      totalCases: number;
-      variables?: Variable[];
-      cancelled?: boolean;
-    }>("/api/scans", {
-      method: "POST",
-      body: JSON.stringify(input),
-      signal: init?.signal,
-    }),
+    runScanStream(input, init),
 
   getAiSettings: () => request<AiSettingsDto>("/api/ai/settings"),
 

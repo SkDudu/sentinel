@@ -4,11 +4,16 @@ import { DashboardPage } from "@/pages/dashboard/DashboardPage";
 import { ProjectsPage } from "@/pages/projects/ProjectsPage";
 import { ProjectDashboardPage } from "@/pages/projects/ProjectDashboardPage";
 import { EnvironmentsPage } from "@/pages/environments/EnvironmentsPage";
-import { ScansPage } from "@/pages/scans/ScansPage";
+import { EnvironmentDetailPage } from "@/pages/environments/EnvironmentDetailPage";
 import { FindingsPage } from "@/pages/findings/FindingsPage";
 import { SettingsPage } from "@/pages/settings/SettingsPage";
 
 function LegacyEndpointsRedirect() {
+  const { projectId } = useParams();
+  return <Navigate to={`/projects/${projectId}/environments`} replace />;
+}
+
+function LegacyScansRedirect() {
   const { projectId } = useParams();
   return <Navigate to={`/projects/${projectId}/environments`} replace />;
 }
@@ -26,10 +31,17 @@ export default function App() {
           element={<EnvironmentsPage />}
         />
         <Route
+          path="projects/:projectId/environments/:environmentId/*"
+          element={<EnvironmentDetailPage />}
+        />
+        <Route
           path="projects/:projectId/endpoints"
           element={<LegacyEndpointsRedirect />}
         />
-        <Route path="projects/:projectId/scans" element={<ScansPage />} />
+        <Route
+          path="projects/:projectId/scans"
+          element={<LegacyScansRedirect />}
+        />
         <Route
           path="projects/:projectId/findings"
           element={<FindingsPage />}

@@ -292,10 +292,13 @@ export function FindingsPage() {
         <PageEmptyState
           icon={Bug}
           title="Nenhum finding ainda"
-          description="Rode um scan em Scans para gerar findings neste projeto."
+          description="Abra um ambiente e rode um scan para gerar findings neste projeto."
           action={
-            <Button render={<Link to={`/projects/${project.id}/scans`} />}>
-              Ir para Scans
+            <Button
+              nativeButton={false}
+              render={<Link to={`/projects/${project.id}/environments`} />}
+            >
+              Ir para Ambientes
             </Button>
           }
         />

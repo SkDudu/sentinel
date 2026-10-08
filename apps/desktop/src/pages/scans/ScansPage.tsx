@@ -1,22 +1,40 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { FolderKanban } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import type { Endpoint, ScanRun, TestCase, TestPersona } from "@sw/core";
-import { api } from "@/services/api";
-import { useProjectStore } from "@/stores/project";
+import { AuthType } from "@sw/core";
+import { api, type ProjectDto, type ScanLogEvent } from "@/services/api";
+import { LiveBadge } from "@/components/dashboardblocks/realtime";
 import { Button } from "@/components/ui/button";
-import { PageEmptyState } from "@/components/layout/page-empty-state";
-import { PageShell } from "@/components/layout/page-shell";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
+import { AiLabPanel } from "./AiLabPanel";
+import { ScanRunDialog } from "./ScanRunDialog";
+import { ScanRunPanel, type ScanScopePayload } from "./ScanRunPanel";
+import {
+  beginScanProgress,
+  createIdleScanProgress,
+  finishScanProgress,
+  reduceScanProgress,
+  setScanCancelling,
+  type ScanProgress,
+} from "./scan-progress";
 
-export function ScansPage() {
-  const { projectId } = useParams<{ projectId: string }>();
-  const { projects, loadProjects, setActiveProject } = useProjectStore();
-  const project = projects.find((p) => p.id === projectId);
+export function ScanWorkspace({
+  project,
+  environmentId,
+  view,
+}: {
+  project: ProjectDto;
+  environmentId: string;
+  view: "scan" | "lab";
+}) {
 
   const [endpoints, setEndpoints] = useState<Endpoint[]>([]);
+  const [endpointsLoading, setEndpointsLoading] = useState(false);
   const [runs, setRuns] = useState<ScanRun[]>([]);
-  const [environmentId, setEnvironmentId] = useState("");
-  const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [bearerToken, setBearerToken] = useState("");
   const [variablesJson, setVariablesJson] = useState(
     '{\n  "userId": "1",\n  "otherUserId": "999999"\n}',
@@ -27,7 +45,10 @@ export function ScansPage() {
   >("idle");
   const [scanAbort, setScanAbort] = useState<AbortController | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [lastResult, setLastResult] = useState<string | null>(null);
+  const [scanProgress, setScanProgress] = useState<ScanProgress>(() =>
+    createIdleScanProgress(0),
+  );
+  const [scanDialogOpen, setScanDialogOpen] = useState(false);
 
   const [aiCases, setAiCases] = useState<TestCase[]>([]);
   const [rejectedAi, setRejectedAi] = useState<
@@ -43,45 +64,61 @@ export function ScansPage() {
   const [editingPersonaId, setEditingPersonaId] = useState<string | null>(null);
 
   useEffect(() => {
-    void loadProjects();
-  }, [loadProjects]);
-
-  useEffect(() => {
-    if (projectId) setActiveProject(projectId);
-  }, [projectId, setActiveProject]);
-
-  useEffect(() => {
     if (!environmentId) {
       setEndpoints([]);
-      setSelected({});
+      setEndpointsLoading(false);
+      setScanProgress((prev) =>
+        prev.outcome === "idle" ? createIdleScanProgress(0) : prev,
+      );
       return;
     }
     let cancelled = false;
-    void api.listEnvironmentEndpoints(environmentId).then((items) => {
-      if (cancelled) return;
-      setEndpoints(items);
-      const next: Record<string, boolean> = {};
-      for (const item of items) next[item.id] = true;
-      setSelected(next);
-    });
+    setEndpointsLoading(true);
+    void api
+      .listEnvironmentEndpoints(environmentId)
+      .then((items) => {
+        if (cancelled) return;
+        setEndpoints(items);
+        setScanProgress((prev) =>
+          prev.outcome === "idle"
+            ? createIdleScanProgress(
+                items.length,
+                items.map((item) => ({
+                  method: item.method,
+                  path: item.path,
+                })),
+              )
+            : prev,
+        );
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setEndpoints([]);
+        setError(err instanceof Error ? err.message : "Falha ao carregar endpoints");
+      })
+      .finally(() => {
+        if (!cancelled) setEndpointsLoading(false);
+      });
     return () => {
       cancelled = true;
     };
   }, [environmentId]);
 
   useEffect(() => {
-    if (!project) return;
-    setEnvironmentId((current) => {
-      if (current && project.environments.some((env) => env.id === current)) {
-        return current;
-      }
-      return project.environments[0]?.id ?? "";
-    });
-    void api.listRuns(project.id).then(setRuns);
+    let cancelled = false;
+    void api
+      .listRuns(project.id)
+      .then((items) => {
+        if (!cancelled) setRuns(items);
+      })
+      .catch(() => {
+        if (!cancelled) setRuns([]);
+      });
     void api.listPersonas(project.id).then(setPersonas);
     void api
       .getAiCases(project.id)
       .then((stored) => {
+        if (cancelled) return;
         setAiCases(stored.cases);
         const next: Record<string, boolean> = {};
         for (const c of stored.cases) {
@@ -92,22 +129,42 @@ export function ScansPage() {
         setGenMode(stored.genMode ?? null);
       })
       .catch(() => {
+        if (cancelled) return;
         setAiCases([]);
         setApproved({});
         setRejectedAi([]);
         setGenMode(null);
       });
-  }, [project]);
+    return () => {
+      cancelled = true;
+    };
+  }, [project.id]);
 
-  const selectedIds = useMemo(
-    () => Object.entries(selected).filter(([, v]) => v).map(([id]) => id),
-    [selected],
+  // Recarrega histórico ao mudar projeto, ambiente ou aba Scan/Lab.
+  useEffect(() => {
+    let cancelled = false;
+    void api
+      .listRuns(project.id)
+      .then((items) => {
+        if (!cancelled) setRuns(items);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [project.id, environmentId, view]);
+
+  const endpointIds = useMemo(
+    () => endpoints.map((item) => item.id),
+    [endpoints],
   );
 
   const approvedCases = useMemo(
     () => aiCases.filter((c) => approved[c.id]),
     [aiCases, approved],
   );
+
+  const environment = project?.environments.find((env) => env.id === environmentId);
 
   function parseVariables() {
     const raw = JSON.parse(variablesJson) as Record<string, unknown>;
@@ -137,6 +194,32 @@ export function ScansPage() {
     });
   }
 
+  function onScanEvent(event: ScanLogEvent) {
+    if (event.type === "start") {
+      if (event.runId) {
+        const runId = event.runId;
+        setRuns((prev) => {
+          if (prev.some((run) => run.id === runId)) return prev;
+          return [
+            {
+              id: runId,
+              projectId: project.id,
+              environmentId,
+              status: "RUNNING",
+              startedAt: new Date().toISOString(),
+              totalCases: 0,
+              completedCases: 0,
+              findingsCount: 0,
+            },
+            ...prev,
+          ];
+        });
+      }
+      void api.listRuns(project.id).then(setRuns).catch(() => undefined);
+    }
+    setScanProgress((prev) => reduceScanProgress(prev, event));
+  }
+
   async function runScanJob(
     input: Parameters<typeof api.runScan>[0],
     successLabel: (result: Awaited<ReturnType<typeof api.runScan>>) => string,
@@ -147,23 +230,50 @@ export function ScansPage() {
     setBusy(true);
     setScanPhase("running");
     setError(null);
-    setLastResult(null);
+    const targetIds = new Set(input.endpointIds ?? endpointIds);
+    const seeds = endpoints
+      .filter((item) => targetIds.has(item.id))
+      .map((item) => ({ method: item.method, path: item.path }));
+    setScanProgress(
+      beginScanProgress(
+        seeds.length || targetIds.size,
+        Boolean(environment?.productionSafetyMode),
+        seeds,
+      ),
+    );
+    setScanDialogOpen(true);
     try {
-      const result = await api.runScan(input, { signal: abort.signal });
-      if (result.cancelled || result.run.status === "CANCELLED") {
-        setLastResult(
-          `Scan cancelado: ${result.run.completedCases}/${result.totalCases} casos, ${result.findings.length} findings.`,
-        );
-      } else {
-        setLastResult(successLabel(result));
-      }
+      const result = await api.runScan(input, {
+        signal: abort.signal,
+        onEvent: onScanEvent,
+      });
+      const summary =
+        result.cancelled || result.run.status === "CANCELLED"
+          ? `Scan cancelado: ${result.run.completedCases}/${result.totalCases} casos, ${result.findings.length} findings.`
+          : successLabel(result);
+      setScanProgress((prev) =>
+        finishScanProgress(
+          prev,
+          result.cancelled || result.run.status === "CANCELLED"
+            ? "cancelled"
+            : "done",
+          summary,
+        ),
+      );
       setRuns(await api.listRuns(project.id));
     } catch (err) {
       if (abort.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) {
-        setLastResult("Scan cancelado pelo usuário.");
+        const summary = "Scan cancelado pelo usuário.";
+        setScanProgress((prev) =>
+          finishScanProgress(prev, "cancelled", summary),
+        );
         setRuns(await api.listRuns(project.id));
       } else {
-        setError(err instanceof Error ? err.message : "Scan falhou");
+        const summary = err instanceof Error ? err.message : "Scan falhou";
+        setError(summary);
+        setScanProgress((prev) =>
+          finishScanProgress(prev, "failed", summary),
+        );
         setRuns(await api.listRuns(project.id));
       }
     } finally {
@@ -173,15 +283,26 @@ export function ScansPage() {
     }
   }
 
-  async function onRun() {
+  async function onRun(scope: ScanScopePayload) {
     if (!project || !environmentId) return;
+    let variables;
+    try {
+      variables = parseVariables();
+    } catch {
+      setError("Variáveis do scan não são JSON válido.");
+      return;
+    }
     await runScanJob(
       {
         projectId: project.id,
         environmentId,
-        endpointIds: selectedIds,
-        bearerToken: bearerToken || undefined,
-        variables: parseVariables(),
+        endpointIds: scope.endpointIds,
+        categories: scope.categories,
+        bearerToken:
+          environment?.authType === AuthType.BASIC
+            ? undefined
+            : bearerToken || undefined,
+        variables,
       },
       (result) =>
         `Scan concluído: ${result.endpointsScanned} endpoints, ${result.totalCases} casos, ${result.findings.length} findings.`,
@@ -191,6 +312,7 @@ export function ScansPage() {
   function onCancelScan() {
     if (!scanAbort) return;
     setScanPhase("cancelling");
+    setScanProgress((prev) => setScanCancelling(prev));
     scanAbort.abort();
   }
 
@@ -201,7 +323,7 @@ export function ScansPage() {
     try {
       const result = await api.generateAiCases({
         projectId: project.id,
-        endpointIds: selectedIds,
+        endpointIds,
         allowPersonaSeed: true,
       });
       const next: Record<string, boolean> = {};
@@ -259,6 +381,13 @@ export function ScansPage() {
 
   async function onRunApprovedAi() {
     if (!project || !environmentId || approvedCases.length === 0) return;
+    let variables;
+    try {
+      variables = parseVariables();
+    } catch {
+      setError("Variáveis do scan não são JSON válido.");
+      return;
+    }
     const stamped = approvedCases.map((c) => ({
       ...c,
       tags: [...c.tags.filter((t) => t !== "needs-review"), "approved"],
@@ -279,11 +408,14 @@ export function ScansPage() {
       {
         projectId: project.id,
         environmentId,
-        endpointIds: selectedIds,
-        bearerToken: bearerToken || undefined,
+        endpointIds,
+        bearerToken:
+          environment?.authType === AuthType.BASIC
+            ? undefined
+            : bearerToken || undefined,
         approvedAiCases: stamped,
         aiOnly: true,
-        variables: parseVariables(),
+        variables,
       },
       (result) =>
         `AI Lab: ${result.totalCases} casos aprovados, ${result.findings.length} findings.`,
@@ -345,385 +477,102 @@ export function ScansPage() {
     }
   }
 
-  if (!project) {
-    return (
-      <PageShell title="Scans">
-        <PageEmptyState
-          icon={FolderKanban}
-          title="Nenhum projeto ativo"
-          description="Abra um projeto em Projetos para rodar scans e AI Lab."
-          action={
-            <Button render={<Link to="/projects" />}>Ir para Projetos</Button>
-          }
-        />
-      </PageShell>
-    );
-  }
-
-  if (project.environments.length === 0) {
-    return (
-      <PageShell title="Scans">
-        <PageEmptyState
-          icon={FolderKanban}
-          title="Nenhum ambiente"
-          description="Adicione um ambiente no dashboard do projeto antes de rodar scans."
-          action={
-            <Button
-              render={
-                <Link to={`/projects/${project.id}/environments?newEnv=1`} />
-              }
-            >
-              Adicionar ambiente
-            </Button>
-          }
-        />
-      </PageShell>
-    );
-  }
-
   return (
-    <PageShell title="Scans">
-
-      {error && (
-        <p className="mb-4 rounded-md border border-[var(--danger)]/40 bg-[var(--danger)]/10 px-3 py-2 text-sm text-[var(--danger)]">
-          {error}
-        </p>
-      )}
-      {scanPhase !== "idle" && (
-        <p className="mb-4 text-sm text-[var(--warn)]">
-          {scanPhase === "cancelling"
-            ? "Cancelando scan…"
-            : "Scan em execução…"}
-        </p>
-      )}
-      {lastResult && (
-        <p className="mb-4 text-sm text-[var(--accent)]">{lastResult}</p>
-      )}
-
-      <div className="mb-6 space-y-4 rounded-lg border border-[var(--line)] bg-[var(--panel)] p-5">
-        <label className="block text-sm">
-          Ambiente
-          <select
-            value={environmentId}
-            onChange={(e) => setEnvironmentId(e.target.value)}
-            className="mt-1 w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2"
-          >
-            {project.environments.map((env) => (
-              <option key={env.id} value={env.id}>
-                {env.name} — {env.baseUrl}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="block text-sm">
-          Override de token (opcional — só desta execução; senão usa o vault do
-          ambiente)
-          <input
-            type="password"
-            value={bearerToken}
-            onChange={(e) => setBearerToken(e.target.value)}
-            className="mt-1 w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2 font-mono text-xs"
-            placeholder="deixe vazio para usar secret salvo"
-          />
-        </label>
-        {project.environments.find((e) => e.id === environmentId)
-          ?.secretConfigured && (
-          <p className="text-xs text-[var(--accent)]">
-            Secret configurado no vault para este ambiente.
-          </p>
-        )}
-        {project.environments.find((e) => e.id === environmentId)
-          ?.productionSafetyMode && (
-          <p className="text-xs text-[var(--warn)]">
-            Production Safety Mode: rate-limit capped (≤5 req, concurrency 1).
-          </p>
-        )}
-
-        <label className="block text-sm">
-          Variáveis do scan (JSON → {"{{userId}}"}, {"{{otherUserId}}"},{" "}
-          {"{{token}}"}…)
-          <textarea
-            value={variablesJson}
-            onChange={(e) => setVariablesJson(e.target.value)}
-            rows={4}
-            className="mt-1 w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2 font-mono text-xs"
-          />
-        </label>
-
-        <div>
-          <p className="mb-2 text-sm text-[var(--muted)]">
-            Endpoints ({selectedIds.length}/{endpoints.length})
-          </p>
-          {endpoints.length === 0 ? (
-            <p className="text-sm text-[var(--muted)]">
-              Importe o OpenAPI no ambiente primeiro.
-            </p>
-          ) : (
-            <ul className="max-h-56 space-y-1 overflow-auto">
-              {endpoints.map((endpoint) => (
-                <li key={endpoint.id}>
-                  <label className="flex items-center gap-2 rounded border border-[var(--line)] px-3 py-2 font-mono text-xs">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(selected[endpoint.id])}
-                      onChange={() =>
-                        setSelected((prev) => ({
-                          ...prev,
-                          [endpoint.id]: !prev[endpoint.id],
-                        }))
-                      }
-                    />
-                    <span>
-                      {endpoint.method} {endpoint.path}
-                    </span>
-                  </label>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={busy || !environmentId || selectedIds.length === 0}
-            onClick={() => void onRun()}
-            className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          >
-            {scanPhase === "running" ? "Executando…" : "Run scan"}
-          </button>
-          {scanPhase !== "idle" && (
-            <button
+    <div className="flex min-w-0 flex-col gap-4">
+      {error ? (
+        <Alert variant="destructive">
+          <AlertCircle />
+          <AlertTitle>Algo deu errado</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : null}
+      {view === "lab" && scanPhase !== "idle" ? (
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <span className="flex items-center gap-2">
+            <LiveBadge
+              label={
+                scanPhase === "cancelling" ? "Cancelando" : "Scan ao vivo"
+              }
+              paused={scanPhase === "cancelling"}
+            />
+            <span className="text-muted-foreground">
+              {scanProgress.liveLabel ?? "Executando casos aprovados…"}
+            </span>
+          </span>
+          <div className="flex flex-wrap gap-2">
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setScanDialogOpen(true)}
+            >
+              Ver progresso
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
               disabled={scanPhase === "cancelling"}
               onClick={onCancelScan}
-              className="rounded-md border border-[var(--danger)]/40 px-4 py-2 text-sm text-[var(--danger)] disabled:opacity-50"
             >
               {scanPhase === "cancelling" ? "Cancelando…" : "Cancelar"}
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="mb-6 space-y-4 rounded-lg border border-[var(--line)] bg-[var(--panel)] p-5">
-        <div>
-          <h3 className="text-lg font-medium">AI Test Lab</h3>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            Gera casos (Ollama ou seed de personas), review gate obrigatório,
-            safety filter no servidor. Aprovações persistem em{" "}
-            <code className="text-[var(--accent)]">data/ai-cases/</code>.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={busy || selectedIds.length === 0}
-            onClick={() => void onGenerateAi()}
-            className="rounded-md border border-[var(--line)] px-4 py-2 text-sm disabled:opacity-50"
-          >
-            Gerar casos AI
-          </button>
-          {aiCases.length > 0 && (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void onClearAiCases()}
-              className="rounded-md border border-[var(--line)] px-4 py-2 text-sm disabled:opacity-50"
-            >
-              Limpar casos salvos
-            </button>
-          )}
-          <button
-            type="button"
-            disabled={
-              busy || !environmentId || approvedCases.length === 0
-            }
-            onClick={() => void onRunApprovedAi()}
-            className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          >
-            Run aprovados ({approvedCases.length})
-          </button>
-          {scanPhase !== "idle" && (
-            <button
-              type="button"
-              disabled={scanPhase === "cancelling"}
-              onClick={onCancelScan}
-              className="rounded-md border border-[var(--danger)]/40 px-4 py-2 text-sm text-[var(--danger)] disabled:opacity-50"
-            >
-              {scanPhase === "cancelling" ? "Cancelando…" : "Cancelar"}
-            </button>
-          )}
-        </div>
-
-        {genMode && (
-          <p className="text-xs text-[var(--muted)]">
-            Modo: {genMode}
-            {rejectedAi.length > 0
-              ? ` · ${rejectedAi.length} rejeitados pelo safety filter`
-              : ""}
-          </p>
-        )}
-
-        {aiCases.length > 0 && (
-          <ul className="max-h-72 space-y-2 overflow-auto">
-            {aiCases.map((testCase) => (
-              <li
-                key={testCase.id}
-                className="rounded border border-[var(--line)] px-3 py-2"
-              >
-                <label className="flex items-start gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    className="mt-1"
-                    checked={Boolean(approved[testCase.id])}
-                    onChange={() => void onToggleApproved(testCase.id)}
-                  />
-                  <span>
-                    <span className="font-medium">{testCase.name}</span>
-                    {testCase.description && (
-                      <span className="mt-0.5 block text-xs text-[var(--muted)]">
-                        {testCase.description}
-                      </span>
-                    )}
-                    <code className="mt-1 block whitespace-pre-wrap font-mono text-[10px] text-[var(--muted)]">
-                      {JSON.stringify(testCase.mutations, null, 2)}
-                    </code>
-                  </span>
-                </label>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {rejectedAi.length > 0 && (
-          <div>
-            <p className="mb-1 text-xs uppercase tracking-wider text-[var(--muted)]">
-              Rejeitados (safety)
-            </p>
-            <ul className="space-y-1 text-xs text-[var(--danger)]">
-              {rejectedAi.map((item) => (
-                <li key={item.id}>
-                  {item.name}: {item.reason}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        <div className="border-t border-[var(--line)] pt-4">
-          <p className="mb-2 text-sm font-medium">Personas</p>
-          <ul className="mb-3 space-y-1">
-            {personas.map((persona) => (
-              <li
-                key={persona.id}
-                className="flex items-center justify-between gap-2 rounded border border-[var(--line)] px-3 py-2 text-sm"
-              >
-                <span>
-                  {persona.name}
-                  <span className="ml-2 text-xs text-[var(--muted)]">
-                    {persona.tags.join(", ")}
-                  </span>
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => onEditPersona(persona)}
-                    className="text-xs text-[var(--accent)]"
-                  >
-                    Editar
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => void onDeletePersona(persona.id)}
-                    className="text-xs text-[var(--danger)]"
-                  >
-                    Apagar
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <label className="block text-sm">
-              Nome
-              <input
-                value={personaName}
-                onChange={(e) => setPersonaName(e.target.value)}
-                className="mt-1 w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2"
-              />
-            </label>
-            <label className="block text-sm sm:col-span-2">
-              Fields (JSON)
-              <textarea
-                value={personaFieldsJson}
-                onChange={(e) => setPersonaFieldsJson(e.target.value)}
-                rows={4}
-                className="mt-1 w-full rounded-md border border-[var(--line)] bg-[var(--bg)] px-3 py-2 font-mono text-xs"
-              />
-            </label>
-          </div>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={busy || !personaName.trim()}
-              onClick={() => void onSavePersona()}
-              className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm disabled:opacity-50"
-            >
-              {editingPersonaId ? "Salvar persona" : "Adicionar persona"}
-            </button>
-            {editingPersonaId && (
-              <button
-                type="button"
-                onClick={() => {
-                  setEditingPersonaId(null);
-                  setPersonaName("");
-                  setPersonaFieldsJson(
-                    '{\n  "email": "edge@example.com",\n  "role": "user"\n}',
-                  );
-                }}
-                className="rounded-md border border-[var(--line)] px-3 py-1.5 text-sm"
-              >
-                Cancelar edição
-              </button>
-            )}
+            </Button>
           </div>
         </div>
-      </div>
+      ) : null}
+      {view === "scan" ? (
+        <ScanRunPanel
+          environment={environment}
+          environmentId={environmentId}
+          endpoints={endpoints}
+          busy={busy || endpointsLoading}
+          progress={scanProgress}
+          runs={runs}
+          dialogOpen={scanDialogOpen}
+          onDialogOpenChange={setScanDialogOpen}
+          onRun={(scope) => void onRun(scope)}
+          onCancel={onCancelScan}
+        />
+      ) : (
+        <AiLabPanel
+          environment={environment}
+          selectedCount={endpointIds.length}
+          busy={busy || endpointsLoading}
+          scanPhase={scanPhase}
+          cases={aiCases}
+          approved={approved}
+          approvedCount={approvedCases.length}
+          rejected={rejectedAi}
+          genMode={genMode}
+          personas={personas}
+          personaName={personaName}
+          personaFieldsJson={personaFieldsJson}
+          editingPersonaId={editingPersonaId}
+          onGenerate={() => void onGenerateAi()}
+          onClear={() => void onClearAiCases()}
+          onRunApproved={() => void onRunApprovedAi()}
+          onToggleApproved={(id) => void onToggleApproved(id)}
+          onPersonaName={setPersonaName}
+          onPersonaFields={setPersonaFieldsJson}
+          onSavePersona={() => void onSavePersona()}
+          onEditPersona={onEditPersona}
+          onCancelEdit={() => {
+            setEditingPersonaId(null);
+            setPersonaName("");
+            setPersonaFieldsJson(
+              '{\n  "email": "edge@example.com",\n  "role": "user"\n}',
+            );
+          }}
+          onDeletePersona={(id) => void onDeletePersona(id)}
+        />
+      )}
 
-      <div>
-        <h3 className="mb-3 text-sm uppercase tracking-wider text-[var(--muted)]">
-          Histórico
-        </h3>
-        {runs.length === 0 ? (
-          <p className="text-sm text-[var(--muted)]">Nenhum scan ainda.</p>
-        ) : (
-          <ul className="space-y-2">
-            {runs.map((run) => (
-              <li
-                key={run.id}
-                className="rounded-lg border border-[var(--line)] bg-[var(--bg-elevated)] px-4 py-3 text-sm"
-              >
-                <div className="flex flex-wrap gap-3">
-                  <span className="font-medium">{run.status}</span>
-                  <span className="text-[var(--muted)]">
-                    {run.completedCases}/{run.totalCases} casos
-                  </span>
-                  <span className="text-[var(--muted)]">
-                    {run.findingsCount} findings
-                  </span>
-                </div>
-                <p className="mt-1 font-mono text-xs text-[var(--muted)]">
-                  {run.startedAt ?? "—"}
-                </p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </PageShell>
+      <ScanRunDialog
+        open={scanDialogOpen}
+        onOpenChange={setScanDialogOpen}
+        progress={scanProgress}
+        onCancel={onCancelScan}
+      />
+    </div>
   );
 }

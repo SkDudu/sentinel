@@ -4,7 +4,6 @@ import {
   Bug,
   FolderKanban,
   LayoutDashboard,
-  Radar,
   Server,
   Settings,
   Shield,
@@ -41,11 +40,6 @@ function projectLinks(projectId: string) {
       to: `/projects/${projectId}/environments`,
       label: "Ambientes",
       icon: Server,
-    },
-    {
-      to: `/projects/${projectId}/scans`,
-      label: "Scans / AI Lab",
-      icon: Radar,
     },
     {
       to: `/projects/${projectId}/findings`,

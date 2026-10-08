@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   AlertCircle,
   FolderKanban,
@@ -60,11 +60,11 @@ import {
   EnvironmentFormDialog,
   type EnvironmentFormValues,
 } from "@/pages/projects/EnvironmentFormDialog";
-import { EnvironmentDetailDialog } from "@/pages/environments/EnvironmentDetailDialog";
 
 export function EnvironmentsPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const {
     projects,
     loadProjects,
@@ -85,7 +85,6 @@ export function EnvironmentsPage() {
   const [secretUsername, setSecretUsername] = useState("");
   const [secretPassword, setSecretPassword] = useState("");
   const [deleteEnv, setDeleteEnv] = useState<EnvironmentDto | null>(null);
-  const [detailEnvId, setDetailEnvId] = useState<string | null>(null);
 
   useEffect(() => {
     void loadProjects();
@@ -218,8 +217,6 @@ export function EnvironmentsPage() {
   }
 
   const hasEnvironments = project.environments.length > 0;
-  const detailEnv =
-    project.environments.find((env) => env.id === detailEnvId) ?? null;
 
   return (
     <PageShell
@@ -274,7 +271,9 @@ export function EnvironmentsPage() {
                 aria-label={`Abrir ${env.name}`}
                 onClick={() => {
                   setError(null);
-                  setDetailEnvId(env.id);
+                  void navigate(
+                    `/projects/${project.id}/environments/${env.id}`,
+                  );
                 }}
                 className="absolute inset-0 z-0 cursor-pointer rounded-xl"
               />
@@ -357,31 +356,6 @@ export function EnvironmentsPage() {
           ))}
         </div>
       )}
-
-      <EnvironmentDetailDialog
-        environment={detailEnv}
-        open={detailEnvId !== null && detailEnv !== null}
-        onOpenChange={(open) => {
-          if (!open) setDetailEnvId(null);
-        }}
-        onEdit={() => {
-          if (!detailEnv) return;
-          setError(null);
-          setEditingEnv(detailEnv);
-        }}
-        onSecret={() => {
-          if (!detailEnv) return;
-          setError(null);
-          setSecretValue("");
-          setSecretUsername("");
-          setSecretPassword("");
-          setSecretEnv(detailEnv);
-        }}
-        onDelete={() => {
-          if (!detailEnv) return;
-          setDeleteEnv(detailEnv);
-        }}
-      />
 
       <EnvironmentFormDialog
         open={createOpen}

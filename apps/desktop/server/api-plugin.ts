@@ -6,6 +6,7 @@ import {
   AiProviderKind,
   AuthType,
   FindingStatus,
+  TestCategory,
   type TestCase,
   type Variable,
 } from "@sw/core";
@@ -21,7 +22,7 @@ import {
   TestRunRepository,
   type SqliteHandle,
 } from "@sw/database";
-import { runProjectScan } from "@sw/scan-runner";
+import { runProjectScan, type ScanProgressEvent } from "@sw/scan-runner";
 import { createAiClientFromSettings } from "./ai-client.js";
 import {
   generateAiCasesForEndpoints,
@@ -254,6 +255,30 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
             }
           }
 
+          const envLatencyMatch = path.match(
+            /^\/api\/environments\/([^/]+)\/latency$/,
+          );
+          if (envLatencyMatch && method === "GET") {
+            const id = decodeURIComponent(envLatencyMatch[1]!);
+            if (!(await environments.getById(id))) return notFound(res);
+            const points = await testResults.listLatencyByEnvironment(id, 12);
+            const latest = points[points.length - 1];
+            const previous = points[points.length - 2];
+            let trend = 0;
+            if (latest && previous && previous.p95 > 0) {
+              trend =
+                Math.round(
+                  ((latest.p95 - previous.p95) / previous.p95) * 1000,
+                ) / 10;
+            }
+            sendJson(res, 200, {
+              points,
+              headlineMs: latest?.p95 ?? 0,
+              trend,
+            });
+            return;
+          }
+
           const envMatch = path.match(/^\/api\/environments\/([^/]+)$/);
           if (envMatch) {
             const id = decodeURIComponent(envMatch[1]!);
@@ -401,6 +426,26 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
             return;
           }
 
+          const envOpenApiMatch = path.match(
+            /^\/api\/environments\/([^/]+)\/openapi$/,
+          );
+          if (envOpenApiMatch && method === "DELETE") {
+            const id = decodeURIComponent(envOpenApiMatch[1]!);
+            const environment = await environments.getById(id);
+            if (!environment) return notFound(res);
+            const before = await endpoints.listByEnvironment(id);
+            const removed = before.filter(
+              (item) => item.source === "openapi",
+            ).length;
+            await endpoints.replaceOpenApiEndpoints(
+              environment.projectId,
+              environment.id,
+              [],
+            );
+            sendJson(res, 200, { removed });
+            return;
+          }
+
           const findingsMatch = path.match(
             /^\/api\/projects\/([^/]+)\/findings$/,
           );
@@ -436,6 +481,48 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
             return;
           }
 
+          const runDetailMatch = path.match(/^\/api\/runs\/([^/]+)$/);
+          if (runDetailMatch && method === "GET") {
+            const runId = decodeURIComponent(runDetailMatch[1]!);
+            const run = await runs.getById(runId);
+            if (!run) return notFound(res);
+            const [runFindings, resultRows] = await Promise.all([
+              findings.listByRun(runId),
+              testResults.listByRun(runId),
+            ]);
+            let passed = 0;
+            let failed = 0;
+            const byTest = new Map<
+              string,
+              { testId: string; passed: number; failed: number }
+            >();
+            for (const row of resultRows) {
+              if (row.passed) passed += 1;
+              else failed += 1;
+              const bucket = byTest.get(row.testId) ?? {
+                testId: row.testId,
+                passed: 0,
+                failed: 0,
+              };
+              if (row.passed) bucket.passed += 1;
+              else bucket.failed += 1;
+              byTest.set(row.testId, bucket);
+            }
+            sendJson(res, 200, {
+              run,
+              findings: runFindings,
+              results: {
+                passed,
+                failed,
+                total: resultRows.length,
+                byTest: [...byTest.values()].sort(
+                  (a, b) => b.failed - a.failed || a.testId.localeCompare(b.testId),
+                ),
+              },
+            });
+            return;
+          }
+
           if (path === "/api/scans" && method === "POST") {
             const body = await readJson<{
               projectId?: string;
@@ -444,6 +531,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
               bearerToken?: string;
               approvedAiCases?: TestCase[];
               aiOnly?: boolean;
+              categories?: TestCategory[];
               variables?: Variable[];
               rateLimit?: {
                 requests?: number;
@@ -466,27 +554,79 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
             };
             res.on("close", onClientGone);
 
+            const stream = (req.headers.accept ?? "").includes(
+              "application/x-ndjson",
+            );
+            const categories = body.categories?.filter((c): c is TestCategory =>
+              Object.values(TestCategory).includes(c),
+            );
+            const scanInput = {
+              projectId: body.projectId,
+              environmentId: body.environmentId,
+              endpointIds: body.endpointIds,
+              bearerToken: body.bearerToken,
+              approvedAiCases: body.approvedAiCases,
+              aiOnly: body.aiOnly,
+              categories:
+                categories && categories.length > 0 ? categories : undefined,
+              variables: body.variables,
+              rateLimit: body.rateLimit,
+              signal: abort.signal,
+            };
+            const repos = {
+              projects,
+              environments,
+              endpoints,
+              findings,
+              runs,
+              testResults,
+            };
+            if (stream) {
+              res.statusCode = 200;
+              res.setHeader(
+                "Content-Type",
+                "application/x-ndjson; charset=utf-8",
+              );
+              res.setHeader("Cache-Control", "no-cache, no-transform");
+              res.setHeader("X-Accel-Buffering", "no");
+              res.flushHeaders();
+              res.socket?.setNoDelay(true);
+              const writeEvent = (event: ScanProgressEvent | {
+                type: "result";
+                result: unknown;
+              } | { type: "error"; error: string }) => {
+                if (!res.writableEnded) {
+                  res.write(`${JSON.stringify(event)}\n`);
+                }
+              };
+              try {
+                const result = await runProjectScan(
+                  { ...scanInput, onEvent: writeEvent },
+                  repos,
+                  secrets,
+                );
+                writeEvent({ type: "result", result });
+              } catch (error) {
+                writeEvent({
+                  type: "error",
+                  error:
+                    abort.signal.aborted
+                      ? "Scan cancelled"
+                      : error instanceof Error
+                        ? error.message
+                        : "Scan failed",
+                });
+              } finally {
+                res.off("close", onClientGone);
+                if (!res.writableEnded) res.end();
+              }
+              return;
+            }
+
             try {
               const result = await runProjectScan(
-                {
-                  projectId: body.projectId,
-                  environmentId: body.environmentId,
-                  endpointIds: body.endpointIds,
-                  bearerToken: body.bearerToken,
-                  approvedAiCases: body.approvedAiCases,
-                  aiOnly: body.aiOnly,
-                  variables: body.variables,
-                  rateLimit: body.rateLimit,
-                  signal: abort.signal,
-                },
-                {
-                  projects,
-                  environments,
-                  endpoints,
-                  findings,
-                  runs,
-                  testResults,
-                },
+                scanInput,
+                repos,
                 secrets,
               );
               sendJson(res, 201, result);

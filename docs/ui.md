@@ -30,9 +30,10 @@ Shell com contexto do projeto ativo (nome visível; saída clara de volta a Proj
 | Destino | Papel |
 | --- | --- |
 | **Dashboard do projeto** | Home do projeto: indicadores e atalhos do próprio projeto |
-| **Ambientes** | CRUD de ambientes (base URL, auth, safety, secrets). Clique no card abre o dialog com o contrato OpenAPI daquele ambiente |
-| **Scans / AI Lab** | Execução, histórico, geração e review de casos AI |
+| **Ambientes** | CRUD de ambientes (base URL, auth, safety, secrets). Clique no card abre a página do ambiente |
 | **Findings** | Lista, filtros, evidência |
+
+Página do ambiente (`/projects/:projectId/environments/:environmentId`): header com abas **Informações**, **Endpoints**, **Scan do ambiente**, **AI Test Lab**. Scan e AI Lab não têm item próprio na sidebar.
 
 Rotas sugeridas (implementação futura):
 
@@ -42,7 +43,10 @@ Rotas sugeridas (implementação futura):
 /settings                 → Configurações
 /projects/:projectId      → Dashboard do projeto
 /projects/:projectId/environments
-/projects/:projectId/scans
+/projects/:projectId/environments/:environmentId
+/projects/:projectId/environments/:environmentId/endpoints
+/projects/:projectId/environments/:environmentId/scan
+/projects/:projectId/environments/:environmentId/lab
 /projects/:projectId/findings
 ```
 
@@ -52,8 +56,7 @@ O `projectId` na URL é a fonte de verdade do contexto. Evitar depender só de `
 App open
   ├─ Dashboard (global)
   ├─ Projetos ──click card──► Dialog (detalhe) ──Abrir──► Dashboard do projeto
-  │                                                      ├─ Ambientes (contrato OpenAPI no dialog)
-  │                                                      ├─ Scans / AI Lab
+  │                                                      ├─ Ambientes ──card──► detalhe (Informações, Endpoints, Scan, AI Lab)
   │                                                      └─ Findings
   └─ Configurações
 ```

@@ -1,4 +1,6 @@
-import { Outlet, useLocation } from "react-router-dom";
+import type { ComponentProps } from "react";
+import { Link as RouterLink, Outlet, useLocation } from "react-router-dom";
+import { LinkProvider, type LinkProps } from "@/components/dashboardblocks/link";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
   SidebarInset,
@@ -9,6 +11,10 @@ import { Separator } from "@/components/ui/separator";
 import { Toaster } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useProjectStore } from "@/stores/project";
+
+function AppLink({ href, ...props }: LinkProps) {
+  return <RouterLink to={href} {...(props as Omit<ComponentProps<typeof RouterLink>, "to">)} />;
+}
 
 function parseProjectId(pathname: string): string | null {
   const match = pathname.match(/^\/projects\/([^/]+)/);
@@ -24,6 +30,7 @@ export function Shell() {
     : undefined;
 
   return (
+    <LinkProvider component={AppLink}>
     <Toaster>
       <TooltipProvider>
         <SidebarProvider>
@@ -51,5 +58,6 @@ export function Shell() {
         </SidebarProvider>
       </TooltipProvider>
     </Toaster>
+    </LinkProvider>
   );
 }

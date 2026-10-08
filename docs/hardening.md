@@ -86,7 +86,7 @@ Schema em `packages/database` tem entidades sem repo/API/UI. Só implementar se 
 | --- | --- | --- | --- |
 | Projects | `apps/desktop/src/pages/projects/ProjectsPage.tsx` | `/api/projects`, `/api/environments`, `.../secret` | `@sw/database`, `@sw/auth` |
 | Endpoints | `.../environments/EnvironmentDetailDialog.tsx` | `/api/environments/:id/endpoints`, `.../openapi/import` | `@sw/api-parser`, `@sw/database` |
-| Scans | `.../scans/ScansPage.tsx` | `POST /api/scans`, `GET .../runs` | `@sw/scan-runner`, `@sw/security-engine`, `@sw/test-registry` |
+| Scans | detalhe do ambiente (`.../scan`, `.../lab`) via `ScanWorkspace` | `POST /api/scans`, `GET .../runs` | `@sw/scan-runner`, `@sw/security-engine`, `@sw/test-registry` |
 | Findings | `.../findings/FindingsPage.tsx` | `GET .../findings`, `PATCH /api/findings/:id/status` | `@sw/database`, `@sw/findings` (CLI/export) |
 | AI Lab | Scans + Settings | `/api/ai/*`, `/api/projects/:id/personas` | `@sw/ai-data-generator`, `@sw/ai` |
 | CLI | — | — | `apps/cli`, `@sw/scan-runner`, `@sw/findings` |

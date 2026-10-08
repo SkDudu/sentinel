@@ -167,6 +167,7 @@ body,
 
   body {
     @apply bg-background text-foreground font-sans;
+    position: relative;
     background-image:
       radial-gradient(
         1200px 600px at 10% -10%,
@@ -188,4 +189,15 @@ input,
 textarea,
 select {
   font: inherit;
+}
+
+@keyframes scan-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
