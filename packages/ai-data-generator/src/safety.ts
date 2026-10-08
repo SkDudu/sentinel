@@ -52,6 +52,11 @@ function oversizedValues(value: unknown): boolean {
   return false;
 }
 
+/** Primeiro padrão perigoso presente no texto, se houver. */
+export function blockedPattern(serialized: string): RegExp | undefined {
+  return BLOCKED_PATTERNS.find((pattern) => pattern.test(serialized));
+}
+
 export interface SafetyResult {
   accepted: TestCase[];
   rejected: Array<{ id: string; name: string; reason: string }>;
@@ -91,7 +96,7 @@ export function applySafetyFilter(cases: TestCase[]): SafetyResult {
       continue;
     }
 
-    const hit = BLOCKED_PATTERNS.find((pattern) => pattern.test(serialized));
+    const hit = blockedPattern(serialized);
     if (hit) {
       rejected.push({
         id: testCase.id,
