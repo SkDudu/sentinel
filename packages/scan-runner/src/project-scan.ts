@@ -1,11 +1,11 @@
 import {
   AuthType,
   ScanStatus,
+  TestCategory,
   type Endpoint,
   type Environment,
   type RateLimitConfig,
   type TestCase,
-  type TestCategory,
   type TestDataOptions,
   type Variable,
 } from "@sw/core";
@@ -113,6 +113,11 @@ export async function runProjectScan(
     const allow = new Set(input.endpointIds);
     targetEndpoints = targetEndpoints.filter((e) => allow.has(e.id));
   }
+  // Imports antigos podiam gravar `$ref` de parâmetro sem name/in.
+  targetEndpoints = targetEndpoints.map((e) => ({
+    ...e,
+    parameters: e.parameters.filter((p) => Boolean(p?.name && p?.in)),
+  }));
   if (targetEndpoints.length === 0) {
     throw new Error(
       "No endpoints to scan — import OpenAPI on this environment first",
@@ -150,6 +155,7 @@ export async function runProjectScan(
   const run = await repos.runs.create({
     projectId: input.projectId,
     environmentId: input.environmentId,
+    categories: input.aiOnly ? [TestCategory.AI_GENERATED] : input.categories,
   });
 
   const orchestrator = new TestOrchestrator(input.registry);
