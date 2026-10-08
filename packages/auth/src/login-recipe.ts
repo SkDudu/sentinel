@@ -65,7 +65,7 @@ export function parseRecipeSecrets(raw: string | undefined): Record<string, stri
   return { password: raw };
 }
 
-function parseSetCookie(line: string) {
+export function parseSetCookie(line: string) {
   const [pair = "", ...attributes] = line.split(";");
   const eq = pair.indexOf("=");
   if (eq <= 0) return null;
@@ -110,7 +110,7 @@ function findInputValue(html: string, name: string): string | undefined {
   return undefined;
 }
 
-function readJsonPath(body: unknown, path: string): string | undefined {
+export function readJsonPath(body: unknown, path: string): string | undefined {
   let current: unknown = body;
   if (typeof current === "string") {
     try {

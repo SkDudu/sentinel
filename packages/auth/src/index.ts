@@ -1,4 +1,10 @@
-import { AuthType, type Environment } from "@sw/core";
+import {
+  AuthType,
+  type Environment,
+  type LoginRecipe,
+  type PersonaBinding,
+} from "@sw/core";
+import { personaSecretRef } from "./encrypted-file-store.js";
 import {
   parseRecipeSecrets,
   runLoginRecipe,
@@ -11,6 +17,8 @@ export type { SecretStore } from "./types.js";
 export {
   LoginRecipeError,
   parseRecipeSecrets,
+  parseSetCookie,
+  readJsonPath,
   runLoginRecipe,
   type LoginAudience,
   type LoginExecutor,
@@ -20,6 +28,7 @@ export {
 export {
   EncryptedFileSecretStore,
   environmentSecretRef,
+  personaSecretRef,
 } from "./encrypted-file-store.js";
 export {
   KeychainSecretStore,
@@ -186,4 +195,47 @@ export async function resolveAuthHeaders(
   }
 
   return headers;
+}
+
+/** Ambiente "virtual" com auth/secret da persona; receita e headers do ambiente. */
+export function personaEnvironment(
+  environment: Environment,
+  binding: PersonaBinding,
+): Environment {
+  return {
+    ...environment,
+    authType: binding.authType,
+    secretRef:
+      binding.secretRef ?? personaSecretRef(environment.id, binding.personaId),
+  };
+}
+
+/**
+ * Receita reaproveitada por persona precisa do login vindo do vault —
+ * identificador literal faria toda persona logar como o mesmo usuário.
+ */
+export function assertPersonaRecipe(recipe: LoginRecipe | undefined) {
+  if (!recipe) throw new Error("Ambiente sem receita de login");
+  const usesUsername = recipe.steps.some((step) =>
+    Object.values(step.request.fields).some(
+      (value) => value.kind === "secret" && value.key === "username",
+    ),
+  );
+  if (!usesUsername) {
+    throw new Error(
+      'Receita grava o login como literal — troque o campo de usuário por { "kind": "secret", "key": "username" }',
+    );
+  }
+}
+
+export async function resolvePersonaAuthHeaders(
+  environment: Environment,
+  binding: PersonaBinding,
+  store: SecretStore,
+  options: { executor?: LoginExecutor } = {},
+): Promise<Record<string, string>> {
+  if (binding.authType === AuthType.LOGIN_RECIPE) {
+    assertPersonaRecipe(environment.loginRecipe);
+  }
+  return resolveAuthHeaders(personaEnvironment(environment, binding), store, options);
 }

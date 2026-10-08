@@ -130,3 +130,7 @@ export class EncryptedFileSecretStore implements SecretStore {
 export function environmentSecretRef(environmentId: string): string {
   return `env:${environmentId}:auth`;
 }
+
+export function personaSecretRef(environmentId: string, personaId: string): string {
+  return `persona:${environmentId}:${personaId}:auth`;
+}

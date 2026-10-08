@@ -11,6 +11,7 @@
     "tauri:dev": "pnpm --filter @sw/desktop tauri:dev",
     "tauri:build": "pnpm --filter @sw/desktop tauri:build",
     "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm build && node --test \"packages/*/test/*.test.ts\"",
     "lint": "pnpm -r run typecheck"
   },
   "engines": {
