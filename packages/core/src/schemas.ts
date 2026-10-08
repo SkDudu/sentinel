@@ -108,11 +108,21 @@ export const ParameterSchema = z.object({
 });
 export type Parameter = z.infer<typeof ParameterSchema>;
 
+/** OpenAPI `links`: valor da response alimenta param de outra operação. */
+export const EndpointLinkSchema = z.object({
+  name: z.string(),
+  operationId: z.string().optional(),
+  /** param → expressão, ex.: { orderId: "$response.body#/id" }. */
+  parameters: z.record(z.string()).default({}),
+});
+export type EndpointLink = z.infer<typeof EndpointLinkSchema>;
+
 export const EndpointResponseSchema = z.object({
   status: z.string().min(1),
   description: z.string().optional(),
   contentType: z.string().optional(),
   schema: z.unknown().optional(),
+  links: z.array(EndpointLinkSchema).optional(),
 });
 export type EndpointResponse = z.infer<typeof EndpointResponseSchema>;
 
@@ -265,3 +275,42 @@ export const PersonaBindingSchema = z.object({
   fixtures: z.record(z.string()).default({}),
 });
 export type PersonaBinding = z.infer<typeof PersonaBindingSchema>;
+
+export const ResourceOperationSchema = z.enum([
+  "create",
+  "list",
+  "read",
+  "update",
+  "delete",
+]);
+export type ResourceOperation = z.infer<typeof ResourceOperationSchema>;
+
+export const ResourceSchema = z.object({
+  /** Segmento do path, ex.: "orders", "company-units". */
+  name: z.string().min(1),
+  /** Param que identifica o item, ex.: "orderId", "company_unit". */
+  idParam: z.string().optional(),
+  /** operação → endpointId. */
+  operations: z.record(ResourceOperationSchema, z.string()).default({}),
+});
+export type Resource = z.infer<typeof ResourceSchema>;
+
+export const RelationKindSchema = z.enum(["parent", "reference", "owner", "produces"]);
+export type RelationKind = z.infer<typeof RelationKindSchema>;
+
+export const ResourceRelationSchema = z.object({
+  /** Estável: hash de from|kind|to|via — sobrevive a reimport. */
+  id: z.string().min(1),
+  from: z.string().min(1),
+  to: z.string().min(1),
+  kind: RelationKindSchema,
+  /** Param ou campo: "userId", "body.customer_id". */
+  via: z.string().min(1),
+  /** `produces`: de onde sai o valor, ex.: "response.id". */
+  source: z.string().optional(),
+  evidence: z.array(z.string()).default([]),
+  confidence: z.number().min(0).max(100),
+  origin: z.enum(["links", "path", "field", "observed", "ai", "manual"]),
+  status: z.enum(["suggested", "confirmed", "rejected"]).default("suggested"),
+});
+export type ResourceRelation = z.infer<typeof ResourceRelationSchema>;
