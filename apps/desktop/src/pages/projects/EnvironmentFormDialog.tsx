@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { AuthType, LoginRecipeSchema, type LoginRecipe } from "@sw/core";
 import type { EnvironmentDto } from "@/services/api";
+import { api } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -186,6 +187,11 @@ export function EnvironmentFormDialog({
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [recipeJson, setRecipeJson] = useState("");
+  const [recorderId, setRecorderId] = useState<string | null>(null);
+  const [captured, setCaptured] = useState<
+    Array<{ method: string; url: string; status: number }>
+  >([]);
+  const [recording, setRecording] = useState(false);
   const [secretLocked, setSecretLocked] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -214,6 +220,7 @@ export function EnvironmentFormDialog({
       setSafety(false);
       setHeaders("");
       setRecipeJson("");
+      setCaptured([]);
       setSecretLocked(false);
       setSecret("");
       setUsername("");
@@ -221,12 +228,75 @@ export function EnvironmentFormDialog({
     }
   }, [open, mode]);
 
+  useEffect(() => {
+    if (!recorderId) return;
+    let cancelled = false;
+    const timer = setInterval(() => {
+      void api
+        .recorderStatus(recorderId)
+        .then((snap) => {
+          if (!cancelled) setCaptured(snap.steps);
+        })
+        .catch(() => undefined);
+    }, 1000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [recorderId]);
+
+  useEffect(() => {
+    if (open || !recorderId) return;
+    const id = recorderId;
+    setRecorderId(null);
+    setCaptured([]);
+    void api.stopRecorder(id).catch(() => undefined);
+  }, [open, recorderId]);
+
   function unlockSecret() {
     if (!secretLocked) return;
     setSecretLocked(false);
     setSecret("");
     setUsername("");
     setPassword("");
+  }
+
+  async function beginRecording() {
+    setFormError(null);
+    setRecording(true);
+    try {
+      const snap = await api.startRecorder(baseUrl.trim());
+      setRecorderId(snap.id);
+      setCaptured(snap.steps);
+    } catch (err) {
+      setFormError(
+        err instanceof Error ? err.message : "Falha ao abrir o navegador",
+      );
+    } finally {
+      setRecording(false);
+    }
+  }
+
+  async function finishRecording() {
+    if (!recorderId) return;
+    const id = recorderId;
+    setRecorderId(null);
+    setRecording(true);
+    try {
+      const derived = await api.stopRecorder(id);
+      setRecipeJson(JSON.stringify(derived.recipe, null, 2));
+      setCaptured([]);
+      if (derived.secrets.password) {
+        setSecretLocked(false);
+        setPassword(derived.secrets.password);
+      }
+    } catch (err) {
+      setFormError(
+        err instanceof Error ? err.message : "Falha ao concluir a gravação",
+      );
+    } finally {
+      setRecording(false);
+    }
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -328,7 +398,12 @@ export function EnvironmentFormDialog({
                   setSecret("");
                   setUsername("");
                   setPassword("");
-                  setRecipeJson("");
+                  if (recorderId) {
+                    const id = recorderId;
+                    setRecorderId(null);
+                    setCaptured([]);
+                    void api.stopRecorder(id).catch(() => undefined);
+                  }
                 }}
               >
                 <SelectTrigger className="w-full">
@@ -440,6 +515,44 @@ export function EnvironmentFormDialog({
 
             {isRecipe ? (
               <>
+                <div className="space-y-2 sm:col-span-2">
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={recording || Boolean(recorderId) || !baseUrl.trim()}
+                      onClick={() => void beginRecording()}
+                    >
+                      {recording && !recorderId ? (
+                        <Spinner data-icon="inline-start" />
+                      ) : null}
+                      Abrir navegador
+                    </Button>
+                    {recorderId ? (
+                      <Button
+                        type="button"
+                        disabled={recording}
+                        onClick={() => void finishRecording()}
+                      >
+                        {recording ? <Spinner data-icon="inline-start" /> : null}
+                        Concluir gravação
+                      </Button>
+                    ) : null}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Abre o Chrome na base URL. Faça o login nessa janela.
+                    Concluir monta a receita e preenche a senha para o vault.
+                  </p>
+                  {captured.length > 0 ? (
+                    <ul className="max-h-28 space-y-0.5 overflow-auto rounded-md border px-2 py-1 font-mono text-xs">
+                      {captured.slice(-8).map((step, index) => (
+                        <li key={`${step.url}-${index}`} className="truncate">
+                          {step.status} {step.method} {step.url}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
                 <label className="block text-sm sm:col-span-2">
                   Senha
                   <Input

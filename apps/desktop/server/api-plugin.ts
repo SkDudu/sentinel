@@ -20,7 +20,10 @@ import {
   loginWithRecipe,
   LoginRecipeError,
 } from "@sw/auth";
-import { HttpExecutor } from "@sw/http-client";
+import {
+  startLoginRecording,
+  type RecorderHandle,
+} from "@sw/login-recorder";
 import {
   createSqliteDb,
   EndpointRepository,
@@ -136,6 +139,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
       const findings = new FindingRepository(handle.db);
       const runs = new TestRunRepository(handle.db);
       const testResults = new TestResultRepository(handle.db);
+      const recorders = new Map<string, RecorderHandle>();
 
       server.httpServer?.once("close", () => {
         handle?.close();
@@ -155,6 +159,58 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
 
           if (path === "/api/health" && method === "GET") {
             sendJson(res, 200, { ok: true });
+            return;
+          }
+
+          if (path === "/api/recorder/start" && method === "POST") {
+            const body = await readJson<{ baseUrl?: string }>(req);
+            if (!body.baseUrl?.trim()) {
+              sendJson(res, 400, { error: "baseUrl is required" });
+              return;
+            }
+            try {
+              const handle = await startLoginRecording({
+                baseUrl: body.baseUrl.trim(),
+              });
+              recorders.set(handle.id, handle);
+              sendJson(res, 201, handle.snapshot());
+            } catch (error) {
+              sendJson(res, 400, {
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : "Falha ao abrir o navegador",
+              });
+            }
+            return;
+          }
+
+          const recorderStopMatch = path.match(
+            /^\/api\/recorder\/([^/]+)\/stop$/,
+          );
+          if (recorderStopMatch && method === "POST") {
+            const id = decodeURIComponent(recorderStopMatch[1]!);
+            const handle = recorders.get(id);
+            if (!handle) return notFound(res);
+            recorders.delete(id);
+            try {
+              sendJson(res, 200, await handle.stop());
+            } catch (error) {
+              sendJson(res, 400, {
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : "Falha ao concluir a gravação",
+              });
+            }
+            return;
+          }
+
+          const recorderMatch = path.match(/^\/api\/recorder\/([^/]+)$/);
+          if (recorderMatch && method === "GET") {
+            const handle = recorders.get(decodeURIComponent(recorderMatch[1]!));
+            if (!handle) return notFound(res);
+            sendJson(res, 200, handle.snapshot());
             return;
           }
 

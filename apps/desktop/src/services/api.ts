@@ -32,6 +32,12 @@ export type LoginTestResult = {
   spec?: { url: string; bytes: number };
 };
 
+export type RecorderSnapshot = {
+  id: string;
+  open: boolean;
+  steps: Array<{ method: string; url: string; status: number }>;
+};
+
 export interface ProjectDto {
   id: string;
   name: string;
@@ -275,6 +281,22 @@ export const api = {
       `/api/environments/${environmentId}/openapi/fetch`,
       { method: "POST" },
     ),
+
+  startRecorder: (baseUrl: string) =>
+    request<RecorderSnapshot>("/api/recorder/start", {
+      method: "POST",
+      body: JSON.stringify({ baseUrl }),
+    }),
+
+  recorderStatus: (id: string) =>
+    request<RecorderSnapshot>(`/api/recorder/${id}`),
+
+  stopRecorder: (id: string) =>
+    request<{
+      recipe: LoginRecipe;
+      secrets: Record<string, string>;
+      specCandidates: string[];
+    }>(`/api/recorder/${id}/stop`, { method: "POST" }),
 
   importEnvironmentOpenApi: (environmentId: string, text: string) =>
     request<{ imported: number; endpoints: Endpoint[] }>(

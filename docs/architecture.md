@@ -44,7 +44,8 @@ sentinel/
     ├── core/             # tipos, enums, Zod
     ├── database/         # Drizzle schema
     ├── api-parser/       # OpenAPI + semantics
-    ├── auth/             # auth headers + secret store
+    ├── auth/             # auth headers + secret store + login recipe replay
+    ├── login-recorder/   # grava login no Chrome (Playwright) → receita
     ├── http-client/      # RequestExecutor
     ├── test-registry/    # plugins SecurityTest
     ├── security-engine/  # TestOrchestrator
