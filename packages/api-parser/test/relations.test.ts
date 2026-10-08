@@ -166,3 +166,34 @@ test("merge preserva revisão, manuais e confirmadas", () => {
   ]);
   assert.deepEqual(merged[0]!.evidence, ["e2"]);
 });
+
+test("requestBody via $ref em components.requestBodies", () => {
+  const [endpoint] = parseOpenApi(
+    {
+      openapi: "3.0.3",
+      paths: {
+        "/orders": {
+          post: { requestBody: { $ref: "#/components/requestBodies/NewOrder" }, responses: {} },
+        },
+      },
+      components: {
+        requestBodies: {
+          NewOrder: {
+            content: {
+              "application/json": { schema: { $ref: "#/components/schemas/Order" } },
+            },
+          },
+        },
+        schemas: {
+          Order: { type: "object", properties: { note: { type: "string" } } },
+        },
+      },
+    },
+    PROJECT,
+  );
+  assert.deepEqual(
+    (endpoint!.requestBodySchema as { properties: unknown }).properties,
+    { note: { type: "string" } },
+  );
+  assert.deepEqual(endpoint!.parameters.map((p) => `${p.in}:${p.name}`), ["body:note"]);
+});

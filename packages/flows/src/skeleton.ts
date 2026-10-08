@@ -1,5 +1,6 @@
 import {
   Severity,
+  sampleRequestBody,
   type Endpoint,
   type Flow,
   type FlowStep,
@@ -11,21 +12,6 @@ function camel(value: string): string {
   return value
     .replace(/[-_\s]+(\w)/g, (_, c: string) => c.toUpperCase())
     .replace(/s$/, "");
-}
-
-/** Corpo mínimo a partir do schema: texto livre leva o prefixo do run. */
-function sampleBody(schema: unknown): Record<string, unknown> | undefined {
-  const properties = (schema as { properties?: Record<string, { type?: string }> } | undefined)
-    ?.properties;
-  if (!properties) return undefined;
-  const body: Record<string, unknown> = {};
-  for (const [name, property] of Object.entries(properties)) {
-    if (/^(id|created_?at|updated_?at)$/i.test(name)) continue;
-    if (property.type === "string") body[name] = "{{prefix}}";
-    else if (property.type === "integer" || property.type === "number") body[name] = 1;
-    else if (property.type === "boolean") body[name] = true;
-  }
-  return Object.keys(body).length > 0 ? body : undefined;
 }
 
 /** Item param → `{{var}}` extraído; demais params → fixture do ator. */
@@ -64,7 +50,7 @@ export function generateFlowSkeletons(input: {
     if (!create || !read) continue;
     const remove = byId.get(resource.operations.delete ?? "");
     const idVar = `${camel(resource.name)}Id`;
-    const body = sampleBody(create.requestBodySchema);
+    const body = sampleRequestBody(create.requestBodySchema);
 
     const createStep: FlowStep = {
       id: "create",
