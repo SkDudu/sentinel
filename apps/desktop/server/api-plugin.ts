@@ -34,6 +34,7 @@ import {
   TestRunRepository,
   type SqliteHandle,
 } from "@sw/database";
+import { HttpExecutor } from "@sw/http-client";
 import { runProjectScan, type ScanProgressEvent } from "@sw/scan-runner";
 import { createAiClientFromSettings } from "./ai-client.js";
 import {
