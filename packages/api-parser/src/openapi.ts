@@ -70,7 +70,12 @@ function resolveRef(
       if (!current || typeof current !== "object") return node;
       current = (current as Record<string, unknown>)[part];
     }
-    return resolveRef(document, current, depth + 1);
+    const resolved = resolveRef(document, current, depth + 1);
+    // Nome do component alimenta a inferência de relações.
+    const component = obj.$ref.match(/^#\/components\/schemas\/([^/]+)$/)?.[1];
+    return component && resolved && typeof resolved === "object"
+      ? { ...(resolved as Record<string, unknown>), "x-component": component }
+      : resolved;
   }
 
   if (obj.properties && typeof obj.properties === "object") {
@@ -160,8 +165,32 @@ function mapResponses(
   const responses = operation.responses ?? {};
   return Object.entries(responses).map(([status, raw]) => {
     const response = resolveRef(document, raw) as
-      | { description?: string; content?: Record<string, { schema?: JsonSchema }> }
+      | {
+          description?: string;
+          content?: Record<string, { schema?: JsonSchema }>;
+          links?: Record<string, unknown>;
+        }
       | undefined;
+    const links = Object.entries(response?.links ?? {}).flatMap(
+      ([name, rawLink]) => {
+        const link = resolveRef(document, rawLink) as {
+          operationId?: string;
+          parameters?: Record<string, unknown>;
+        } | null;
+        if (!link || typeof link !== "object") return [];
+        return [
+          {
+            name,
+            operationId: link.operationId,
+            parameters: Object.fromEntries(
+              Object.entries(link.parameters ?? {}).filter(
+                (entry): entry is [string, string] => typeof entry[1] === "string",
+              ),
+            ),
+          },
+        ];
+      },
+    );
     const content = response?.content ?? {};
     const contentType =
       "application/json" in content
@@ -175,6 +204,7 @@ function mapResponses(
       description: response?.description,
       contentType,
       schema,
+      ...(links.length > 0 ? { links } : {}),
     };
   });
 }
