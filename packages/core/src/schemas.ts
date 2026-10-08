@@ -250,5 +250,18 @@ export const TestPersonaSchema = z.object({
   description: z.string().optional(),
   fields: z.record(z.unknown()),
   tags: z.array(z.string()).default([]),
+  /** "user" | "admin" | "support" | livre. */
+  role: z.string().min(1).optional(),
 });
 export type TestPersona = z.infer<typeof TestPersonaSchema>;
+
+/** Persona × ambiente. Credencial só no vault (`secretRef`). */
+export const PersonaBindingSchema = z.object({
+  environmentId: z.string().uuid(),
+  personaId: z.string().min(1),
+  authType: z.nativeEnum(AuthType),
+  secretRef: z.string().optional(),
+  /** Recursos DESSA persona, ex.: { userId: "42", orderId: "ord_9" }. */
+  fixtures: z.record(z.string()).default({}),
+});
+export type PersonaBinding = z.infer<typeof PersonaBindingSchema>;
