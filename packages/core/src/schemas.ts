@@ -103,6 +103,8 @@ export const HttpRequestSchema = z.object({
   url: z.string(),
   headers: z.record(z.string()).default({}),
   body: z.unknown().optional(),
+  /** Default `follow`. `manual` keeps 3xx + its Set-Cookie (login flows). */
+  redirect: z.enum(["follow", "manual"]).optional(),
 });
 export type HttpRequest = z.infer<typeof HttpRequestSchema>;
 
@@ -111,6 +113,8 @@ export const HttpResponseSchema = z.object({
   headers: z.record(z.string()).default({}),
   body: z.unknown().optional(),
   durationMs: z.number(),
+  /** Every Set-Cookie line; `headers` collapses duplicates. */
+  setCookies: z.array(z.string()).optional(),
 });
 export type HttpResponse = z.infer<typeof HttpResponseSchema>;
 
