@@ -7,12 +7,21 @@ import {
   AuthType,
   FindingStatus,
   LoginRecipeSchema,
+  RelationKindSchema,
   TestCategory,
+  type Endpoint,
   type LoginRecipe,
+  type ResourceRelation,
   type TestCase,
   type Variable,
 } from "@sw/core";
-import { parseOpenApi, parseSpecText } from "@sw/api-parser";
+import {
+  inferRelations,
+  mergeRelations,
+  parseOpenApi,
+  parseSpecText,
+  relationId,
+} from "@sw/api-parser";
 import {
   assertPersonaRecipe,
   createSecretStore,
@@ -35,6 +44,7 @@ import {
   FindingRepository,
   PersonaBindingRepository,
   ProjectRepository,
+  RelationRepository,
   TestResultRepository,
   TestRunRepository,
   type SqliteHandle,
@@ -146,7 +156,24 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
       const runs = new TestRunRepository(handle.db);
       const testResults = new TestResultRepository(handle.db);
       const personaBindings = new PersonaBindingRepository(handle.db);
+      const relationsRepo = new RelationRepository(handle.db);
       const recorders = new Map<string, RecorderHandle>();
+
+      /** Contrato mudou: re-infere grafo e preserva revisão. */
+      const refreshRelations = async (
+        environmentId: string,
+        contract: Endpoint[],
+      ) => {
+        const inferred = inferRelations(contract);
+        await relationsRepo.replace(
+          environmentId,
+          inferred.resources,
+          mergeRelations(
+            await relationsRepo.listRelations(environmentId),
+            inferred.relations,
+          ),
+        );
+      };
 
       const bindingSecretRef = (binding: {
         environmentId: string;
@@ -540,6 +567,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                 environment.id,
                 parsed,
               );
+              await refreshRelations(environment.id, saved);
               sendJson(res, 201, {
                 imported: saved.filter((e) => e.source === "openapi").length,
                 endpoints: saved,
@@ -616,6 +644,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                 environment.id,
                 parsed,
               );
+              await refreshRelations(environment.id, saved);
               sendJson(res, 201, {
                 imported: saved.filter((e) => e.source === "openapi").length,
                 endpoints: saved,
@@ -642,13 +671,140 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
             const removed = before.filter(
               (item) => item.source === "openapi",
             ).length;
-            await endpoints.replaceOpenApiEndpoints(
+            const remaining = await endpoints.replaceOpenApiEndpoints(
               environment.projectId,
               environment.id,
               [],
             );
+            await refreshRelations(environment.id, remaining);
             sendJson(res, 200, { removed });
             return;
+          }
+
+          const envRelationsMatch = path.match(
+            /^\/api\/environments\/([^/]+)\/relations(?:\/([^/]+))?$/,
+          );
+          if (envRelationsMatch) {
+            const environment = await environments.getById(
+              decodeURIComponent(envRelationsMatch[1]!),
+            );
+            if (!environment) return notFound(res);
+            const relationKey = envRelationsMatch[2]
+              ? decodeURIComponent(envRelationsMatch[2])
+              : undefined;
+            const statuses = ["suggested", "confirmed", "rejected"] as const;
+            const parseStatus = (value: unknown) =>
+              statuses.find((status) => status === value);
+
+            if (!relationKey && method === "GET") {
+              if ((await relationsRepo.listResources(environment.id)).length === 0) {
+                await refreshRelations(
+                  environment.id,
+                  await endpoints.listByEnvironment(environment.id),
+                );
+              }
+              sendJson(res, 200, {
+                resources: await relationsRepo.listResources(environment.id),
+                relations: await relationsRepo.listRelations(environment.id),
+              });
+              return;
+            }
+
+            if (!relationKey && method === "PATCH") {
+              const body = await readJson<{ ids?: string[]; status?: string }>(req);
+              const status = parseStatus(body.status);
+              if (!status || !Array.isArray(body.ids)) {
+                sendJson(res, 400, { error: "ids and valid status are required" });
+                return;
+              }
+              for (const id of body.ids) {
+                const relation = await relationsRepo.getRelation(environment.id, id);
+                if (relation) {
+                  await relationsRepo.upsertRelation(environment.id, {
+                    ...relation,
+                    status,
+                  });
+                }
+              }
+              sendJson(res, 200, {
+                relations: await relationsRepo.listRelations(environment.id),
+              });
+              return;
+            }
+
+            if (!relationKey && method === "POST") {
+              const body = await readJson<Partial<ResourceRelation>>(req);
+              const kind = RelationKindSchema.safeParse(body.kind);
+              if (!body.from?.trim() || !body.to?.trim() || !body.via?.trim() || !kind.success) {
+                sendJson(res, 400, { error: "from, to, kind and via are required" });
+                return;
+              }
+              const fields = {
+                from: body.from.trim(),
+                to: body.to.trim(),
+                kind: kind.data,
+                via: body.via.trim(),
+              };
+              sendJson(
+                res,
+                201,
+                await relationsRepo.upsertRelation(environment.id, {
+                  ...fields,
+                  id: relationId(fields),
+                  ...(body.source?.trim() ? { source: body.source.trim() } : {}),
+                  evidence: [],
+                  confidence: 100,
+                  origin: "manual",
+                  status: "confirmed",
+                }),
+              );
+              return;
+            }
+
+            if (relationKey && method === "PUT") {
+              const existing = await relationsRepo.getRelation(
+                environment.id,
+                relationKey,
+              );
+              if (!existing) return notFound(res);
+              const body = await readJson<Partial<ResourceRelation>>(req);
+              const kind = body.kind
+                ? RelationKindSchema.safeParse(body.kind)
+                : null;
+              if (kind && !kind.success) {
+                sendJson(res, 400, { error: "invalid kind" });
+                return;
+              }
+              const fields = {
+                from: body.from?.trim() || existing.from,
+                to: body.to?.trim() || existing.to,
+                kind: kind?.data ?? existing.kind,
+                via: body.via?.trim() || existing.via,
+              };
+              const id = relationId(fields);
+              const edited = id !== existing.id;
+              if (edited) await relationsRepo.deleteRelation(environment.id, existing.id);
+              sendJson(
+                res,
+                200,
+                await relationsRepo.upsertRelation(environment.id, {
+                  ...existing,
+                  ...fields,
+                  id,
+                  source: body.source === undefined ? existing.source : body.source || undefined,
+                  // Editada à mão sobrevive a reimport como manual.
+                  origin: edited ? "manual" : existing.origin,
+                  status: parseStatus(body.status) ?? (edited ? "confirmed" : existing.status),
+                }),
+              );
+              return;
+            }
+
+            if (relationKey && method === "DELETE") {
+              await relationsRepo.deleteRelation(environment.id, relationKey);
+              sendJson(res, 204);
+              return;
+            }
           }
 
           const findingsMatch = path.match(

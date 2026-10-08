@@ -55,11 +55,13 @@ import {
 import { ScanWorkspace } from "@/pages/scans/ScansPage";
 import { EnvironmentAccessPanel } from "./EnvironmentAccessPanel";
 import { EnvironmentEndpointsPanel } from "./EnvironmentDetailDialog";
+import { EnvironmentRelationsPanel } from "./EnvironmentRelationsPanel";
 
-type Section = "info" | "endpoints" | "access" | "scan" | "lab";
+type Section = "info" | "endpoints" | "relations" | "access" | "scan" | "lab";
 
 function sectionOf(pathname: string, base: string): Section {
   if (pathname === `${base}/endpoints`) return "endpoints";
+  if (pathname === `${base}/relations`) return "relations";
   if (pathname === `${base}/access`) return "access";
   if (pathname === `${base}/scan`) return "scan";
   if (pathname === `${base}/lab`) return "lab";
@@ -101,9 +103,31 @@ export function EnvironmentDetailPage() {
   );
   const [latencyLoading, setLatencyLoading] = useState(false);
 
+  const [pendingRelations, setPendingRelations] = useState<number | null>(null);
+
   const onEndpointCount = useCallback((count: number) => {
     setEndpointCount(count);
   }, []);
+
+  const onPendingRelations = useCallback((count: number) => {
+    setPendingRelations(count);
+  }, []);
+
+  useEffect(() => {
+    if (!environmentId) return;
+    let cancelled = false;
+    void api
+      .listRelations(environmentId)
+      .then(({ relations }) => {
+        if (!cancelled) {
+          setPendingRelations(relations.filter((r) => r.status === "suggested").length);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [environmentId, endpointsRevision]);
 
   useEffect(() => {
     void loadProjects();
@@ -388,6 +412,11 @@ export function EnvironmentDetailPage() {
       title: "Endpoints",
       badge: endpointCount ?? undefined,
     },
+    {
+      href: `${base}/relations`,
+      title: "Relacionamentos",
+      badge: pendingRelations || undefined,
+    },
     { href: `${base}/access`, title: "Acesso" },
     { href: `${base}/scan`, title: "Scan do ambiente" },
     { href: `${base}/lab`, title: "AI Test Lab" },
@@ -552,6 +581,15 @@ export function EnvironmentDetailPage() {
           environment={environment}
           onCount={onEndpointCount}
           reloadToken={endpointsRevision}
+        />
+      ) : null}
+
+      {section === "relations" ? (
+        <EnvironmentRelationsPanel
+          environment={environment}
+          reloadToken={endpointsRevision}
+          onPendingCount={onPendingRelations}
+          onAddDocs={() => setDocsOpen(true)}
         />
       ) : null}
 

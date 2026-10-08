@@ -7,6 +7,8 @@ import type {
   LoginRecipe,
   PersonaBinding,
   RateLimitConfig,
+  Resource,
+  ResourceRelation,
   ScanRun,
   TestCase,
   TestCategory,
@@ -550,4 +552,38 @@ export const api = {
       `/api/environments/${environmentId}/personas/${encodeURIComponent(personaId)}/login/test`,
       { method: "POST" },
     ),
+
+  listRelations: (environmentId: string) =>
+    request<{ resources: Resource[]; relations: ResourceRelation[] }>(
+      `/api/environments/${environmentId}/relations`,
+    ),
+
+  reviewRelations: (
+    environmentId: string,
+    ids: string[],
+    status: RelationStatus,
+  ) =>
+    request<{ relations: ResourceRelation[] }>(
+      `/api/environments/${environmentId}/relations`,
+      { method: "PATCH", body: JSON.stringify({ ids, status }) },
+    ),
+
+  createRelation: (
+    environmentId: string,
+    input: Pick<ResourceRelation, "from" | "to" | "kind" | "via"> & {
+      source?: string;
+    },
+  ) =>
+    request<ResourceRelation>(`/api/environments/${environmentId}/relations`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
+  deleteRelation: (environmentId: string, relationId: string) =>
+    request<void>(
+      `/api/environments/${environmentId}/relations/${encodeURIComponent(relationId)}`,
+      { method: "DELETE" },
+    ),
 };
+
+export type RelationStatus = "suggested" | "confirmed" | "rejected";
