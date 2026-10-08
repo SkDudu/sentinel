@@ -244,12 +244,12 @@ export const api = {
   deleteEndpoint: (id: string) =>
     request<void>(`/api/endpoints/${id}`, { method: "DELETE" }),
 
-  importEnvironmentOpenApi: (environmentId: string, document: unknown) =>
+  importEnvironmentOpenApi: (environmentId: string, text: string) =>
     request<{ imported: number; endpoints: Endpoint[] }>(
       `/api/environments/${environmentId}/openapi/import`,
       {
         method: "POST",
-        body: JSON.stringify({ document }),
+        body: JSON.stringify({ text }),
       },
     ),
 

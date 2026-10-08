@@ -10,7 +10,7 @@ import {
   type TestCase,
   type Variable,
 } from "@sw/core";
-import { parseOpenApi } from "@sw/api-parser";
+import { parseOpenApi, parseSpecText } from "@sw/api-parser";
 import { createSecretStore, environmentSecretRef } from "@sw/auth";
 import {
   createSqliteDb,
@@ -394,15 +394,21 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
             const environment = await environments.getById(id);
             if (!environment) return notFound(res);
 
-            const body = await readJson<{ document?: unknown }>(req);
-            if (!body.document) {
-              sendJson(res, 400, { error: "document is required" });
+            const body = await readJson<{ document?: unknown; text?: string }>(
+              req,
+            );
+            if (!body.document && !body.text) {
+              sendJson(res, 400, { error: "document or text is required" });
               return;
             }
 
             try {
+              const document =
+                typeof body.text === "string"
+                  ? parseSpecText(body.text)
+                  : body.document;
               const parsed = parseOpenApi(
-                body.document,
+                document,
                 environment.projectId,
                 environment.id,
               );

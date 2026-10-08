@@ -2,7 +2,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
-import { parseOpenApi } from "@sw/api-parser";
+import { parseOpenApi, parseSpecText } from "@sw/api-parser";
 import { createSecretStore } from "@sw/auth";
 import {
   createSqliteDb,
@@ -94,7 +94,7 @@ async function runOpenApiScan(args: string[]) {
     process.exit(1);
   }
 
-  const document = JSON.parse(readFileSync(resolve(openapiPath), "utf8"));
+  const document = parseSpecText(readFileSync(resolve(openapiPath), "utf8"));
   const projectId = randomUUID();
   let endpoints = parseOpenApi(document, projectId);
   if (onlyPath) endpoints = endpoints.filter((e) => e.path === onlyPath);

@@ -123,14 +123,8 @@ export function EnvironmentDetailPage() {
       if (!environment) throw new Error("Ambiente não encontrado.");
       onProgress(0.2);
       const text = await file.text();
-      let document: unknown;
-      try {
-        document = JSON.parse(text) as unknown;
-      } catch {
-        throw new Error("O arquivo não é JSON válido.");
-      }
       onProgress(0.55);
-      const result = await api.importEnvironmentOpenApi(environment.id, document);
+      const result = await api.importEnvironmentOpenApi(environment.id, text);
       onProgress(1);
       setEndpointCount(result.endpoints.length);
       setEndpointsRevision((current) => current + 1);
@@ -513,16 +507,16 @@ export function EnvironmentDetailPage() {
           <DialogHeader className="sr-only">
             <DialogTitle>Adicionar documentação</DialogTitle>
             <DialogDescription>
-              Envie o openapi.json. Reimportar substitui o contrato deste ambiente.
+              Envie o OpenAPI (JSON ou YAML). Reimportar substitui o contrato deste ambiente.
             </DialogDescription>
           </DialogHeader>
           {docsOpen ? (
             <Files1
               title="Documentação"
-              description="Envie o openapi.json. Reimportar substitui o contrato deste ambiente."
-              accept=".json,application/json"
-              acceptHint="JSON OpenAPI, até 5 MB"
-              dropTitle="Solte o openapi.json ou escolha o arquivo"
+              description="Envie o OpenAPI (JSON ou YAML). Reimportar substitui o contrato deste ambiente."
+              accept=".json,.yaml,.yml,application/json,application/yaml,text/yaml"
+              acceptHint="OpenAPI JSON ou YAML, até 5 MB"
+              dropTitle="Solte o openapi.json/.yaml ou escolha o arquivo"
               maxFiles={1}
               maxSize={5 * 1024 * 1024}
               upload={uploadOpenApi}
@@ -622,7 +616,7 @@ export function EnvironmentDetailPage() {
             <AlertTitle>Ação destrutiva</AlertTitle>
             <AlertDescription>
               Confirme só se tiver certeza. Será preciso reimportar o
-              openapi.json.
+              OpenAPI.
             </AlertDescription>
           </Alert>
           <AlertDialogFooter>
