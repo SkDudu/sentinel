@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { CircleDot, Globe } from "lucide-react";
 import { AuthType, LoginRecipeSchema, type LoginRecipe } from "@sw/core";
 import type { EnvironmentDto } from "@/services/api";
 import { api } from "@/services/api";
@@ -21,6 +22,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
+import { toast } from "@/components/ui/toast";
+
+function recorderOpenUrl(baseUrl: string, docsUrl: string): string {
+  const base = baseUrl.trim();
+  const docs = docsUrl.trim();
+  if (!docs) return base;
+  if (/^https?:\/\//i.test(docs)) return docs;
+  if (!base) return docs;
+  try {
+    const path = docs.startsWith("/") ? docs : `/${docs}`;
+    return new URL(path, base).toString();
+  } catch {
+    return docs;
+  }
+}
 
 const AUTH_TYPE_ITEMS = Object.values(AuthType).map((type) => ({
   label: type,
@@ -120,6 +136,7 @@ export function headersToJson(
 export type EnvironmentFormValues = {
   name: string;
   baseUrl: string;
+  docsUrl?: string | null;
   authType: string;
   headers: Record<string, string>;
   productionSafetyMode: boolean;
@@ -180,6 +197,7 @@ export function EnvironmentFormDialog({
   const isEdit = mode?.kind === "edit";
   const [name, setName] = useState("Development");
   const [baseUrl, setBaseUrl] = useState("http://localhost:3000");
+  const [docsUrl, setDocsUrl] = useState("/docs");
   const [authType, setAuthType] = useState<string>(AuthType.NONE);
   const [safety, setSafety] = useState(false);
   const [headers, setHeaders] = useState("");
@@ -203,6 +221,7 @@ export function EnvironmentFormDialog({
       const locked = Boolean(env.secretConfigured);
       setName(env.name);
       setBaseUrl(env.baseUrl);
+      setDocsUrl(env.docsUrl ?? "");
       setAuthType(env.authType);
       setSafety(env.productionSafetyMode);
       setHeaders(headersToJson(env.headers));
@@ -216,6 +235,7 @@ export function EnvironmentFormDialog({
     } else {
       setName("Development");
       setBaseUrl("http://localhost:3000");
+      setDocsUrl("/docs");
       setAuthType(AuthType.NONE);
       setSafety(false);
       setHeaders("");
@@ -235,7 +255,13 @@ export function EnvironmentFormDialog({
       void api
         .recorderStatus(recorderId)
         .then((snap) => {
-          if (!cancelled) setCaptured(snap.steps);
+          if (cancelled) return;
+          setCaptured(snap.steps);
+          if (!snap.open) {
+            cancelled = true;
+            clearInterval(timer);
+            void finishRecording();
+          }
         })
         .catch(() => undefined);
     }, 1000);
@@ -265,13 +291,16 @@ export function EnvironmentFormDialog({
     setFormError(null);
     setRecording(true);
     try {
-      const snap = await api.startRecorder(baseUrl.trim());
+      const snap = await api.startRecorder(baseUrl.trim(), docsUrl.trim() || null);
       setRecorderId(snap.id);
       setCaptured(snap.steps);
     } catch (err) {
-      setFormError(
-        err instanceof Error ? err.message : "Falha ao abrir o navegador",
-      );
+      toast.add({
+        title: "Não abriu o navegador",
+        description:
+          err instanceof Error ? err.message : "Falha ao abrir o navegador",
+        type: "error",
+      });
     } finally {
       setRecording(false);
     }
@@ -291,9 +320,12 @@ export function EnvironmentFormDialog({
         setPassword(derived.secrets.password);
       }
     } catch (err) {
-      setFormError(
-        err instanceof Error ? err.message : "Falha ao concluir a gravação",
-      );
+      toast.add({
+        title: "Gravação falhou",
+        description:
+          err instanceof Error ? err.message : "Falha ao concluir a gravação",
+        type: "error",
+      });
     } finally {
       setRecording(false);
     }
@@ -324,6 +356,7 @@ export function EnvironmentFormDialog({
       await onSubmit({
         name,
         baseUrl,
+        docsUrl: docsUrl.trim() || null,
         authType,
         headers: parsedHeaders,
         productionSafetyMode: safety,
@@ -342,11 +375,30 @@ export function EnvironmentFormDialog({
     isEdit && mode.kind === "edit"
       ? Boolean(mode.environment.secretConfigured)
       : false;
+  const recipeMissing =
+    isRecipe && (!recipeJson.trim() || Boolean(recorderId) || recording);
+
+  const headersField = (
+    <label className="block text-sm sm:col-span-2">
+      Headers (JSON{isEdit ? "" : ", opcional"})
+      <textarea
+        value={headers}
+        onChange={(e) => setHeaders(e.target.value)}
+        rows={3}
+        placeholder='{"X-Tenant":"dev"}'
+        className="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 font-mono text-xs"
+      />
+    </label>
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="z-[60] sm:max-w-lg"
+        className={
+          isRecipe
+            ? "z-[60] flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden sm:max-w-4xl"
+            : "z-[60] sm:max-w-lg"
+        }
         overlayClassName="z-[60]"
       >
         <DialogHeader>
@@ -359,13 +411,33 @@ export function EnvironmentFormDialog({
               : "Development/Staging com base URL e auth. Secrets vão para o vault."}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form
+          onSubmit={handleSubmit}
+          className={
+            isRecipe
+              ? "flex min-h-0 flex-1 flex-col gap-4 overflow-hidden"
+              : "space-y-4"
+          }
+        >
           {formError ? (
             <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
               {formError}
             </p>
           ) : null}
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div
+            className={
+              isRecipe
+                ? "grid min-h-0 flex-1 gap-4 overflow-hidden sm:grid-cols-2"
+                : undefined
+            }
+          >
+          <div
+            className={
+              isRecipe
+                ? "grid min-h-0 content-start gap-3 overflow-y-auto sm:grid-cols-2"
+                : "grid content-start gap-3 sm:grid-cols-2"
+            }
+          >
             <label className="block text-sm sm:col-span-1">
               Nome
               <Input
@@ -376,7 +448,7 @@ export function EnvironmentFormDialog({
                 autoFocus
               />
             </label>
-            <label className="block text-sm sm:col-span-1">
+            <label className="block text-sm sm:col-span-2">
               Base URL
               <Input
                 required
@@ -385,6 +457,22 @@ export function EnvironmentFormDialog({
                 onChange={(e) => setBaseUrl(e.target.value)}
                 className="mt-1 font-mono text-xs"
               />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Usada nas requisições de teste.
+              </p>
+            </label>
+            <label className="block text-sm sm:col-span-2">
+              Documentação
+              <Input
+                value={docsUrl}
+                placeholder="/docs"
+                onChange={(e) => setDocsUrl(e.target.value)}
+                className="mt-1 font-mono text-xs"
+                spellCheck={false}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Path ou URL da documentação. O usual é /docs.
+              </p>
             </label>
             <div className="block text-sm">
               <span className="mb-1 block">Auth</span>
@@ -515,19 +603,29 @@ export function EnvironmentFormDialog({
 
             {isRecipe ? (
               <>
-                <div className="space-y-2 sm:col-span-2">
+                <div className="space-y-3 rounded-lg border-2 border-primary/50 bg-primary/5 p-3 sm:col-span-2">
+                  <div className="flex items-start gap-2">
+                    {recorderId ? (
+                      <CircleDot className="mt-0.5 size-4 shrink-0 animate-pulse text-destructive" />
+                    ) : (
+                      <Globe className="mt-0.5 size-4 shrink-0 text-primary" />
+                    )}
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">
+                        {recorderId
+                          ? "Gravando… faça o login no Chrome"
+                          : recipeJson.trim()
+                            ? "Receita pronta"
+                            : "Grave o login no navegador"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Abre o Chrome em {recorderOpenUrl(baseUrl, docsUrl) || "a documentação"}.
+                        Faça o login nessa janela. Concluir monta a receita e
+                        preenche a senha para o vault.
+                      </p>
+                    </div>
+                  </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={recording || Boolean(recorderId) || !baseUrl.trim()}
-                      onClick={() => void beginRecording()}
-                    >
-                      {recording && !recorderId ? (
-                        <Spinner data-icon="inline-start" />
-                      ) : null}
-                      Abrir navegador
-                    </Button>
                     {recorderId ? (
                       <Button
                         type="button"
@@ -537,12 +635,18 @@ export function EnvironmentFormDialog({
                         {recording ? <Spinner data-icon="inline-start" /> : null}
                         Concluir gravação
                       </Button>
-                    ) : null}
+                    ) : (
+                      <Button
+                        type="button"
+                        variant={recipeJson.trim() ? "outline" : "default"}
+                        disabled={recording || !baseUrl.trim()}
+                        onClick={() => void beginRecording()}
+                      >
+                        {recording ? <Spinner data-icon="inline-start" /> : null}
+                        {recipeJson.trim() ? "Gravar de novo" : "Abrir navegador"}
+                      </Button>
+                    )}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Abre o Chrome na base URL. Faça o login nessa janela.
-                    Concluir monta a receita e preenche a senha para o vault.
-                  </p>
                   {captured.length > 0 ? (
                     <ul className="max-h-28 space-y-0.5 overflow-auto rounded-md border px-2 py-1 font-mono text-xs">
                       {captured.slice(-8).map((step, index) => (
@@ -576,32 +680,29 @@ export function EnvironmentFormDialog({
                     </p>
                   ) : null}
                 </label>
-                <label className="block text-sm sm:col-span-2">
-                  Receita de login (JSON)
-                  <textarea
-                    required
-                    value={recipeJson}
-                    onChange={(e) => setRecipeJson(e.target.value)}
-                    rows={8}
-                    placeholder={RECIPE_PLACEHOLDER}
-                    className="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 font-mono text-xs"
-                  />
-                </label>
               </>
-            ) : null}
-
-            <label className="block text-sm sm:col-span-2">
-              Headers (JSON{isEdit ? "" : ", opcional"})
-              <textarea
-                value={headers}
-                onChange={(e) => setHeaders(e.target.value)}
-                rows={3}
-                placeholder='{"X-Tenant":"dev"}'
-                className="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 font-mono text-xs"
-              />
-            </label>
+            ) : (
+              headersField
+            )}
           </div>
-          <DialogFooter>
+
+          {isRecipe ? (
+            <div className="flex min-h-0 flex-col gap-3 overflow-hidden">
+              <label className="flex min-h-0 flex-1 flex-col text-sm">
+                Receita de login (JSON)
+                <textarea
+                  required
+                  value={recipeJson}
+                  onChange={(e) => setRecipeJson(e.target.value)}
+                  placeholder={RECIPE_PLACEHOLDER}
+                  className="mt-1 min-h-40 w-full flex-1 resize-none overflow-auto rounded-md border border-input bg-transparent px-3 py-2 font-mono text-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                />
+              </label>
+              {headersField}
+            </div>
+          ) : null}
+          </div>
+          <DialogFooter className={isRecipe ? "shrink-0" : undefined}>
             <Button
               type="button"
               variant="outline"
@@ -609,7 +710,12 @@ export function EnvironmentFormDialog({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={busy || !name.trim() || !baseUrl.trim()}>
+            <Button
+              type="submit"
+              disabled={
+                busy || !name.trim() || !baseUrl.trim() || recipeMissing
+              }
+            >
               {busy ? <Spinner data-icon="inline-start" /> : null}
               {isEdit ? "Salvar" : "Criar ambiente"}
             </Button>

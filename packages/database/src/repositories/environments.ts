@@ -3,12 +3,20 @@ import { eq } from "drizzle-orm";
 import { AuthType, type Environment, type LoginRecipe } from "@sw/core";
 import type { SentinelDb } from "../client.js";
 import { mapEnvironment } from "../mappers.js";
-import { endpoints, environments, findings, projects, testResults } from "../schema.js";
+import {
+  endpoints,
+  environments,
+  findings,
+  projects,
+  testResults,
+  testRuns,
+} from "../schema.js";
 
 export interface CreateEnvironmentInput {
   projectId: string;
   name: string;
   baseUrl: string;
+  docsUrl?: string | null;
   authType?: Environment["authType"];
   secretRef?: string;
   headers?: Record<string, string>;
@@ -19,6 +27,7 @@ export interface CreateEnvironmentInput {
 export interface UpdateEnvironmentInput {
   name?: string;
   baseUrl?: string;
+  docsUrl?: string | null;
   authType?: Environment["authType"];
   secretRef?: string | null;
   headers?: Record<string, string>;
@@ -62,6 +71,7 @@ export class EnvironmentRepository {
       projectId: input.projectId,
       name: input.name.trim(),
       baseUrl: input.baseUrl.trim(),
+      docsUrl: input.docsUrl?.trim() || null,
       authType: input.authType ?? AuthType.NONE,
       secretRef: input.secretRef ?? `env:${id}:auth`,
       headersJson: JSON.stringify(input.headers ?? {}),
@@ -87,6 +97,10 @@ export class EnvironmentRepository {
       .set({
         name: input.name?.trim() ?? existing.name,
         baseUrl: input.baseUrl?.trim() ?? existing.baseUrl,
+        docsUrl:
+          input.docsUrl === undefined
+            ? (existing.docsUrl ?? null)
+            : input.docsUrl?.trim() || null,
         authType: input.authType ?? existing.authType,
         secretRef:
           input.secretRef === undefined
@@ -114,21 +128,29 @@ export class EnvironmentRepository {
     const existing = await this.getById(id);
     if (!existing) return false;
 
+    // Findings e scans do ambiente saem junto (test_runs não tem ON DELETE CASCADE).
+    const runs = await this.db
+      .select({ id: testRuns.id })
+      .from(testRuns)
+      .where(eq(testRuns.environmentId, id));
+    for (const run of runs) {
+      await this.db.delete(findings).where(eq(findings.runId, run.id));
+    }
+    await this.db.delete(testRuns).where(eq(testRuns.environmentId, id));
+
     const owned = await this.db
       .select({ id: endpoints.id })
       .from(endpoints)
       .where(eq(endpoints.environmentId, id));
     for (const row of owned) {
-      await this.db
-        .update(findings)
-        .set({ endpointId: null })
-        .where(eq(findings.endpointId, row.id));
+      await this.db.delete(findings).where(eq(findings.endpointId, row.id));
       await this.db
         .update(testResults)
         .set({ endpointId: null })
         .where(eq(testResults.endpointId, row.id));
     }
     await this.db.delete(endpoints).where(eq(endpoints.environmentId, id));
+
     await this.db.delete(environments).where(eq(environments.id, id));
     await this.touchProject(existing.projectId);
     return true;

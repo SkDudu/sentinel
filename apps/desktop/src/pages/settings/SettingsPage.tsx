@@ -103,7 +103,6 @@ export function SettingsPage() {
         kind: settings.kind,
         baseUrl: settings.baseUrl,
         model: settings.model,
-        maxAiCases: settings.maxAiCases,
         ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
       });
       setSettings(next);
@@ -168,7 +167,7 @@ export function SettingsPage() {
         <section className="flex flex-col gap-4">
           <SectionIntro
             title="Provedor de IA"
-            description="Usado pelo AI Lab para gerar casos. O scan determinístico funciona sem isso."
+            description="Usado para interpretar findings. O scan determinístico funciona sem isso."
           />
           <Card>
             {!settings ? (
@@ -180,7 +179,7 @@ export function SettingsPage() {
                     <div className="min-w-0">
                       <CardTitle>IA habilitada</CardTitle>
                       <CardDescription>
-                        Desligada, o AI Lab não chama o provedor.
+                        Desligada, o app não chama o provedor.
                       </CardDescription>
                     </div>
                     <Switch
@@ -262,26 +261,6 @@ export function SettingsPage() {
                     />
                   </Field>
 
-                  <Field
-                    id="ai-max-cases"
-                    label="Máximo de casos por geração"
-                    hint="De 1 a 100."
-                  >
-                    <Input
-                      id="ai-max-cases"
-                      type="number"
-                      min={1}
-                      max={100}
-                      value={settings.maxAiCases}
-                      onChange={(e) =>
-                        setSettings({
-                          ...settings,
-                          maxAiCases: Number(e.target.value) || 20,
-                        })
-                      }
-                      className="max-w-32"
-                    />
-                  </Field>
                 </CardContent>
                 <CardFooter className="justify-end">
                   <Button

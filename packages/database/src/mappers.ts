@@ -52,6 +52,7 @@ export function mapEnvironment(row: EnvironmentRow): Environment {
     projectId: row.projectId,
     name: row.name,
     baseUrl: row.baseUrl,
+    docsUrl: row.docsUrl ?? undefined,
     authType,
     secretRef: row.secretRef ?? undefined,
     headers,

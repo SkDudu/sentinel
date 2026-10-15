@@ -54,6 +54,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { toast } from "@/components/ui/toast";
 import { PageEmptyState } from "@/components/layout/page-empty-state";
 import { PageShell } from "@/components/layout/page-shell";
 import {
@@ -111,6 +112,11 @@ export function EnvironmentsPage() {
     try {
       await createEnvironment(project.id, values);
       setCreateOpen(false);
+      toast.add({
+        title: "Ambiente criado.",
+        description: `${values.name.trim()} já pode receber a documentação.`,
+        type: "success",
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao criar ambiente");
       throw err;
@@ -127,6 +133,7 @@ export function EnvironmentsPage() {
       await updateEnvironment(editingEnv.id, {
         name: values.name,
         baseUrl: values.baseUrl,
+        docsUrl: values.docsUrl,
         authType: values.authType,
         headers: values.headers,
         productionSafetyMode: values.productionSafetyMode,
@@ -291,6 +298,7 @@ export function EnvironmentsPage() {
                   </CardTitle>
                   <CardDescription className="mt-1 truncate font-mono text-xs">
                     {env.baseUrl}
+                    {env.docsUrl ? ` · docs ${env.docsUrl}` : ""}
                   </CardDescription>
                   <p className="mt-2 text-xs text-muted-foreground">
                     Auth {env.authType}

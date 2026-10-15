@@ -183,7 +183,10 @@ function pickJsonBodySchema(
   document: OpenApiDocument,
   operation: OpenApiOperation,
 ): JsonSchema | undefined {
-  const content = operation.requestBody?.content ?? {};
+  const requestBody = resolveRef(document, operation.requestBody) as
+    | OpenApiOperation["requestBody"]
+    | undefined;
+  const content = requestBody?.content ?? {};
   const json = content["application/json"]?.schema;
   if (json) return asSchema(document, json);
   const first = Object.values(content)[0]?.schema;

@@ -9,7 +9,6 @@ import {
   LoginRecipeSchema,
   TestCategory,
   type LoginRecipe,
-  type TestCase,
   type Variable,
 } from "@sw/core";
 import { parseOpenApi, parseSpecText } from "@sw/api-parser";
@@ -34,28 +33,16 @@ import {
   TestRunRepository,
   type SqliteHandle,
 } from "@sw/database";
+import { HttpExecutor } from "@sw/http-client";
+import { interpretFindings } from "@sw/ai";
 import { runProjectScan, type ScanProgressEvent } from "@sw/scan-runner";
 import { createAiClientFromSettings } from "./ai-client.js";
-import {
-  generateAiCasesForEndpoints,
-  interpretProjectFindings,
-} from "./ai-lab.js";
 import {
   loadAiSettings,
   saveAiSettings,
   toPublicAiSettings,
   type AiSettingsFile,
 } from "./ai-settings.js";
-import {
-  clearAiCases,
-  loadAiCases,
-  saveAiCases,
-} from "./ai-cases-store.js";
-import {
-  deletePersona,
-  listPersonas,
-  upsertPersona,
-} from "./personas-store.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dataDir = join(__dirname, "..", "..", "..", "data");
@@ -83,6 +70,18 @@ function sendJson(res: ServerResponse, status: number, body?: unknown) {
 
 function notFound(res: ServerResponse) {
   sendJson(res, 404, { error: "Not found" });
+}
+
+function parseDocsUrl(value: unknown): { value?: string | null; error?: string } {
+  if (value === undefined) return {};
+  if (value === null || value === "") return { value: null };
+  if (typeof value !== "string") {
+    return { error: "A documentação precisa ser um path como /docs ou uma URL." };
+  }
+  const trimmed = value.trim();
+  if (!trimmed) return { value: null };
+  if (trimmed.startsWith("/") || URL.canParse(trimmed)) return { value: trimmed };
+  return { error: "A documentação precisa ser um path como /docs ou uma URL." };
 }
 
 function parseAuthType(value: unknown) {
@@ -163,14 +162,15 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
           }
 
           if (path === "/api/recorder/start" && method === "POST") {
-            const body = await readJson<{ baseUrl?: string }>(req);
+            const body = await readJson<{ baseUrl?: string; docsUrl?: string | null }>(req);
             if (!body.baseUrl?.trim()) {
-              sendJson(res, 400, { error: "baseUrl is required" });
+              sendJson(res, 400, { error: "Informe a base URL antes de abrir o navegador." });
               return;
             }
             try {
               const handle = await startLoginRecording({
                 baseUrl: body.baseUrl.trim(),
+                docsUrl: body.docsUrl,
               });
               recorders.set(handle.id, handle);
               sendJson(res, 201, handle.snapshot());
@@ -304,6 +304,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
               const body = await readJson<{
                 name?: string;
                 baseUrl?: string;
+                docsUrl?: string | null;
                 authType?: string;
                 secretRef?: string;
                 headers?: Record<string, string>;
@@ -312,7 +313,12 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
               }>(req);
 
               if (!body.name?.trim() || !body.baseUrl?.trim()) {
-                sendJson(res, 400, { error: "name and baseUrl are required" });
+                sendJson(res, 400, { error: "Informe o nome e a base URL." });
+                return;
+              }
+              const docsUrl = parseDocsUrl(body.docsUrl);
+              if (docsUrl.error) {
+                sendJson(res, 400, { error: docsUrl.error });
                 return;
               }
 
@@ -330,6 +336,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                     projectId,
                     name: body.name,
                     baseUrl: body.baseUrl,
+                    docsUrl: docsUrl.value,
                     authType: parseAuthType(body.authType),
                     secretRef: body.secretRef,
                     headers: body.headers,
@@ -378,6 +385,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
               const body = await readJson<{
                 name?: string;
                 baseUrl?: string;
+                docsUrl?: string | null;
                 authType?: string;
                 secretRef?: string | null;
                 headers?: Record<string, string>;
@@ -389,12 +397,18 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                 sendJson(res, 400, { error: recipe.error });
                 return;
               }
+              const docsUrl = parseDocsUrl(body.docsUrl);
+              if (docsUrl.error) {
+                sendJson(res, 400, { error: docsUrl.error });
+                return;
+              }
               const updated = await environments.update(id, {
                 ...body,
                 authType: body.authType
                   ? parseAuthType(body.authType)
                   : undefined,
                 loginRecipe: recipe.value,
+                ...(docsUrl.value !== undefined ? { docsUrl: docsUrl.value } : {}),
               });
               if (!updated) return notFound(res);
               sendJson(res, 200, updated);
@@ -712,8 +726,6 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
               environmentId?: string;
               endpointIds?: string[];
               bearerToken?: string;
-              approvedAiCases?: TestCase[];
-              aiOnly?: boolean;
               categories?: TestCategory[];
               variables?: Variable[];
               rateLimit?: {
@@ -748,8 +760,6 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
               environmentId: body.environmentId,
               endpointIds: body.endpointIds,
               bearerToken: body.bearerToken,
-              approvedAiCases: body.approvedAiCases,
-              aiOnly: body.aiOnly,
               categories:
                 categories && categories.length > 0 ? categories : undefined,
               variables: body.variables,
@@ -853,53 +863,6 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
             return;
           }
 
-          if (path === "/api/ai/generate-cases" && method === "POST") {
-            const body = await readJson<{
-              projectId?: string;
-              endpointIds?: string[];
-              allowPersonaSeed?: boolean;
-            }>(req);
-
-            if (!body.projectId) {
-              sendJson(res, 400, { error: "projectId is required" });
-              return;
-            }
-            if (!(await projects.getById(body.projectId))) return notFound(res);
-
-            let target = await endpoints.listByProject(body.projectId);
-            if (body.endpointIds?.length) {
-              const allow = new Set(body.endpointIds);
-              target = target.filter((e) => allow.has(e.id));
-            }
-            if (target.length === 0) {
-              sendJson(res, 400, { error: "No endpoints selected" });
-              return;
-            }
-
-            const settings = loadAiSettings(dataDir);
-            const client = createAiClientFromSettings(settings);
-            const personas = listPersonas(dataDir, body.projectId);
-
-            try {
-              const result = await generateAiCasesForEndpoints({
-                endpoints: target,
-                personas,
-                client,
-                maxAiCases: settings.maxAiCases,
-                allowPersonaSeed: body.allowPersonaSeed ?? !client,
-              });
-              sendJson(res, 200, result);
-            } catch (error) {
-              sendJson(res, 400, {
-                error:
-                  error instanceof Error
-                    ? error.message
-                    : "AI generation failed",
-              });
-            }
-            return;
-          }
-
           if (path === "/api/ai/interpret" && method === "POST") {
             const body = await readJson<{
               projectId?: string;
@@ -928,10 +891,7 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
             }
 
             try {
-              const interpretation = await interpretProjectFindings(
-                client,
-                items,
-              );
+              const interpretation = await interpretFindings(client, items);
               sendJson(res, 200, { interpretation, count: items.length });
             } catch (error) {
               sendJson(res, 400, {
@@ -941,131 +901,6 @@ export function sentinelApiPlugin(dbPath = defaultDbPath): Plugin {
                     : "Interpretation failed",
               });
             }
-            return;
-          }
-
-          const aiCasesMatch = path.match(
-            /^\/api\/projects\/([^/]+)\/ai-cases$/,
-          );
-          if (aiCasesMatch) {
-            const projectId = decodeURIComponent(aiCasesMatch[1]!);
-            if (!(await projects.getById(projectId))) return notFound(res);
-
-            if (method === "GET") {
-              sendJson(res, 200, loadAiCases(dataDir, projectId));
-              return;
-            }
-
-            if (method === "PUT") {
-              const body = await readJson<{
-                cases?: TestCase[];
-                approvedIds?: string[];
-                genMode?: string | null;
-                rejected?: Array<{ id: string; name: string; reason: string }>;
-              }>(req);
-              if (!Array.isArray(body.cases) || !Array.isArray(body.approvedIds)) {
-                sendJson(res, 400, {
-                  error: "cases and approvedIds arrays are required",
-                });
-                return;
-              }
-              sendJson(
-                res,
-                200,
-                saveAiCases(dataDir, projectId, {
-                  cases: body.cases,
-                  approvedIds: body.approvedIds,
-                  genMode: body.genMode,
-                  rejected: body.rejected,
-                }),
-              );
-              return;
-            }
-
-            if (method === "DELETE") {
-              sendJson(res, 200, clearAiCases(dataDir, projectId));
-              return;
-            }
-          }
-
-          const personasMatch = path.match(
-            /^\/api\/projects\/([^/]+)\/personas$/,
-          );
-          if (personasMatch) {
-            const projectId = decodeURIComponent(personasMatch[1]!);
-            if (!(await projects.getById(projectId))) return notFound(res);
-
-            if (method === "GET") {
-              sendJson(res, 200, listPersonas(dataDir, projectId));
-              return;
-            }
-
-            if (method === "POST") {
-              const body = await readJson<{
-                id?: string;
-                name?: string;
-                description?: string;
-                fields?: Record<string, unknown>;
-                tags?: string[];
-              }>(req);
-              if (!body.name?.trim() || !body.fields) {
-                sendJson(res, 400, { error: "name and fields are required" });
-                return;
-              }
-              sendJson(
-                res,
-                201,
-                upsertPersona(dataDir, projectId, {
-                  id: body.id,
-                  name: body.name,
-                  description: body.description,
-                  fields: body.fields,
-                  tags: body.tags,
-                }),
-              );
-              return;
-            }
-          }
-
-          const personaMatch = path.match(
-            /^\/api\/projects\/([^/]+)\/personas\/([^/]+)$/,
-          );
-          if (personaMatch && method === "DELETE") {
-            const projectId = decodeURIComponent(personaMatch[1]!);
-            const personaId = decodeURIComponent(personaMatch[2]!);
-            if (!(await projects.getById(projectId))) return notFound(res);
-            if (!deletePersona(dataDir, projectId, personaId)) {
-              return notFound(res);
-            }
-            sendJson(res, 204);
-            return;
-          }
-
-          if (personaMatch && method === "PUT") {
-            const projectId = decodeURIComponent(personaMatch[1]!);
-            const personaId = decodeURIComponent(personaMatch[2]!);
-            if (!(await projects.getById(projectId))) return notFound(res);
-            const body = await readJson<{
-              name?: string;
-              description?: string;
-              fields?: Record<string, unknown>;
-              tags?: string[];
-            }>(req);
-            if (!body.name?.trim() || !body.fields) {
-              sendJson(res, 400, { error: "name and fields are required" });
-              return;
-            }
-            sendJson(
-              res,
-              200,
-              upsertPersona(dataDir, projectId, {
-                id: personaId,
-                name: body.name,
-                description: body.description,
-                fields: body.fields,
-                tags: body.tags,
-              }),
-            );
             return;
           }
 
