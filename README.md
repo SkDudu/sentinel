@@ -1,166 +1,157 @@
 # Sentinel
 
-**Workbench local de testes de segurança para APIs.**
+[![CI](https://github.com/SkDudu/sentinel/actions/workflows/ci.yml/badge.svg)](https://github.com/SkDudu/sentinel/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
-Importe o OpenAPI, gere casos de teste (determinísticos + IA opcional), execute contra o seu ambiente e receba findings com severidade, confiança, evidência e recomendação.
+**Local-first API security testing workbench.**
 
-Não é um scanner na nuvem. É uma ferramenta **pessoal**, com engine própria — desktop hoje, CLI/CI amanhã.
+Import an OpenAPI spec, generate test cases (deterministic + optional AI), run them against your own environment and get findings with severity, confidence, evidence and a recommendation.
+
+Not a cloud scanner. Sentinel runs on your machine with its own engine — desktop app today, CLI/CI too.
+
+🇧🇷 [Leia em português](./README.pt-BR.md)
+
+> [!WARNING]
+> Only test APIs you own or are explicitly authorized to test (local, staging, your own services). Aggressive tests are gated behind **Production Safety Mode**. You are responsible for how you use this tool.
 
 ---
 
-## Por que existe
+## Why
 
-Testar segurança de API costuma ser manual, inconsistente ou preso a ferramentas externas sem fluxo de produto. O Sentinel une o ciclo completo:
+API security testing is usually manual, inconsistent, or locked into external tools with no product flow. Sentinel covers the whole loop:
 
 ```
-Projeto → Ambiente (OpenAPI) → Casos de teste → Execução → Findings
+Project → Environment (OpenAPI) → Test cases → Run → Findings
 ```
 
-| Em vez de… | Sentinel faz… |
+| Instead of… | Sentinel does… |
 | --- | --- |
-| Fuzz genérico | Entende o schema e a semântica dos campos (`email`, `cpf`, `role`…) |
-| Só UI em cima do ZAP | Engine própria; adapters externos são opcionais |
-| IA disparando requests sozinha | IA gera casos → você revisa → engine executa |
-| Achados sem contexto | Finding padronizado (severity + confidence + evidence) |
+| Generic fuzzing | Understands the schema and field semantics (`email`, `cpf`, `role`…) |
+| A UI on top of ZAP | Own engine; external adapters are optional |
+| AI firing requests on its own | AI generates cases → you review → the engine runs them |
+| Findings without context | Standard finding (severity + confidence + evidence) |
 
 ---
 
-## Princípios
+## Principles
 
-1. **Local por padrão** — cloud AI é opcional  
-2. **Engine ≠ UI** — o mesmo cérebro serve desktop, CLI e CI  
-3. **Determinístico primeiro** — null, missing, tipo errado não gastam token  
-4. **IA como amplificador** — gera dados / interpreta findings; não roda o scanner  
-5. **Review antes do burst** — casos de IA passam por seleção humana  
-6. **Secrets no keychain** — nunca plaintext no SQLite  
-7. **Plugins de teste** — novo teste = registry, sem reescrever o executor  
-
----
-
-## Status atual
-
-| Fase | Estado |
-| --- | --- |
-| 0 Fundação | ✅ |
-| 1 MVP usável | ✅ |
-| 2 AI Test Lab | ✅ |
-| 3 Authz / rate-limit / HTTP | ✅ |
-| 4 Tauri + keychain + ZAP + plugins | ✅ (build Tauri precisa Rust) |
-| 5 CLI / CI / SARIF | ✅ |
-
-Detalhes em [`docs/roadmap.md`](./docs/roadmap.md).
+1. **Local by default** — cloud AI is optional
+2. **Engine ≠ UI** — the same core powers desktop, CLI and CI
+3. **Deterministic first** — null, missing field, wrong type don't spend tokens
+4. **AI as an amplifier** — generates data / interprets findings; never drives the scanner
+5. **Review before burst** — AI cases go through human selection
+6. **Secrets in the keychain** — never plaintext in SQLite
+7. **Test plugins** — a new test is a registry plugin, no executor rewrite
 
 ---
 
 ## Stack
 
-| Camada | Tecnologia |
+| Layer | Technology |
 | --- | --- |
 | Desktop | React + TypeScript + Tailwind (Vite) → Tauri |
 | Monorepo | pnpm workspaces |
-| Validação | Zod |
-| Banco | SQLite + Drizzle |
+| Validation | Zod |
+| Database | SQLite + Drizzle |
 | HTTP | `fetch` via `RequestExecutor` |
-| AI (opcional) | Ollama / LM Studio / OpenAI-compatible |
-| External scanner | OWASP ZAP (`ZapExecutor`, opcional) |
-
-Requisitos: **Node ≥ 22.5** (SQLite nativo) e **pnpm**. Tauri opcional: **Rust** + `pnpm tauri:dev`.
+| AI (optional) | Ollama / LM Studio / OpenAI-compatible |
+| External scanner | OWASP ZAP (`ZapExecutor`, optional) |
 
 ---
 
-## Quick start
+## Getting started
+
+Requirements: **Node ≥ 22.5** (native SQLite) and **pnpm 10**. Optional: **Rust** for the Tauri desktop shell.
 
 ```bash
+git clone https://github.com/SkDudu/sentinel.git
+cd sentinel
 pnpm install
 pnpm build
 pnpm dev:desktop
 ```
 
-A UI sobe em `http://localhost:1420`.
+The UI runs at `http://localhost:1420`. Tauri shell: `pnpm tauri:dev`.
+
+Optional AI config: copy `.env.example` to `.env` (defaults point to a local Ollama).
+
+### First scan
+
+1. Create a project and an environment in **Projects**
+2. Open the environment and import an `openapi.json` (try `examples/sample-openapi.json`)
+3. Run the scan in **Scans** (optional per-run Bearer token)
+4. Review and triage in **Findings**
 
 ### CLI
 
 ```bash
 pnpm --filter @sw/cli build
 
-# OpenAPI ad-hoc
+# Ad-hoc OpenAPI
 pnpm --filter @sw/cli exec node ./dist/index.js scan \
   --openapi examples/sample-openapi.json \
   --base-url http://localhost:3000 \
   --format sarif --output report.sarif
 
-# Projeto persistido (SQLite do desktop)
+# Persisted project (desktop SQLite)
 pnpm --filter @sw/cli exec node ./dist/index.js scan \
   --project <uuid> --environment <uuid> --db ./data/sentinel.db
 ```
 
-Exit codes: `0` gate ok · `1` erro · `2` gate falhou (critical/high).  
+Exit codes: `0` gate passed · `1` error · `2` gate failed (critical/high).
 Plugins: `--plugins examples/plugins` · ZAP: `--executor zap --zap-url http://127.0.0.1:8080`.
+CI example: [`.github/workflows/sentinel-scan.example.yml`](./.github/workflows/sentinel-scan.example.yml).
 
 ---
 
-## Estrutura
+## Project layout
 
 ```
 sentinel/
 ├── apps/
-│   ├── desktop/     # Workbench (Projects, Ambientes, Findings)
-│   └── cli/         # Scan headless
+│   ├── desktop/           # Workbench (Projects, Environments, Findings)
+│   └── cli/               # Headless scan
 ├── packages/
-│   ├── core/              # Tipos e schemas Zod
-│   ├── database/          # Schema Drizzle / SQLite
-│   ├── api-parser/        # OpenAPI → modelo interno + semântica
+│   ├── core/              # Types and Zod schemas
+│   ├── database/          # Drizzle / SQLite schema
+│   ├── api-parser/        # OpenAPI → internal model + semantics
 │   ├── auth/              # Auth headers + secret store
+│   ├── login-recorder/    # Interactive login → session recipe
 │   ├── http-client/       # RequestExecutor + ZapExecutor
-│   ├── test-registry/     # Plugins de teste + loader externo
+│   ├── test-registry/     # Test plugins + external loader
 │   ├── security-engine/   # Orchestrator + custom scanners
-│   ├── scan-runner/       # runProjectScan compartilhado (UI/CLI)
+│   ├── scan-runner/       # Shared runProjectScan (UI/CLI)
 │   ├── findings/          # Summary, gate, JSON/SARIF
-│   ├── ai/                # Client LLM + interpretação
-│   └── ai-data-generator/ # Casos determinísticos, personas e IA
-└── docs/                  # Produto, roadmap, arquitetura, stack, regras de IA
+│   ├── ai/                # LLM client + interpretation
+│   └── ai-data-generator/ # Deterministic cases, personas and AI
+├── examples/              # Sample OpenAPI + sample plugin
+└── docs/                  # Product, roadmap, architecture, stack, AI rules
 ```
 
-Pacotes internos usam o prefixo `@sw/*`. Na UI e na documentação o produto é **Sentinel**.
+Internal packages use the `@sw/*` prefix. The product name is **Sentinel**.
 
 ---
 
-## Documentação
+## Contributing
 
-| Doc | Conteúdo |
-| --- | --- |
-| [Produto](./docs/product.md) | Visão, princípios, MVP |
-| [Roadmap](./docs/roadmap.md) | Fases e prioridades |
-| [Arquitetura](./docs/architecture.md) | Componentes, fluxos, contratos |
-| [Tecnologias](./docs/technologies.md) | Stack e decisões |
-| [Regras para IA](./docs/ai-rules.md) | Guardrails para agentes e IA de produto |
-
----
-
-## Desenvolvimento
+Issues and PRs are welcome.
 
 ```bash
-pnpm build          # compila packages
-pnpm typecheck      # TypeScript em todo o monorepo
+pnpm build          # build packages
+pnpm typecheck      # TypeScript across the monorepo
 pnpm dev:desktop    # UI
-pnpm dev:cli        # CLI em modo tsx
+pnpm dev:cli        # CLI via tsx
 ```
 
-Novos testes de segurança entram em `@sw/test-registry` como plugins — não no executor HTTP.
+- New security tests go into `@sw/test-registry` as plugins — not into the HTTP executor.
+- Scan/parser/findings logic lives in `packages/`, not in the UI.
+- Read [`docs/`](./docs/README.md) before changing architecture or scope (docs are in Portuguese).
+- Never commit secrets, local databases (`data/`) or `node_modules`.
+
+Found a vulnerability in Sentinel itself? Please open a [private security advisory](https://github.com/SkDudu/sentinel/security/advisories/new) instead of a public issue.
 
 ---
 
-## MVP (fluxo atual)
+## License
 
-1. Crie um projeto e ambiente em **Projects**  
-2. Abra um ambiente e importe `openapi.json` no dialog (ex.: `examples/sample-openapi.json`)  
-3. Rode o scan em **Scans** (Bearer opcional só da execução)  
-4. Revise e atualize status em **Findings**
-
-Secrets no vault (keychain no shell Tauri). Ver [roadmap](./docs/roadmap.md).
-
----
-
-## Licença / uso
-
-Projeto em desenvolvimento ativo. Use apenas contra APIs que você tem autorização para testar (local / staging / próprias).
+[MIT](./LICENSE) © Eduardo Santos
