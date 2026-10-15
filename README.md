@@ -1,6 +1,7 @@
 # Sentinel
 
 [![CI](https://github.com/SkDudu/sentinel/actions/workflows/ci.yml/badge.svg)](https://github.com/SkDudu/sentinel/actions/workflows/ci.yml)
+[![Desktop release](https://github.com/SkDudu/sentinel/actions/workflows/desktop-release.yml/badge.svg)](https://github.com/SkDudu/sentinel/actions/workflows/desktop-release.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
 **Local-first API security testing workbench.**
@@ -56,6 +57,20 @@ Project → Environment (OpenAPI) → Test cases → Run → Findings
 | HTTP | `fetch` via `RequestExecutor` |
 | AI (optional) | Ollama / LM Studio / OpenAI-compatible |
 | External scanner | OWASP ZAP (`ZapExecutor`, optional) |
+
+---
+
+## Download
+
+Prebuilt desktop apps are on the [**Releases**](https://github.com/SkDudu/sentinel/releases) page.
+
+| Platform | File |
+| --- | --- |
+| 🍎 macOS (Apple Silicon) | `Sentinel_<version>_aarch64.dmg` |
+| 🪟 Windows (x64) | `Sentinel_<version>_x64-setup.exe` or `.msi` |
+
+> [!NOTE]
+> Builds are not code-signed yet. macOS: run `xattr -cr /Applications/Sentinel.app` after installing. Windows: SmartScreen → *More info* → *Run anyway*. Details in [`docs/release.md`](./docs/release.md).
 
 ---
 

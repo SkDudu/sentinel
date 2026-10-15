@@ -1,0 +1,77 @@
+name: Desktop release
+
+# Tag push (v*) → builds macOS + Windows and opens a draft GitHub Release.
+# Manual run → builds and uploads the installers as workflow artifacts only.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            name: macOS (Apple Silicon)
+          - platform: windows-latest
+            name: Windows (x64)
+
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.platform }}
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.1
+
+      # The sidecar ships this runner's node binary; node:sqlite needs >= 22.5.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Build and bundle
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Skips the Finder AppleScript step of bundle_dmg.sh on headless runners.
+          CI: "true"
+        with:
+          projectPath: apps/desktop
+          tauriScript: pnpm tauri
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+          releaseName: Sentinel ${{ github.ref_name }}
+          releaseBody: |
+            Unsigned build — see [docs/release.md](https://github.com/${{ github.repository }}/blob/main/docs/release.md#instalando-build-não-assinado) to open it on macOS / Windows.
+          releaseDraft: true
+          prerelease: true
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: sentinel-${{ runner.os }}
+          path: |
+            apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
+            apps/desktop/src-tauri/target/release/bundle/msi/*.msi
+            apps/desktop/src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
