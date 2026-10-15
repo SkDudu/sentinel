@@ -18,7 +18,7 @@ Rodar o desktop (`pnpm --filter @sw/desktop dev` ou script do monorepo) contra A
 | 2 | **Endpoints** | Importar OpenAPI no dialog do ambiente (`examples/sample-openapi.json` ou contrato real) | Lista method/path no ambiente; reimport substitui o OpenAPI só daquele ambiente | ✅ Delete + detalhe mínimo no dialog; sem página Endpoints / CRUD manual/YAML |
 | 3 | **Scans (determinístico)** | Escolher env + endpoints → vars JSON se precisar → Run | Run no histórico; findings novos no projeto | ✅ Cancel + status rodando/cancelado/falhou; `test_results` gravados; store órfão removido |
 | 4 | **Findings** | Abrir lista → mudar status (OPEN → …) → refresh | Status persiste no SQLite | ✅ Evidência HTTP + filtros severity/status + export JSON/SARIF na UI |
-| 5 | **AI Lab** | Settings AI (ou seed offline) → gerar casos → aprovar subset → run `aiOnly` | Só casos aprovados disparam; findings aparecem | ✅ Persona edit + casos/aprovações em `data/ai-cases/` |
+| 5 | **AI Lab** | Settings AI (ou seed offline) → gerar casos → aprovar subset → run `aiOnly` | Só casos aprovados disparam; findings aparecem | ⏸ Removido da UI nesta versão (volta quando estabilizar) |
 | 6 | **CLI** | Mesmo DB `data/sentinel.db`: `sentinel scan --project … --format sarif` | Exit codes + relatório batem com findings da UI | ✅ Path absoluto logado; `--openapi` é efêmero; ZAP/plugins ainda só na CLI |
 
 ### Checklist rápido por bug
@@ -86,9 +86,9 @@ Schema em `packages/database` tem entidades sem repo/API/UI. Só implementar se 
 | --- | --- | --- | --- |
 | Projects | `apps/desktop/src/pages/projects/ProjectsPage.tsx` | `/api/projects`, `/api/environments`, `.../secret` | `@sw/database`, `@sw/auth` |
 | Endpoints | `.../environments/EnvironmentDetailDialog.tsx` | `/api/environments/:id/endpoints`, `.../openapi/import` | `@sw/api-parser`, `@sw/database` |
-| Scans | detalhe do ambiente (`.../scan`, `.../lab`) via `ScanWorkspace` | `POST /api/scans`, `GET .../runs` | `@sw/scan-runner`, `@sw/security-engine`, `@sw/test-registry` |
+| Scans | detalhe do ambiente (`.../scan`) via `ScanWorkspace` | `POST /api/scans`, `GET .../runs` | `@sw/scan-runner`, `@sw/security-engine`, `@sw/test-registry` |
 | Findings | `.../findings/FindingsPage.tsx` | `GET .../findings`, `PATCH /api/findings/:id/status` | `@sw/database`, `@sw/findings` (CLI/export) |
-| AI Lab | Scans + Settings | `/api/ai/*`, `/api/projects/:id/personas` | `@sw/ai-data-generator`, `@sw/ai` |
+| IA (interpretação) | Findings + Settings | `/api/ai/settings`, `/api/ai/interpret` | `@sw/ai` |
 | CLI | — | — | `apps/cli`, `@sw/scan-runner`, `@sw/findings` |
 
 Client HTTP da UI: `apps/desktop/src/services/api.ts`.  

@@ -104,7 +104,7 @@ Plugins: `--plugins examples/plugins` · ZAP: `--executor zap --zap-url http://1
 ```
 sentinel/
 ├── apps/
-│   ├── desktop/     # Workbench (Projects, Ambientes, AI Test Lab, Findings)
+│   ├── desktop/     # Workbench (Projects, Ambientes, Findings)
 │   └── cli/         # Scan headless
 ├── packages/
 │   ├── core/              # Tipos e schemas Zod
@@ -157,7 +157,7 @@ Novos testes de segurança entram em `@sw/test-registry` como plugins — não n
 3. Rode o scan em **Scans** (Bearer opcional só da execução)  
 4. Revise e atualize status em **Findings**
 
-AI Lab em **Scans**; secrets no vault (keychain no shell Tauri). Ver [roadmap](./docs/roadmap.md).
+Secrets no vault (keychain no shell Tauri). Ver [roadmap](./docs/roadmap.md).
 
 ---
 

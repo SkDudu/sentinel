@@ -7,9 +7,7 @@ import type {
   LoginRecipe,
   RateLimitConfig,
   ScanRun,
-  TestCase,
   TestCategory,
-  TestPersona,
   Variable,
 } from "@sw/core";
 
@@ -99,8 +97,6 @@ async function runScanStream(
     environmentId: string;
     endpointIds?: string[];
     bearerToken?: string;
-    approvedAiCases?: TestCase[];
-    aiOnly?: boolean;
     categories?: TestCategory[];
     variables?: Variable[];
     rateLimit?: Partial<RateLimitConfig>;
@@ -373,8 +369,6 @@ export const api = {
       environmentId: string;
       endpointIds?: string[];
       bearerToken?: string;
-      approvedAiCases?: TestCase[];
-      aiOnly?: boolean;
       categories?: TestCategory[];
       variables?: Variable[];
       rateLimit?: Partial<RateLimitConfig>;
@@ -401,100 +395,9 @@ export const api = {
       body: JSON.stringify(input),
     }),
 
-  generateAiCases: (input: {
-    projectId: string;
-    endpointIds?: string[];
-    allowPersonaSeed?: boolean;
-  }) =>
-    request<{
-      cases: TestCase[];
-      rejected: Array<{ id: string; name: string; reason: string }>;
-      mode: "ai" | "persona-seed";
-    }>("/api/ai/generate-cases", {
-      method: "POST",
-      body: JSON.stringify(input),
-    }),
-
   interpretFindings: (input: { projectId: string; findingIds?: string[] }) =>
     request<{ interpretation: string; count: number }>("/api/ai/interpret", {
       method: "POST",
       body: JSON.stringify(input),
-    }),
-
-  getAiCases: (projectId: string) =>
-    request<{
-      cases: TestCase[];
-      approvedIds: string[];
-      genMode?: string | null;
-      rejected?: Array<{ id: string; name: string; reason: string }>;
-      updatedAt: string;
-    }>(`/api/projects/${projectId}/ai-cases`),
-
-  saveAiCases: (
-    projectId: string,
-    input: {
-      cases: TestCase[];
-      approvedIds: string[];
-      genMode?: string | null;
-      rejected?: Array<{ id: string; name: string; reason: string }>;
-    },
-  ) =>
-    request<{
-      cases: TestCase[];
-      approvedIds: string[];
-      genMode?: string | null;
-      rejected?: Array<{ id: string; name: string; reason: string }>;
-      updatedAt: string;
-    }>(`/api/projects/${projectId}/ai-cases`, {
-      method: "PUT",
-      body: JSON.stringify(input),
-    }),
-
-  clearAiCases: (projectId: string) =>
-    request<{
-      cases: TestCase[];
-      approvedIds: string[];
-      updatedAt: string;
-    }>(`/api/projects/${projectId}/ai-cases`, { method: "DELETE" }),
-
-  listPersonas: (projectId: string) =>
-    request<TestPersona[]>(`/api/projects/${projectId}/personas`),
-
-  upsertPersona: (
-    projectId: string,
-    input: {
-      id?: string;
-      name: string;
-      description?: string;
-      fields: Record<string, unknown>;
-      tags?: string[];
-    },
-  ) =>
-    request<TestPersona>(`/api/projects/${projectId}/personas`, {
-      method: "POST",
-      body: JSON.stringify(input),
-    }),
-
-  updatePersona: (
-    projectId: string,
-    personaId: string,
-    input: {
-      name: string;
-      description?: string;
-      fields: Record<string, unknown>;
-      tags?: string[];
-    },
-  ) =>
-    request<TestPersona>(
-      `/api/projects/${projectId}/personas/${personaId}`,
-      {
-        method: "PUT",
-        body: JSON.stringify(input),
-      },
-    ),
-
-  deletePersona: (projectId: string, personaId: string) =>
-    request<void>(`/api/projects/${projectId}/personas/${personaId}`, {
-      method: "DELETE",
     }),
 };

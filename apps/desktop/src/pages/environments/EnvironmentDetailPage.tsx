@@ -55,12 +55,11 @@ import {
 import { ScanWorkspace } from "@/pages/scans/ScansPage";
 import { EnvironmentEndpointsPanel } from "./EnvironmentDetailDialog";
 
-type Section = "info" | "endpoints" | "scan" | "lab";
+type Section = "info" | "endpoints" | "scan";
 
 function sectionOf(pathname: string, base: string): Section {
   if (pathname === `${base}/endpoints`) return "endpoints";
   if (pathname === `${base}/scan`) return "scan";
-  if (pathname === `${base}/lab`) return "lab";
   return "info";
 }
 
@@ -388,7 +387,6 @@ export function EnvironmentDetailPage() {
       badge: endpointCount ?? undefined,
     },
     { href: `${base}/scan`, title: "Scan do ambiente" },
-    { href: `${base}/lab`, title: "AI Test Lab" },
   ];
 
   return (
@@ -555,16 +553,10 @@ export function EnvironmentDetailPage() {
 
       {/* Mantém montado: trocar aba não perde scan ao vivo nem runs. */}
       <div
-        className={
-          section === "scan" || section === "lab" ? "contents" : "hidden"
-        }
-        aria-hidden={section !== "scan" && section !== "lab"}
+        className={section === "scan" ? "contents" : "hidden"}
+        aria-hidden={section !== "scan"}
       >
-        <ScanWorkspace
-          project={project}
-          environmentId={environment.id}
-          view={section === "lab" ? "lab" : "scan"}
-        />
+        <ScanWorkspace project={project} environmentId={environment.id} />
       </div>
 
       <EnvironmentFormDialog
