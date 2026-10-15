@@ -1,0 +1,245 @@
+
+(node:40743) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+  VITE v6.4.3  ready in 485 ms
+
+  ➜  Local:   http://localhost:1420/
+  ➜  Network: use --host to expose
+  ➜  press h + enter to show help
+4:44:01 PM [vite] (client) hmr update /src/pages/projects/EnvironmentFormDialog.tsx, /src/index.cs:01 PM [vite] (client) hmr update /src/pages/projects/EnvironmentFormDialog.tsx, /src/index.css
+4:44:01 PM [vite] (client) hmr invalidate /src/pages/projects/EnvironmentFormDialog.tsx Could not Fast Refresh ("heade4:44Json" export is incompatible). Learn 
+4:44:01 PM [vite] (client) hmr invalidate /src/pages/projects/EnvironmentFormDialog.tsx Could not Fast Refresh ("headersToJson" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+4:44:01 PM [vite] (client) hmr update /src/index.css, /src/pages/environments/EnvironmentDetailPage.tsx, /src/pages/environments/EnvironmentsPage.tsx
+4:44:51 PM [vite] (client) hmr update /src/pages/projects/EnvironmentFormDialog.tsx, /src/index.css
+4:44:51 PM [vite] (client) hmr invalidate /src/pages/projects/EnvironmentFormDialog.tsx Could not Fast Refresh ("headersToJson" export is incompatible). Learn 
+4:44:51 PM [vite] (client) hmr invalidate /src/pages/projects/EnvironmentFormDialog.tsx Could not Fast Refresh ("headersToJson" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+4:44:51 PM [vite] (client) hmr update /src/index.css, /src/pages/environments/EnvironmentDetailPage.tsx, /src/pages/environments/EnvironmentsPage.tsx
+4:47:19 PM [vite] (client) hmr update /src/pages/projects/EnvironmentFormDialog.tsx, /src/index.css
+4:47:19 PM [vite] (client) hmr invalidate /src/pages/projects/EnvironmentFormDialog.tsx Could not Fast Refresh ("headersToJson" export is incompatible). Learn 
+4:47:19 PM [vite] (client) hmr invalidate /src/pages/projects/EnvironmentFormDialog.tsx Could not Fast Refresh ("headersToJson" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+4:47:19 PM [vite] (client) hmr update /src/index.css, /src/pages/environments/EnvironmentDetailPage.tsx, /src/pages/environments/EnvironmentsPage.tsx
+4:47:19 PM [vite] (client) hmr update /src/pages/projects/EnvironmentFormDialog.tsx, /src/index.css
+4:47:19 PM [vite] (client) hmr invalidate /src/pages/projects/EnvironmentFormDialog.tsx Could not Fast Refresh ("headersToJson" export is incompatible). Learn 
+4:47:19 PM [vite] (client) hmr invalidate /src/pages/projects/EnvironmentFormDialog.tsx Could not Fast Refresh ("headersToJson" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+4:47:19 PM [vite] (client) hmr update /src/index.css, /src/pages/environments/EnvironmentDetailPage.tsx, /src/pages/environments/EnvironmentsPage.tsx
+4:47:20 PM [vite] (client) hmr update /src/pages/projects/EnvironmentFormDialog.tsx, /src/index.css
+4:47:20 PM [vite] (client) hmr invalidate /src/pages/projects/EnvironmentFormDialog.tsx Could not Fast Refresh ("headersToJson" export is incompatible). Learn 
+4:47:20 PM [vite] (client) hmr invalidate /src/pages/projects/EnvironmentFormDialog.tsx Could not Fast Refresh ("headersToJson" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+4:47:20 PM [vite] (client) hmr update /src/index.css, /src/pages/environments/EnvironmentDetailPage.tsx, /src/pages/environments/EnvironmentsPage.tsx
+4:47:20 PM [vite] (client) hmr update /src/pages/projects/EnvironmentFormDialog.tsx, /src/index.css
+4:47:20 PM [vite] (client) hmr invalidate /src/pages/projects/EnvironmentFormDialog.tsx Could not Fast Refresh ("headersToJson" export is incompatible). Learn 
+4:47:20 PM [vite] (client) hmr invalidate /src/pages/projects/EnvironmentFormDialog.tsx Could not Fast Refresh ("headersToJson" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+4:47:20 PM [vite] (client) hmr update /src/index.css, /src/pages/environments/EnvironmentDetailPage.tsx, /src/pages/environments/EnvironmentsPage.tsx
+4:47:24 PM [vite] (client) hmr update /src/pages/projects/EnvironmentFormDialog.tsx, /src/index.css
+4:47:24 PM [vite] (client) hmr invalidate /src/pages/projects/EnvironmentFormDialog.tsx Could not Fast Refresh ("headersToJson" export is incompatible). Learn 
+4:47:24 PM [vite] (client) hmr invalidate /src/pages/projects/EnvironmentFormDialog.tsx Could not Fast Refresh ("headersToJson" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+4:47:24 PM [vite] (client) hmr update /src/index.css, /src/pages/environments/EnvironmentDetailPage.tsx, /src/pages/environments/EnvironmentsPage.tsx
+4:47:34 PM [vite] (client) hmr update /src/pages/projects/EnvironmentFormDialog.tsx, /src/index.css
+4:47:34 PM [vite] (client) hmr update /src/pages/projects/EnvironmentFormDialog.tsx, /src/index.css
+4:47:34 PM [vite] (client) hmr invalidate /src/pages/projects/EnvironmentFormDialog.tsx Could not Fast Refresh ("headersToJson" export is incompatible). Learn 
+4:47:34 PM [vite] (client) hmr invalidate /src/pages/projects/EnvironmentFormDialog.tsx Could not Fast Refresh ("headersToJson" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+4:47:34 PM [vite] (client) hmr update /src/index.css, /src/pages/environments/EnvironmentDetailPage.tsx, /src/pages/environments/EnvironmentsPage.tsx
+4:47:34 PM [vite] (client) hmr update /src/pages/projects/EnvironmentFormDialog.tsx, /src/index.css
+4:47:34 PM [vite] (client) hmr invalidate /src/pages/projects/EnvironmentFormDialog.tsx Could not Fast Refresh ("headersToJson" export is incompatible). Learn 
+4:47:34 PM [vite] (client) hmr invalidate /src/pages/projects/EnvironmentFormDialog.tsx Could not Fast Refresh ("headersToJson" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+4:47:34 PM [vite] (client) hmr update /src/index.css, /src/pages/environments/EnvironmentDetailPage.tsx, /src/pages/environments/EnvironmentsPage.tsx
+5:00:06 PM [vite] server/api-plugin.ts changed, restarting server...
+5:00:06 PM [vite] server restarted.
+5:00:07 PM [vite] server/api-plugin.ts changed, restarting server...
+failed to load config from /Users/argogrupo/Projetos/Pessoal/sentinel/apps/desktop/vite.config.ts
+5:00:07 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export 
+5:00:07 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export named 'generateStepBody'
+5:00:07 PM [vite] server restart failed
+5:00:08 PM [vite] (client) hmr update /src/index.css, /src/pages/dashboard/DashboardPage.tsx, /src/pages/flows/FlowEditorPage.tsx, /src/pages/projects/ProjectD
+5:00:08 PM [vite] (client) hmr update /src/index.css, /src/pages/dashboard/DashboardPage.tsx, /src/pages/flows/FlowEditorPage.tsx, /src/pages/projects/ProjectDashboardPage.tsx, /src/pages/flows/FlowsPage.tsx, /src/pages/settings/SettingsPage.tsx, /src/pages/findings/FindingsPage.tsx, /src/pages/environments/Environme
+5:00:08 PM [vite] (client) hmr update /src/index.css, /src/pages/dashboard/DashboardPage.tsx, /src/pages/flows/FlowEditorPage.tsx, /src/pages/projects/ProjectDashboardPage.tsx, /src/pages/flows/FlowsPage.tsx, /src/pages/settings/SettingsPage.tsx, /src/pages/findings/FindingsPage.tsx, /src/pages/environments/EnvironmentDetailPage.tsx, /src/components/layout/Shell.tsx, /src/pages/projects/ProjectsPage.tsx, /src/pages/environments/EnvironmentsPage.tsx, /src/components/app-sid
+5:00:08 PM [vite] (client) hmr update /src/index.css, /src/pages/dashboard/DashboardPage.tsx, /src/pages/flows/FlowEditorPage.tsx, /src/pages/projects/ProjectDashboardPage.tsx, /src/pages/flows/FlowsPage.tsx, /src/pages/settings/SettingsPage.tsx, /src/pages/findings/FindingsPage.tsx, /src/pages/environments/EnvironmentDetailPage.tsx, /src/components/layout/Shell.tsx, /src/pages/projects/ProjectsPage.tsx, /src/pages/environments/EnvironmentsPage.tsx, /src/components/app-sidebar.tsx, /src/pages/projects/ProjectDetailDialog.tsx, /src/pages/projects/EnvironmentFormDialog.tsx, /src/pages/environments/EnvironmentDetailDialog.tsx, /src
+5:00:08 PM [vite] (client) hmr update /src/index.css, /src/pages/dashboard/DashboardPage.tsx, /src/pages/flows/FlowEditorPage.tsx, /src/pages/projects/ProjectDashboardPage.tsx, /src/pages/flows/FlowsPage.tsx, /src/pages/settings/SettingsPage.tsx, /src/pages/findings/FindingsPage.tsx, /src/pages/environments/EnvironmentDetailPage.tsx, /src/components/layout/Shell.tsx, /src/pages/projects/ProjectsPage.tsx, /src/pages/environments/EnvironmentsPage.tsx, /src/components/app-sidebar.tsx, /src/pages/projects/ProjectDetailDialog.tsx, /src/pages/projects/EnvironmentFormDialog.tsx, /src/pages/environments/EnvironmentDetailDialog.tsx, /src/pages/environments/EnvironmentAccessPanel.tsx, /src/pages/scans/ScansPage.tsx, /src/pages/environments/PersonaBindingDialog.tsx, /src/pages/environments/Acces
+5:00:08 PM [vite] (client) hmr update /src/index.css, /src/pages/dashboard/DashboardPage.tsx, /src/pages/flows/FlowEditorPage.tsx, /src/pages/projects/ProjectDashboardPage.tsx, /src/pages/flows/FlowsPage.tsx, /src/pages/settings/SettingsPage.tsx, /src/pages/findings/FindingsPage.tsx, /src/pages/environments/EnvironmentDetailPage.tsx, /src/components/layout/Shell.tsx, /src/pages/projects/ProjectsPage.tsx, /src/pages/environments/EnvironmentsPage.tsx, /src/components/app-sidebar.tsx, /src/pages/projects/ProjectDetailDialog.tsx, /src/pages/projects/EnvironmentFormDialog.tsx, /src/pages/environments/EnvironmentDetailDialog.tsx, /src/pages/environments/EnvironmentAccessPanel.tsx, /src/pages/scans/ScansPage.tsx, /src/pages/environments/PersonaBindingDialog.tsx, /src/pages/environments/AccessMatrixSection.tsx
+5:00:19 PM [vite] (client) hmr update /src/pages/flows/StepPanel.tsx, /src/index.css
+5:00:21 PM [vite] (client) hmr update /src/pages/flows/StepPanel.tsx, /src/index.css
+5:00:22 PM [vite] (client) hmr update /src/pages/flows/StepPanel.tsx, /src/index.css
+5:00:23 PM [vite] (client) hmr update /src/pages/flows/StepPanel.tsx, /src/index.css
+5:00:24 PM [vite] (client) hmr update /src/pages/flows/FlowCanvas.tsx, /src/index.css
+5:00:24 PM [vite] (client) hmr update /src/pages/flows/FlowCanvas.tsx, /src/index.css
+5:00:26 PM [vite] (client) hmr update /src/pages/flows/FlowCanvas.tsx, /src/index.css
+5:00:27 PM [vite] (client) hmr update /src/pages/flows/FlowCanvas.tsx, /src/index.css
+5:00:30 PM [vite] (client) hmr update /src/pages/flows/StepPanel.tsx, /src/index.css
+5:00:34 PM [vite] (client) hmr update /src/pages/flows/StepPanel.tsx, /src/index.css
+5:00:34 PM [vite] (client) hmr update /src/pages/flows/StepPanel.tsx, /src/index.css
+5:00:34 PM [vite] (client) hmr update /src/pages/flows/StepPanel.tsx, /src/index.css
+5:00:34 PM [vite] (client) hmr update /src/pages/flows/FlowCanvas.tsx, /src/index.css
+5:00:40 PM [vite] (client) hmr update /src/pages/flows/StepPanel.tsx, /src/index.css
+5:00:40 PM [vite] (client) hmr update /src/pages/flows/StepPanel.tsx, /src/index.css
+5:00:45 PM [vite] (client) hmr update /src/pages/flows/FlowCanvas.tsx, /src/index.css
+5:00:52 PM [vite] (client) hmr update /src/pages/flows/FlowCanvas.tsx, /src/index.css
+5:04:20 PM [vite] server/api-plugin.ts changed, restarting server...
+failed to load config from /Users/argogrupo/Projetos/Pessoal/sentinel/apps/desktop/vite.config.ts (x2)
+5:04:20 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export 
+5:04:20 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export named 'generateStepBody'
+5:04:20 PM [vite] server restart failed
+5:04:36 PM [vite] server/api-plugin.ts changed, restarting server...
+failed to load config from /Users/argogrupo/Projetos/Pessoal/sentinel/apps/desktop/vite.config.ts (x3)
+5:04:36 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export 
+5:04:36 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export named 'generateStepBody'
+5:04:36 PM [vite] server restart failed
+5:05:09 PM [vite] (client) hmr update /src/pages/flows/FlowCanvas.tsx, /src/index.css
+5:05:09 PM [vite] (client) hmr update /src/pages/flows/FlowCanvas.tsx, /src/index.css
+5:05:09 PM [vite] (client) hmr update /src/pages/flows/FlowCanvas.tsx, /src/index.css
+5:05:10 PM [vite] (client) hmr update /src/pages/flows/FlowCanvas.tsx, /src/index.css
+5:05:11 PM [vite] (client) hmr update /src/pages/flows/FlowCanvas.tsx, /src/index.css
+5:05:11 PM [vite] (client) hmr update /src/pages/flows/StepPanel.tsx, /src/index.css
+5:05:12 PM [vite] (client) hmr update /src/pages/flows/StepPanel.tsx, /src/index.css
+5:05:12 PM [vite] (client) hmr update /src/pages/flows/StepPanel.tsx, /src/index.css
+5:05:13 PM [vite] (client) hmr update /src/index.css, /src/pages/dashboard/DashboardPage.tsx, /src/pages/flows/FlowEditorPage.tsx, /src/pages/projects/ProjectD
+5:05:13 PM [vite] (client) hmr update /src/index.css, /src/pages/dashboard/DashboardPage.tsx, /src/pages/flows/FlowEditorPage.tsx, /src/pages/projects/ProjectDashboardPage.tsx, /src/pages/flows/FlowsPage.tsx, /src/pages/settings/SettingsPage.tsx, /src/pages/findings/FindingsPage.tsx, /src/pages/environments/Environme
+5:05:13 PM [vite] (client) hmr update /src/index.css, /src/pages/dashboard/DashboardPage.tsx, /src/pages/flows/FlowEditorPage.tsx, /src/pages/projects/ProjectDashboardPage.tsx, /src/pages/flows/FlowsPage.tsx, /src/pages/settings/SettingsPage.tsx, /src/pages/findings/FindingsPage.tsx, /src/pages/environments/EnvironmentDetailPage.tsx, /src/components/layout/Shell.tsx, /src/pages/projects/ProjectsPage.tsx, /src/pages/environments/EnvironmentsPage.tsx, /src/components/app-sid
+5:05:13 PM [vite] (client) hmr update /src/index.css, /src/pages/dashboard/DashboardPage.tsx, /src/pages/flows/FlowEditorPage.tsx, /src/pages/projects/ProjectDashboardPage.tsx, /src/pages/flows/FlowsPage.tsx, /src/pages/settings/SettingsPage.tsx, /src/pages/findings/FindingsPage.tsx, /src/pages/environments/EnvironmentDetailPage.tsx, /src/components/layout/Shell.tsx, /src/pages/projects/ProjectsPage.tsx, /src/pages/environments/EnvironmentsPage.tsx, /src/components/app-sidebar.tsx, /src/pages/projects/ProjectDetailDialog.tsx, /src/pages/projects/EnvironmentFormDialog.tsx, /src/pages/environments/EnvironmentDetailDialog.tsx, /src
+5:05:13 PM [vite] (client) hmr update /src/index.css, /src/pages/dashboard/DashboardPage.tsx, /src/pages/flows/FlowEditorPage.tsx, /src/pages/projects/ProjectDashboardPage.tsx, /src/pages/flows/FlowsPage.tsx, /src/pages/settings/SettingsPage.tsx, /src/pages/findings/FindingsPage.tsx, /src/pages/environments/EnvironmentDetailPage.tsx, /src/components/layout/Shell.tsx, /src/pages/projects/ProjectsPage.tsx, /src/pages/environments/EnvironmentsPage.tsx, /src/components/app-sidebar.tsx, /src/pages/projects/ProjectDetailDialog.tsx, /src/pages/projects/EnvironmentFormDialog.tsx, /src/pages/environments/EnvironmentDetailDialog.tsx, /src/pages/environments/EnvironmentAccessPanel.tsx, /src/pages/scans/ScansPage.tsx, /src/pages/environments/PersonaBindingDialog.tsx, /src/pages/environments/Acces
+5:05:13 PM [vite] (client) hmr update /src/index.css, /src/pages/dashboard/DashboardPage.tsx, /src/pages/flows/FlowEditorPage.tsx, /src/pages/projects/ProjectDashboardPage.tsx, /src/pages/flows/FlowsPage.tsx, /src/pages/settings/SettingsPage.tsx, /src/pages/findings/FindingsPage.tsx, /src/pages/environments/EnvironmentDetailPage.tsx, /src/components/layout/Shell.tsx, /src/pages/projects/ProjectsPage.tsx, /src/pages/environments/EnvironmentsPage.tsx, /src/components/app-sidebar.tsx, /src/pages/projects/ProjectDetailDialog.tsx, /src/pages/projects/EnvironmentFormDialog.tsx, /src/pages/environments/EnvironmentDetailDialog.tsx, /src/pages/environments/EnvironmentAccessPanel.tsx, /src/pages/scans/ScansPage.tsx, /src/pages/environments/PersonaBindingDialog.tsx, /src/pages/environments/AccessMatrixSection.tsx, /src/pages/scans/ScanRunDetailDialog.tsx, /src/pages/flows/FlowCanvas.tsx
+5:05:13 PM [vite] (client) hmr invalidate /src/pages/flows/FlowEditorPage.tsx Could not Fast Refresh ("writeSteps" export is incompatible). Learn more at https
+5:05:13 PM [vite] (client) hmr invalidate /src/pages/flows/FlowEditorPage.tsx Could not Fast Refresh ("writeSteps" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+5:05:13 PM [vite] (client) hmr update /src/App.tsx, /src/index.css
+5:05:13 PM [vite] (client) hmr invalidate /src/pages/projects/EnvironmentFormDialog.tsx Could not Fast Refresh ("headersToJson" export is incompatible). Learn 
+5:05:13 PM [vite] (client) hmr invalidate /src/pages/projects/EnvironmentFormDialog.tsx Could not Fast Refresh ("headersToJson" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+5:05:13 PM [vite] (client) hmr update /src/index.css, /src/pages/environments/EnvironmentsPage.tsx, /src/pages/environments/EnvironmentDetailPage.tsx
+5:06:43 PM [vite] server/api-plugin.ts changed, restarting server...
+5:06:43 PM [vite] (client) hmr update /src/index.css, /src/pages/dashboard/DashboardPage.tsx, /src/pages/flows/FlowEditorPage.tsx, /src/pages/projects/ProjectD
+5:06:43 PM [vite] (client) hmr update /src/index.css, /src/pages/dashboard/DashboardPage.tsx, /src/pages/flows/FlowEditorPage.tsx, /src/pages/projects/ProjectDashboardPage.tsx, /src/pages/flows/FlowsPage.tsx, /src/pages/settings/SettingsPage.tsx, /src/pages/findings/FindingsPage.tsx, /src/pages/environments/Environme
+5:06:43 PM [vite] (client) hmr update /src/index.css, /src/pages/dashboard/DashboardPage.tsx, /src/pages/flows/FlowEditorPage.tsx, /src/pages/projects/ProjectDashboardPage.tsx, /src/pages/flows/FlowsPage.tsx, /src/pages/settings/SettingsPage.tsx, /src/pages/findings/FindingsPage.tsx, /src/pages/environments/EnvironmentDetailPage.tsx, /src/components/layout/Shell.tsx, /src/pages/projects/ProjectsPage.tsx, /src/pages/environments/EnvironmentsPage.tsx, /src/components/app-sid
+5:06:43 PM [vite] (client) hmr update /src/index.css, /src/pages/dashboard/DashboardPage.tsx, /src/pages/flows/FlowEditorPage.tsx, /src/pages/projects/ProjectDashboardPage.tsx, /src/pages/flows/FlowsPage.tsx, /src/pages/settings/SettingsPage.tsx, /src/pages/findings/FindingsPage.tsx, /src/pages/environments/EnvironmentDetailPage.tsx, /src/components/layout/Shell.tsx, /src/pages/projects/ProjectsPage.tsx, /src/pages/environments/EnvironmentsPage.tsx, /src/components/app-sidebar.tsx, /src/pages/projects/ProjectDetailDialog.tsx, /src/pages/projects/EnvironmentFormDialog.tsx, /src/pages/environments/EnvironmentDetailDialog.tsx, /src
+5:06:43 PM [vite] (client) hmr update /src/index.css, /src/pages/dashboard/DashboardPage.tsx, /src/pages/flows/FlowEditorPage.tsx, /src/pages/projects/ProjectDashboardPage.tsx, /src/pages/flows/FlowsPage.tsx, /src/pages/settings/SettingsPage.tsx, /src/pages/findings/FindingsPage.tsx, /src/pages/environments/EnvironmentDetailPage.tsx, /src/components/layout/Shell.tsx, /src/pages/projects/ProjectsPage.tsx, /src/pages/environments/EnvironmentsPage.tsx, /src/components/app-sidebar.tsx, /src/pages/projects/ProjectDetailDialog.tsx, /src/pages/projects/EnvironmentFormDialog.tsx, /src/pages/environments/EnvironmentDetailDialog.tsx, /src/pages/environments/EnvironmentAccessPanel.tsx, /src/pages/scans/ScansPage.tsx, /src/pages/environments/PersonaBindingDialog.tsx, /src/pages/environments/Acces
+5:06:43 PM [vite] (client) hmr update /src/index.css, /src/pages/dashboard/DashboardPage.tsx, /src/pages/flows/FlowEditorPage.tsx, /src/pages/projects/ProjectDashboardPage.tsx, /src/pages/flows/FlowsPage.tsx, /src/pages/settings/SettingsPage.tsx, /src/pages/findings/FindingsPage.tsx, /src/pages/environments/EnvironmentDetailPage.tsx, /src/components/layout/Shell.tsx, /src/pages/projects/ProjectsPage.tsx, /src/pages/environments/EnvironmentsPage.tsx, /src/components/app-sidebar.tsx, /src/pages/projects/ProjectDetailDialog.tsx, /src/pages/projects/EnvironmentFormDialog.tsx, /src/pages/environments/EnvironmentDetailDialog.tsx, /src/pages/environments/EnvironmentAccessPanel.tsx, /src/pages/scans/ScansPage.tsx, /src/pages/environments/PersonaBindingDialog.tsx, /src/pages/environments/AccessMatrixSection.tsx, /src/pages/scans/ScanRunDetailDialog.tsx, /src/pages/flows/FlowCanvas.tsx
+5:06:43 PM [vite] (client) hmr invalidate /src/pages/flows/FlowEditorPage.tsx Could not Fast Refresh ("writeSteps" export is incompatible). Learn more at https
+5:06:43 PM [vite] (client) hmr invalidate /src/pages/flows/FlowEditorPage.tsx Could not Fast Refresh ("writeSteps" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+5:06:43 PM [vite] (client) hmr update /src/App.tsx, /src/index.css
+5:06:43 PM [vite] (client) hmr invalidate /src/pages/projects/EnvironmentFormDialog.tsx Could not Fast Refresh ("headersToJson" export is incompatible). Learn 
+5:06:43 PM [vite] (client) hmr invalidate /src/pages/projects/EnvironmentFormDialog.tsx Could not Fast Refresh ("headersToJson" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+5:06:43 PM [vite] (client) hmr update /src/index.css, /src/pages/environments/EnvironmentsPage.tsx, /src/pages/environments/EnvironmentDetailPage.tsx
+failed to load config from /Users/argogrupo/Projetos/Pessoal/sentinel/apps/desktop/vite.config.ts (x4)
+5:06:43 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export 
+5:06:43 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export named 'generateStepBody'
+5:06:43 PM [vite] server restart failed
+5:06:44 PM [vite] server/api-plugin.ts changed, restarting server...
+failed to load config from /Users/argogrupo/Projetos/Pessoal/sentinel/apps/desktop/vite.config.ts (x5)
+5:06:44 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export 
+5:06:44 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export named 'generateStepBody'
+5:06:44 PM [vite] server restart failed
+5:06:44 PM [vite] server/api-plugin.ts changed, restarting server...
+failed to load config from /Users/argogrupo/Projetos/Pessoal/sentinel/apps/desktop/vite.config.ts (x6)
+5:06:44 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export 
+5:06:44 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export named 'generateStepBody'
+5:06:44 PM [vite] server restart failed
+5:06:47 PM [vite] (client) hmr update /src/pages/flows/FlowCanvas.tsx, /src/index.css
+5:09:43 PM [vite] server/ai-settings.ts changed, restarting server...
+failed to load config from /Users/argogrupo/Projetos/Pessoal/sentinel/apps/desktop/vite.config.ts (x7)
+5:09:43 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export 
+5:09:43 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export named 'generateStepBody'
+5:09:43 PM [vite] server restart failed
+5:09:43 PM [vite] server/ai-settings.ts changed, restarting server...
+failed to load config from /Users/argogrupo/Projetos/Pessoal/sentinel/apps/desktop/vite.config.ts (x8)
+5:09:43 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export 
+5:09:43 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export named 'generateStepBody'
+5:09:43 PM [vite] server restart failed
+5:09:44 PM [vite] server/ai-settings.ts changed, restarting server...
+failed to load config from /Users/argogrupo/Projetos/Pessoal/sentinel/apps/desktop/vite.config.ts (x9)
+5:09:44 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export 
+5:09:44 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export named 'generateStepBody'
+5:09:44 PM [vite] server restart failed
+5:09:45 PM [vite] server/ai-settings.ts changed, restarting server...
+failed to load config from /Users/argogrupo/Projetos/Pessoal/sentinel/apps/desktop/vite.config.ts (x10)
+5:09:45 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export 
+5:09:45 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export named 'generateStepBody'
+5:09:45 PM [vite] server restart failed
+5:09:45 PM [vite] server/ai-settings.ts changed, restarting server...
+5:09:45 PM [vite] server/ai-client.ts changed, restarting server...
+failed to load config from /Users/argogrupo/Projetos/Pessoal/sentinel/apps/desktop/vite.config.ts (x11)
+5:09:45 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export 
+5:09:45 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export named 'generateStepBody'
+5:09:45 PM [vite] server restart failed
+5:09:45 PM [vite] (client) hmr update /src/index.css, /src/pages/dashboard/DashboardPage.tsx, /src/pages/flows/FlowEditorPage.tsx, /src/pages/projects/ProjectD
+5:09:45 PM [vite] (client) hmr update /src/index.css, /src/pages/dashboard/DashboardPage.tsx, /src/pages/flows/FlowEditorPage.tsx, /src/pages/projects/ProjectDashboardPage.tsx, /src/pages/flows/FlowsPage.tsx, /src/pages/settings/SettingsPage.tsx, /src/pages/findings/FindingsPage.tsx, /src/pages/environments/Environme
+5:09:45 PM [vite] (client) hmr update /src/index.css, /src/pages/dashboard/DashboardPage.tsx, /src/pages/flows/FlowEditorPage.tsx, /src/pages/projects/ProjectDashboardPage.tsx, /src/pages/flows/FlowsPage.tsx, /src/pages/settings/SettingsPage.tsx, /src/pages/findings/FindingsPage.tsx, /src/pages/environments/EnvironmentDetailPage.tsx, /src/components/layout/Shell.tsx, /src/pages/projects/ProjectsPage.tsx, /src/pages/environments/EnvironmentsPage.tsx, /src/components/app-sid
+5:09:45 PM [vite] (client) hmr update /src/index.css, /src/pages/dashboard/DashboardPage.tsx, /src/pages/flows/FlowEditorPage.tsx, /src/pages/projects/ProjectDashboardPage.tsx, /src/pages/flows/FlowsPage.tsx, /src/pages/settings/SettingsPage.tsx, /src/pages/findings/FindingsPage.tsx, /src/pages/environments/EnvironmentDetailPage.tsx, /src/components/layout/Shell.tsx, /src/pages/projects/ProjectsPage.tsx, /src/pages/environments/EnvironmentsPage.tsx, /src/components/app-sidebar.tsx, /src/pages/projects/ProjectDetailDialog.tsx, /src/pages/projects/EnvironmentFormDialog.tsx, /src/pages/environments/EnvironmentDetailDialog.tsx, /src
+5:09:45 PM [vite] (client) hmr update /src/index.css, /src/pages/dashboard/DashboardPage.tsx, /src/pages/flows/FlowEditorPage.tsx, /src/pages/projects/ProjectDashboardPage.tsx, /src/pages/flows/FlowsPage.tsx, /src/pages/settings/SettingsPage.tsx, /src/pages/findings/FindingsPage.tsx, /src/pages/environments/EnvironmentDetailPage.tsx, /src/components/layout/Shell.tsx, /src/pages/projects/ProjectsPage.tsx, /src/pages/environments/EnvironmentsPage.tsx, /src/components/app-sidebar.tsx, /src/pages/projects/ProjectDetailDialog.tsx, /src/pages/projects/EnvironmentFormDialog.tsx, /src/pages/environments/EnvironmentDetailDialog.tsx, /src/pages/environments/EnvironmentAccessPanel.tsx, /src/pages/scans/ScansPage.tsx, /src/pages/environments/PersonaBindingDialog.tsx, /src/pages/environments/Acces
+5:09:45 PM [vite] (client) hmr update /src/index.css, /src/pages/dashboard/DashboardPage.tsx, /src/pages/flows/FlowEditorPage.tsx, /src/pages/projects/ProjectDashboardPage.tsx, /src/pages/flows/FlowsPage.tsx, /src/pages/settings/SettingsPage.tsx, /src/pages/findings/FindingsPage.tsx, /src/pages/environments/EnvironmentDetailPage.tsx, /src/components/layout/Shell.tsx, /src/pages/projects/ProjectsPage.tsx, /src/pages/environments/EnvironmentsPage.tsx, /src/components/app-sidebar.tsx, /src/pages/projects/ProjectDetailDialog.tsx, /src/pages/projects/EnvironmentFormDialog.tsx, /src/pages/environments/EnvironmentDetailDialog.tsx, /src/pages/environments/EnvironmentAccessPanel.tsx, /src/pages/scans/ScansPage.tsx, /src/pages/environments/PersonaBindingDialog.tsx, /src/pages/environments/AccessMatrixSection.tsx, /src/pages/scans/ScanRunDetailDialog.tsx, /src/pages/flows/FlowCanvas.tsx
+5:09:45 PM [vite] (client) hmr invalidate /src/pages/flows/FlowEditorPage.tsx Could not Fast Refresh ("writeSteps" export is incompatible). Learn more at https
+5:09:45 PM [vite] (client) hmr invalidate /src/pages/flows/FlowEditorPage.tsx Could not Fast Refresh ("writeSteps" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+5:09:45 PM [vite] (client) hmr update /src/App.tsx, /src/index.css
+5:09:45 PM [vite] (client) hmr invalidate /src/pages/projects/EnvironmentFormDialog.tsx Could not Fast Refresh ("headersToJson" export is incompatible). Learn 
+5:09:45 PM [vite] (client) hmr invalidate /src/pages/projects/EnvironmentFormDialog.tsx Could not Fast Refresh ("headersToJson" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+5:09:45 PM [vite] (client) hmr update /src/index.css, /src/pages/environments/EnvironmentsPage.tsx, /src/pages/environments/EnvironmentDetailPage.tsx
+5:09:46 PM [vite] (client) hmr update /src/pages/settings/SettingsPage.tsx, /src/index.css
+5:09:46 PM [vite] (client) hmr update /src/pages/settings/SettingsPage.tsx, /src/index.css
+5:09:47 PM [vite] server/api-plugin.ts changed, restarting server...
+failed to load config from /Users/argogrupo/Projetos/Pessoal/sentinel/apps/desktop/vite.config.ts (x12)
+5:09:47 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export 
+5:09:47 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export named 'generateStepBody'
+5:09:47 PM [vite] server restart failed
+5:19:11 PM [vite] server/ai-settings.ts changed, restarting server...
+failed to load config from /Users/argogrupo/Projetos/Pessoal/sentinel/apps/desktop/vite.config.ts (x13)
+5:19:11 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export 
+5:19:11 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export named 'generateStepBody'
+5:19:11 PM [vite] server restart failed
+5:25:56 PM [vite] server/ai-settings.ts changed, restarting server...
+failed to load config from /Users/argogrupo/Projetos/Pessoal/sentinel/apps/desktop/vite.config.ts (x14)
+5:25:56 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export 
+5:25:56 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export named 'generateStepBody'
+5:25:56 PM [vite] server restart failed
+5:25:57 PM [vite] server/api-plugin.ts changed, restarting server...
+failed to load config from /Users/argogrupo/Projetos/Pessoal/sentinel/apps/desktop/vite.config.ts (x15)
+5:25:57 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export 
+5:25:57 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export named 'generateStepBody'
+5:25:57 PM [vite] server restart failed
+5:26:03 PM [vite] server/api-plugin.ts changed, restarting server...
+failed to load config from /Users/argogrupo/Projetos/Pessoal/sentinel/apps/desktop/vite.config.ts (x16)
+5:26:03 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export 
+5:26:03 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export named 'generateStepBody'
+5:26:03 PM [vite] server restart failed
+5:26:04 PM [vite] server/api-plugin.ts changed, restarting server...
+failed to load config from /Users/argogrupo/Projetos/Pessoal/sentinel/apps/desktop/vite.config.ts (x17)
+5:26:04 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export 
+5:26:04 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export named 'generateStepBody'
+5:26:04 PM [vite] server restart failed
+5:26:04 PM [vite] server/api-plugin.ts changed, restarting server...
+failed to load config from /Users/argogrupo/Projetos/Pessoal/sentinel/apps/desktop/vite.config.ts (x18)
+5:26:04 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export 
+5:26:04 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export named 'generateStepBody'
+5:26:04 PM [vite] server restart failed
+5:26:05 PM [vite] server/api-plugin.ts changed, restarting server...
+failed to load config from /Users/argogrupo/Projetos/Pessoal/sentinel/apps/desktop/vite.config.ts (x19)
+5:26:05 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export 
+5:26:05 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export named 'generateStepBody'
+5:26:05 PM [vite] server restart failed
+5:26:19 PM [vite] server/api-plugin.ts changed, restarting server...
+5:26:19 PM [vite] (client) hmr update /src/index.css, /src/pages/dashboard/DashboardPage.tsx, /src/pages/flows/FlowEditorPage.tsx, /src/pages/projects/ProjectD
+5:26:19 PM [vite] (client) hmr update /src/index.css, /src/pages/dashboard/DashboardPage.tsx, /src/pages/flows/FlowEditorPage.tsx, /src/pages/projects/ProjectDashboardPage.tsx, /src/pages/flows/FlowsPage.tsx, /src/pages/settings/SettingsPage.tsx, /src/pages/findings/FindingsPage.tsx, /src/pages/environments/Environme
+5:26:19 PM [vite] (client) hmr update /src/index.css, /src/pages/dashboard/DashboardPage.tsx, /src/pages/flows/FlowEditorPage.tsx, /src/pages/projects/ProjectDashboardPage.tsx, /src/pages/flows/FlowsPage.tsx, /src/pages/settings/SettingsPage.tsx, /src/pages/findings/FindingsPage.tsx, /src/pages/environments/EnvironmentDetailPage.tsx, /src/components/layout/Shell.tsx, /src/pages/projects/ProjectsPage.tsx, /src/pages/environments/EnvironmentsPage.tsx, /src/components/app-sid
+5:26:19 PM [vite] (client) hmr update /src/index.css, /src/pages/dashboard/DashboardPage.tsx, /src/pages/flows/FlowEditorPage.tsx, /src/pages/projects/ProjectDashboardPage.tsx, /src/pages/flows/FlowsPage.tsx, /src/pages/settings/SettingsPage.tsx, /src/pages/findings/FindingsPage.tsx, /src/pages/environments/EnvironmentDetailPage.tsx, /src/components/layout/Shell.tsx, /src/pages/projects/ProjectsPage.tsx, /src/pages/environments/EnvironmentsPage.tsx, /src/components/app-sidebar.tsx, /src/pages/projects/ProjectDetailDialog.tsx, /src/pages/projects/EnvironmentFormDialog.tsx, /src/pages/environments/EnvironmentDetailDialog.tsx, /src
+5:26:19 PM [vite] (client) hmr update /src/index.css, /src/pages/dashboard/DashboardPage.tsx, /src/pages/flows/FlowEditorPage.tsx, /src/pages/projects/ProjectDashboardPage.tsx, /src/pages/flows/FlowsPage.tsx, /src/pages/settings/SettingsPage.tsx, /src/pages/findings/FindingsPage.tsx, /src/pages/environments/EnvironmentDetailPage.tsx, /src/components/layout/Shell.tsx, /src/pages/projects/ProjectsPage.tsx, /src/pages/environments/EnvironmentsPage.tsx, /src/components/app-sidebar.tsx, /src/pages/projects/ProjectDetailDialog.tsx, /src/pages/projects/EnvironmentFormDialog.tsx, /src/pages/environments/EnvironmentDetailDialog.tsx, /src/pages/environments/EnvironmentAccessPanel.tsx, /src/pages/scans/ScansPage.tsx, /src/pages/environments/PersonaBindingDialog.tsx, /src/pages/environments/Acces
+5:26:19 PM [vite] (client) hmr update /src/index.css, /src/pages/dashboard/DashboardPage.tsx, /src/pages/flows/FlowEditorPage.tsx, /src/pages/projects/ProjectDashboardPage.tsx, /src/pages/flows/FlowsPage.tsx, /src/pages/settings/SettingsPage.tsx, /src/pages/findings/FindingsPage.tsx, /src/pages/environments/EnvironmentDetailPage.tsx, /src/components/layout/Shell.tsx, /src/pages/projects/ProjectsPage.tsx, /src/pages/environments/EnvironmentsPage.tsx, /src/components/app-sidebar.tsx, /src/pages/projects/ProjectDetailDialog.tsx, /src/pages/projects/EnvironmentFormDialog.tsx, /src/pages/environments/EnvironmentDetailDialog.tsx, /src/pages/environments/EnvironmentAccessPanel.tsx, /src/pages/scans/ScansPage.tsx, /src/pages/environments/PersonaBindingDialog.tsx, /src/pages/environments/AccessMatrixSection.tsx, /src/pages/scans/ScanRunDetailDialog.tsx, /src/pages/flows/FlowCanvas.tsx
+5:26:19 PM [vite] (client) hmr invalidate /src/pages/flows/FlowEditorPage.tsx Could not Fast Refresh ("writeSteps" export is incompatible). Learn more at https
+5:26:19 PM [vite] (client) hmr invalidate /src/pages/flows/FlowEditorPage.tsx Could not Fast Refresh ("writeSteps" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+5:26:19 PM [vite] (client) hmr update /src/App.tsx, /src/index.css
+5:26:19 PM [vite] (client) hmr invalidate /src/pages/projects/EnvironmentFormDialog.tsx Could not Fast Refresh ("headersToJson" export is incompatible). Learn 
+5:26:19 PM [vite] (client) hmr invalidate /src/pages/projects/EnvironmentFormDialog.tsx Could not Fast Refresh ("headersToJson" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+5:26:19 PM [vite] (client) hmr update /src/index.css, /src/pages/environments/EnvironmentsPage.tsx, /src/pages/environments/EnvironmentDetailPage.tsx
+failed to load config from /Users/argogrupo/Projetos/Pessoal/sentinel/apps/desktop/vite.config.ts (x20)
+5:26:20 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export 
+5:26:20 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export named 'generateStepBody'
+5:26:20 PM [vite] server restart failed
+5:26:20 PM [vite] (client) hmr update /src/pages/settings/SettingsPage.tsx, /src/index.css
+5:26:21 PM [vite] (client) hmr update /src/pages/settings/SettingsPage.tsx, /src/index.css
+5:26:23 PM [vite] (client) hmr update /src/pages/settings/SettingsPage.tsx, /src/index.css
+5:30:11 PM [vite] server/api-plugin.ts changed, restarting server...
+failed to load config from /Users/argogrupo/Projetos/Pessoal/sentinel/apps/desktop/vite.config.ts (x21)
+5:30:11 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export 
+5:30:11 PM [vite] The requested module 'file:///Users/argogrupo/Projetos/Pessoal/sentinel/packages/ai-data-generator/dist/index.js' does not provide an export named 'generateStepBody'
+5:30:11 PM [vite] server restart failed
+5:30:11 PM [vite] (client) hmr update /src/pages/settings/SettingsPage.tsx, /src/index.css
+/Users/argogrupo/Projetos/Pessoal/sentinel/apps/desktop:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @sw/desktop@0.1.0 dev: `vite`
+Exit status 143
+ ELIFECYCLE  Command failed with exit code 143.4:44:01 PM [vite] (client) hmr invalidate /src/pages/projects/EnvironmentFormDialog.tsx Could not Fast Refresh ("headersToJson" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+4:44:01 PM [vite] (client) hmr update /src/index.css, /src/pagzsh: no such file or directory: @sw/desktop@0.1.0clear
