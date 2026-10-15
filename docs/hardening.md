@@ -67,7 +67,8 @@ Schema em `packages/database` tem entidades sem repo/API/UI. Só implementar se 
 
 - Plugins categoria **injection** (categoria no core, zero teste no registry)  
 - ZAP no desktop (adapter existe; CLI usa; desktop não)  
-- Keychain SO obrigatório (vault arquivo ok; Tauri keychain = fallback path)  
+- Keychain SO obrigatório (vault arquivo ok; Tauri keychain = fallback path). Hoje os comandos `secret_*` existem no Rust, mas a API (Vite/sidecar) não os chama — `createTauriKeychainStore` não tem uso  
+- Build nativo: só `aarch64-apple-darwin` testado; sem assinatura/notarização (Gatekeeper avisa em outra máquina); sidecar usa o `node` do host (~120 MB)  
 - SaaS, WAF, scanner web completo — fora de escopo ([product.md](./product.md))
 
 ### Regras de mudança neste modo

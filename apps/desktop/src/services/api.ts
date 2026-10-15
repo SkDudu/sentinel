@@ -10,6 +10,22 @@ import type {
   TestCategory,
   Variable,
 } from "@sw/core";
+import { isTauriRuntime } from "@/lib/keychain";
+
+type ApiInfo = { port: number; token: string };
+let apiInfo: Promise<ApiInfo | null> | undefined;
+
+/** Packaged app: API runs in a Node sidecar on a random port; dev: Vite serves `/api`. */
+async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  apiInfo ??= isTauriRuntime()
+    ? import("@tauri-apps/api/core").then(({ invoke }) => invoke<ApiInfo | null>("api_info"))
+    : Promise.resolve(null);
+  const info = await apiInfo;
+  if (!info) return fetch(path, init);
+  const headers = new Headers(init.headers);
+  headers.set("Authorization", `Bearer ${info.token}`);
+  return fetch(`http://127.0.0.1:${info.port}${path}`, { ...init, headers });
+}
 
 export type EnvironmentDto = Environment & {
   secretConfigured?: boolean;
@@ -103,7 +119,7 @@ async function runScanStream(
   },
   init?: { signal?: AbortSignal; onEvent?: (event: ScanLogEvent) => void },
 ): Promise<ScanResult> {
-  const response = await fetch("/api/scans", {
+  const response = await apiFetch("/api/scans", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -166,12 +182,12 @@ async function runScanStream(
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
+  const response = await apiFetch(path, {
+    ...init,
     headers: {
       "Content-Type": "application/json",
       ...(init?.headers ?? {}),
     },
-    ...init,
   });
 
   if (response.status === 204) {

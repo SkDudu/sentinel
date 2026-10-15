@@ -35,7 +35,7 @@
 | Packages core/engine/parser/ai-data | Scaffold funcional (build OK) |
 | Desktop Vite/React/Tailwind | UI + AI Test Lab + scans |
 | CLI | `sentinel scan` (OpenAPI ou `--project`) + JSON/SARIF |
-| Tauri | Scaffold em `apps/desktop/src-tauri` (build nativo precisa Rust) |
+| Tauri | `pnpm tauri:build` gera `.app`/`.dmg` (precisa Rust); API roda em sidecar Node |
 | shadcn/ui | Planejado; UI atual é Tailwind direto |
 | SQLite runtime | Drizzle ORM no runtime via `sqlite-proxy` + `node:sqlite` (sem native addon); arquivo em `data/sentinel.db` |
 | Secrets | Vault AES-256-GCM + `KeychainSecretStore` (Tauri/keyring) |
@@ -68,13 +68,17 @@ pnpm --filter @sw/cli dev scan --openapi examples/sample-openapi.json --base-url
 - Copiar Chromium (Electron) sem necessidade real
 - Bibliotecas de exploit ofensivo embutidas como feature default
 
-## Evolução Tauri
-
-Quando `rustc` estiver disponível:
+## Tauri (build nativo)
 
 ```bash
-cd apps/desktop
-pnpm dlx @tauri-apps/cli@latest init
+pnpm build
+pnpm tauri:build   # .app + .dmg em apps/desktop/src-tauri/target/release/bundle
 ```
 
 A UI existente em Vite continua; Tauri só empacota e expõe APIs nativas (FS, keychain, SQL).
+
+- **Dev (`tauri dev`)**: `/api` vem do plugin do Vite, como no browser.
+- **App empacotado**: a mesma API (`server/api-plugin.ts`) roda via `server/standalone.ts` num **sidecar Node** (binário `node` do host copiado por `scripts/build-sidecar.mjs`). Escuta só em `127.0.0.1`, porta aleatória, com bearer token gerado por execução; o Rust repassa porta/token à UI (`api_info`).
+- Dados do app empacotado em `app_data_dir` (macOS: `~/Library/Application Support/dev.sentinel.desktop/`), via `SENTINEL_DATA_DIR`.
+- `.dmg` em ambiente sem GUI: `CI=true pnpm tauri:build` (pula o AppleScript do Finder).
+- Ícones: fonte em `src-tauri/icons/app-icon.svg` → `pnpm --filter @sw/desktop tauri icon src-tauri/icons/app-icon.svg`.

@@ -71,7 +71,7 @@ pnpm build
 pnpm dev:desktop
 ```
 
-The UI runs at `http://localhost:1420`. Tauri shell: `pnpm tauri:dev`.
+The UI runs at `http://localhost:1420`. Tauri shell: `pnpm tauri:dev`. Native app (`.app` / `.dmg`): `pnpm tauri:build`.
 
 Optional AI config: copy `.env.example` to `.env` (defaults point to a local Ollama).
 

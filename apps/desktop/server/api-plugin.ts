@@ -45,7 +45,8 @@ import {
 } from "./ai-settings.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const dataDir = join(__dirname, "..", "..", "..", "data");
+const dataDir =
+  process.env.SENTINEL_DATA_DIR ?? join(__dirname, "..", "..", "..", "data");
 const defaultDbPath = join(dataDir, "sentinel.db");
 
 async function readJson<T>(req: IncomingMessage): Promise<T> {
