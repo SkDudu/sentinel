@@ -5,7 +5,7 @@
 Workflow: [`.github/workflows/desktop-release.yml`](../.github/workflows/desktop-release.yml)
 
 > [!TIP]
-> **Resumo:** `git tag v0.2.0 && git push --tags` → o GitHub Actions builda macOS + Windows em paralelo e abre um **release em rascunho** com os instaladores. Você revisa e clica em *Publish*.
+> **Resumo:** suba a versão no `tauri.conf.json` e dê push na `main` → o GitHub Actions builda macOS + Windows em paralelo e abre o **release em rascunho** `v<versão>` com os instaladores. Você revisa e clica em *Publish*. Sem tag manual.
 
 ---
 
@@ -13,7 +13,7 @@ Workflow: [`.github/workflows/desktop-release.yml`](../.github/workflows/desktop
 
 | Peça | Arquivo | Papel |
 | --- | --- | --- |
-| 🧱 Workflow | `.github/workflows/desktop-release.yml` | Matrix macOS + Windows, cache Rust, `tauri-action` |
+| 🧱 Workflow | `.github/workflows/desktop-release.yml` | Push na `main` → checa versão → matrix macOS + Windows → `tauri-action` |
 | 🟢 Sidecar Node | `apps/desktop/server/standalone.ts` | A mesma API do Vite rodando dentro do app empacotado |
 | 📦 Empacotador do sidecar | `apps/desktop/scripts/build-sidecar.mjs` | esbuild da API + binário `node` do runner + `playwright-core` |
 | 🦀 Shell Rust | `apps/desktop/src-tauri/src/lib.rs` | Sobe o sidecar, entrega porta/token à UI (`api_info`), mata no exit |
@@ -25,8 +25,10 @@ Workflow: [`.github/workflows/desktop-release.yml`](../.github/workflows/desktop
 
 ```mermaid
 flowchart LR
-    tag(["git push --tags<br/>v*"]) --> matrix{{Matrix}}
-    manual(["Run workflow<br/>manual"]) --> matrix
+    push(["push na main<br/>(apps/desktop, packages)"]) --> check{"v&lt;versão&gt;<br/>já publicada?"}
+    manual(["Run workflow<br/>manual"]) --> check
+    check -->|sim| skip(["pula o build"])
+    check -->|não| matrix{{Matrix}}
 
     matrix --> mac["macos-latest<br/>aarch64"]
     matrix --> win["windows-latest<br/>x64"]
@@ -43,13 +45,18 @@ flowchart LR
     win --> job
 
     s5 --> art[/"Artifacts do run"/]
-    s5 -->|só com tag| rel[/"Draft Release"/]
+    s5 --> rel[/"Draft Release v&lt;versão&gt;"/]
 ```
 
-| Gatilho | Builda | Cria release | Onde baixar |
-| --- | --- | --- | --- |
-| Push de tag `v*` | ✅ | ✅ rascunho + prerelease | aba **Releases** |
-| *Run workflow* (manual) | ✅ | — | aba **Actions** → run → *Artifacts* |
+| Situação | O que acontece |
+| --- | --- |
+| Push na `main` com versão nova | Builda e cria o rascunho `v<versão>` |
+| Novo push, versão ainda em rascunho | Builda de novo e **atualiza** os anexos do mesmo rascunho |
+| Push depois de publicar, sem subir versão | Job `check` pula o build — nada publicado é sobrescrito |
+| Push só em docs / README | Não roda (filtro `paths`) |
+| *Run workflow* (manual) | Mesma regra do push |
+
+Os instaladores de cada run também ficam em **Actions** → run → *Artifacts*.
 
 ---
 
@@ -71,16 +78,16 @@ O tamanho vem quase todo do runtime `node` embutido (necessário para `node:sqli
    - `apps/desktop/src-tauri/tauri.conf.json` → `"version"`
    - `apps/desktop/src-tauri/Cargo.toml` → `version`
    - `apps/desktop/package.json` → `"version"`
-2. **Commit** na `main`: `chore(release): v0.2.0`
-3. **Tag e push:**
+2. **Commit e push** na `main`:
    ```bash
-   git tag v0.2.0
-   git push origin main --tags
+   git commit -am "chore(release): v0.2.0"
+   git push
    ```
-4. **Publique:** em *Releases*, abra o rascunho `Sentinel v0.2.0`, revise os anexos e clique em *Publish release*.
+3. **Espere** o *Desktop release* terminar (~10 min) na aba **Actions**.
+4. **Publique:** em *Releases*, abra o rascunho `Sentinel v0.2.0`, revise os anexos e clique em *Publish release*. A tag `v0.2.0` é criada nesse momento.
 
-> [!NOTE]
-> Quer só testar o build sem release? Aba **Actions** → *Desktop release* → *Run workflow*.
+> [!IMPORTANT]
+> Depois de publicar, o workflow só volta a gerar release quando a versão subir. Pushes intermediários na mesma versão (antes de publicar) só atualizam o rascunho.
 
 ---
 

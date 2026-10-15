@@ -1,17 +1,48 @@
 name: Desktop release
 
-# Tag push (v*) → builds macOS + Windows and opens a draft GitHub Release.
-# Manual run → builds and uploads the installers as workflow artifacts only.
+# Push to main → builds macOS + Windows and creates/updates the draft release
+# v<version> (version from tauri.conf.json). Skipped once v<version> is published.
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+    paths:
+      - "apps/desktop/**"
+      - "packages/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/desktop-release.yml"
   workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: desktop-release
+  cancel-in-progress: false
+
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      published: ${{ steps.version.outputs.published }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Draft releases have no git tag yet, so an existing tag means "already published".
+      - id: version
+        run: |
+          version=$(jq -r .version apps/desktop/src-tauri/tauri.conf.json)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" > /dev/null; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::v$version is already published — bump the version in tauri.conf.json to release again."
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: check
+    if: needs.check.outputs.published == 'false'
     strategy:
       fail-fast: false
       matrix:
@@ -59,8 +90,8 @@ jobs:
         with:
           projectPath: apps/desktop
           tauriScript: pnpm tauri
-          tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
-          releaseName: Sentinel ${{ github.ref_name }}
+          tagName: v${{ needs.check.outputs.version }}
+          releaseName: Sentinel v${{ needs.check.outputs.version }}
           releaseBody: |
             Unsigned build — see [docs/release.md](https://github.com/${{ github.repository }}/blob/main/docs/release.md#instalando-build-não-assinado) to open it on macOS / Windows.
           releaseDraft: true
